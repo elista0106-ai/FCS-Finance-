@@ -223,8 +223,8 @@ tr:hover td{background:var(--bg2)}
 
     <!-- Filters -->
     <div class="filters">
-      <input type="text" id="q" placeholder="🔍 Поиск по заявке, клиенту..." style="width:200px" oninput="renderTable()">
-      <input type="number" id="q-amount" placeholder="💰 Сумма..." style="width:120px" oninput="renderTable()">
+      <input type="text" id="q" placeholder="🔍 Поиск..." style="width:180px" oninput="renderTable()">
+      <input type="number" id="q-amount" placeholder="💰 Сумма..." style="width:110px" oninput="renderTable()">
       <select id="f-dept" onchange="renderTable()">
         <option value="">Все направления</option>
         <option value="travel">Travel</option>
@@ -252,8 +252,58 @@ tr:hover td{background:var(--bg2)}
       </select>
       <input type="date" id="f-from" onchange="renderTable()" title="Дата от">
       <input type="date" id="f-to" onchange="renderTable()" title="Дата до">
-      <button class="btn btn-sm" onclick="clearFilters()">✕ Сбросить</button>
+      <button class="btn btn-sm" onclick="toggleExtraFilters()" id="btn-extra-filters">⚙ Ещё</button>
+      <button class="btn btn-sm" onclick="clearFilters()">✕ Сброс</button>
       <span style="font-size:11px;color:var(--text3);margin-left:4px" id="count-label"></span>
+    </div>
+
+    <!-- Расширенные фильтры -->
+    <div id="extra-filters" style="display:none;background:#FFFFF8;border:0.5px solid #FAC775;border-radius:var(--radius);padding:12px 16px;margin:0 0 8px;flex-wrap:wrap;gap:10px;align-items:center">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;width:100%;margin-bottom:4px">⚙ Дополнительные фильтры</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:5px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg2)">
+        <input type="checkbox" id="f-flagged" onchange="renderTable()">
+        <span>🚩 На контроле</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:5px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg2)">
+        <input type="checkbox" id="f-hint-dupe" onchange="renderTable()">
+        <span>⚠ Дубли по сделке</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:5px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg2)">
+        <input type="checkbox" id="f-hint-mixed" onchange="renderTable()">
+        <span>🔄 Разные счета</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:5px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg2)">
+        <input type="checkbox" id="f-hint-balance" onchange="renderTable()">
+        <span>↕ Есть остаток у клиента</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:5px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg2)">
+        <input type="checkbox" id="f-no-receipt" onchange="renderTable()">
+        <span>🧾 Без чека</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:5px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg2)">
+        <input type="checkbox" id="f-payment-received" onchange="renderTable()">
+        <span>✓ Деньги поступили</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:5px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg2)">
+        <input type="checkbox" id="f-no-payment-received" onchange="renderTable()">
+        <span>○ Деньги не поступили</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:5px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg2)">
+        <input type="checkbox" id="f-from-form" onchange="renderTable()">
+        <span>📝 От исполнителей</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:5px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg2)">
+        <input type="checkbox" id="f-has-client" onchange="renderTable()">
+        <span>👤 Есть ФИО клиента</span>
+      </label>
+      <select id="f-agent-pay" onchange="renderTable()" style="padding:5px 10px;border:0.5px solid var(--border2);border-radius:6px;background:var(--bg2);color:var(--text);font-size:12px">
+        <option value="">Тип расхода (любой)</option>
+        <option value="card_rf">Карта РФ</option>
+        <option value="foreign_card">Иностр. карта</option>
+        <option value="corp_card">Корп карта</option>
+        <option value="invoice">Счёт</option>
+        <option value="cash">Наличные</option>
+      </select>
     </div>
 
     <!-- Table -->
@@ -1177,6 +1227,47 @@ function getFilteredData(){
   if(from) data = data.filter(e=>(e.date||'')>=from);
   if(to) data = data.filter(e=>(e.date||'')<=to);
 
+  // Расширенные фильтры
+  const fFlagged = document.getElementById('f-flagged')?.checked;
+  const fDupe = document.getElementById('f-hint-dupe')?.checked;
+  const fMixed = document.getElementById('f-hint-mixed')?.checked;
+  const fBalance = document.getElementById('f-hint-balance')?.checked;
+  const fNoReceipt = document.getElementById('f-no-receipt')?.checked;
+  const fPayRec = document.getElementById('f-payment-received')?.checked;
+  const fNoPayRec = document.getElementById('f-no-payment-received')?.checked;
+  const fFromForm = document.getElementById('f-from-form')?.checked;
+  const fHasClient = document.getElementById('f-has-client')?.checked;
+  const fAgentPay = document.getElementById('f-agent-pay')?.value;
+
+  if(fFlagged) data = data.filter(e=>e.flagged);
+  if(fNoReceipt) data = data.filter(e=>!e.receipt_link);
+  if(fPayRec) data = data.filter(e=>e.payment_received);
+  if(fNoPayRec) data = data.filter(e=>!e.payment_received && e.amount>0);
+  if(fFromForm) data = data.filter(e=>e.from_form);
+  if(fHasClient) data = data.filter(e=>e.client_name);
+  if(fAgentPay) data = data.filter(e=>e.agent_pay_type===fAgentPay);
+
+  if(fDupe||fMixed||fBalance){
+    const {leadMap,clientMap} = buildSmartHints(monthEntries());
+    if(fDupe) data = data.filter(e=>{
+      const lead=getLeadNum(e.link||'');
+      return lead && leadMap[lead] && leadMap[lead].length>1;
+    });
+    if(fMixed) data = data.filter(e=>{
+      const incAcc=['qr','link','invoice'].includes(e.pay);
+      const incCard=e.pay==='personal';
+      const spCard=['card_rf'].includes(e.agent_pay_type);
+      const spAcc=['corp_card','invoice'].includes(e.agent_pay_type);
+      return e.amount>0 && e.agent_amount>0 && ((incAcc&&spCard)||(incCard&&spAcc));
+    });
+    if(fBalance) data = data.filter(e=>{
+      const name=(e.client_name||'').trim();
+      if(!name||!clientMap[name]) return false;
+      const {income,spent}=clientMap[name];
+      return income-spent>0 && spent>0;
+    });
+  }
+
   return data;
 }
 
@@ -1290,9 +1381,14 @@ function renderTable(){
       + (e.agent_pay_type ? `<div style="font-size:10px;color:var(--text3)">${AGENT_PAY[e.agent_pay_type]||e.agent_pay_type}</div>` : '')
       : '—';
 
-    return `<tr>
+    return `<tr style="${e.flagged?'background:#FFFBF5;border-left:3px solid #F59E0B':''}">
       <td><input type="checkbox" ${checked} onchange="onRowCheck('${e.id}',this)" style="cursor:pointer"></td>
-      <td>${lead?`<span style="color:#60A5FA;cursor:pointer;font-size:11px" onclick="filterByLead('${lead}')">#${lead}</span>`:'—'}</td>
+      <td style="white-space:nowrap">
+        ${lead?`<span style="color:var(--accent);cursor:pointer;font-size:11px" onclick="filterByLead('${lead}')">#${lead}</span>`:'—'}
+        <button onclick="toggleFlag('${e.id}',${!!e.flagged},this)" title="${e.flagged?'🚩 На контроле — нажмите чтобы снять':'Поставить на контроль'}"
+          style="margin-left:3px;padding:1px 5px;border-radius:4px;cursor:pointer;font-size:12px;border:none;background:none;opacity:${e.flagged?'1':'0.25'};transition:opacity 0.15s"
+          onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='${e.flagged?'1':'0.25'}'">🚩</button>
+      </td>
       <td><button class="${STATUS_C[e.status]||'s-pending'} s-btn" onclick="cycleStatus('${e.id}')">${STATUS_L[e.status]||'Ожидает'}</button></td>
       <td style="white-space:nowrap;font-size:11px;color:var(--text2)">${e.date||'—'}</td>
       <td><span class="dept-dot d-${e.dept}"></span><span style="font-size:11px">${DEPTS[e.dept]||e.dept}</span></td>
@@ -1867,9 +1963,33 @@ async function sendInvite(){
 }
 
 // ===== FILTERS =====
+async function toggleFlag(id, currentState, btn){
+  const newState = !currentState;
+  const {error} = await sb.from('entries').update({flagged: newState}).eq('id', id);
+  if(error){ showToast('Ошибка: '+error.message); return; }
+  const entry = entries.find(e=>e.id===id);
+  if(entry) entry.flagged = newState;
+  btn.style.opacity = newState ? '1' : '0.25';
+  btn.title = newState ? '🚩 На контроле — нажмите чтобы снять' : 'Поставить на контроль';
+  const row = btn.closest('tr');
+  if(row) row.style.cssText = newState ? 'background:#FFFBF5;border-left:3px solid #F59E0B' : '';
+  showToast(newState ? '🚩 Поставлено на контроль' : 'Снято с контроля');
+}
+
+function toggleExtraFilters(){
+  const el = document.getElementById('extra-filters');
+  const btn = document.getElementById('btn-extra-filters');
+  const isVisible = el.style.display !== 'none';
+  el.style.display = isVisible ? 'none' : 'flex';
+  btn.style.background = isVisible ? '' : '#FEF3E2';
+  btn.style.color = isVisible ? '' : '#854F0B';
+  btn.style.borderColor = isVisible ? '' : '#FAC775';
+}
+
 function clearFilters(){
-  ['q','f-from','f-to'].forEach(id=>document.getElementById(id).value='');
-  ['f-dept','f-status','f-pay'].forEach(id=>document.getElementById(id).value='');
+  ['q','q-amount','f-from','f-to'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['f-dept','f-status','f-pay','f-agent-pay'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['f-flagged','f-hint-dupe','f-hint-mixed','f-hint-balance','f-no-receipt','f-payment-received','f-no-payment-received','f-from-form','f-has-client'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
   renderTable();
 }
 
