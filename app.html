@@ -247,6 +247,7 @@ tr:hover td{background:var(--bg2)}
         <option value="link">По ссылке</option>
         <option value="foreign">Иностр. карта</option>
         <option value="corporate">Корп карта</option>
+        <option value="deposit">Депозит клиента</option>
       </select>
       <input type="date" id="f-from" onchange="renderTable()" title="Дата от">
       <input type="date" id="f-to" onchange="renderTable()" title="Дата до">
@@ -341,13 +342,14 @@ tr:hover td{background:var(--bg2)}
   <div class="grid2">
     <div class="field"><label>Сумма FCS (₽)</label><input type="number" id="m-amount" placeholder="0" oninput="calcModal()"></div>
     <div class="field"><label>Тип оплаты FCS</label>
-      <select id="m-pay" onchange="calcModal()">
+      <select id="m-pay" onchange="onPayChange();calcModal()">
         <option value="personal">Перевод на карту</option>
         <option value="invoice">По счёту</option>
         <option value="qr">По QR (1%)</option>
         <option value="link">По ссылке (3%)</option>
         <option value="foreign">Иностр. карта</option>
         <option value="corporate">Корп карта</option>
+        <option value="deposit">💰 Депозит клиента</option>
       </select>
     </div>
   </div>
@@ -614,7 +616,7 @@ let selectedIds = new Set();
 
 const DEPTS = {travel:'Travel',logistic:'Logistics',lifestyle:'Lifestyle',kbr:'КБР',vip:'VIP ⭐',internal:'Внутренний'};
 const DEPT_C = {travel:'#185FA5',logistic:'#0F6E56',lifestyle:'#B07820',kbr:'#993556',vip:'#7C3AED',internal:'#5A5448'};
-const PAYS = {personal:'Перевод на карту',foreign:'Иностр. карта',corporate:'Корп карта',invoice:'По счёту',qr:'По QR',link:'По ссылке'};
+const PAYS = {personal:'Перевод на карту',foreign:'Иностр. карта',corporate:'Корп карта',invoice:'По счёту',qr:'По QR',link:'По ссылке',deposit:'Депозит клиента'};
 const STATUS_L = {pending:'Ожидает',paid:'Оплачено',cancelled:'Отменено',partial:'Частично'};
 const STATUS_C = {pending:'s-pending',paid:'s-paid',cancelled:'s-cancelled',partial:'s-pending'};
 const AGENT_PAY = {card_rf:'Карта РФ',foreign_card:'Иностр. карта',invoice:'Счёт',corp_card:'Корп Карта',cash:'Наличные'};
@@ -989,110 +991,129 @@ function toggleDay(day){
 }
 
 // ===== КЛИЕНТЫ =====
+let activeClient = null;
 function renderClients(){
-  // Группируем все заявки по ФИО клиента
-  const clientMap = {};
+  if(activeClient){renderClientDetail(activeClient);return;}
+  const clientMap={};
   entries.forEach(e=>{
-    if(!e.client_name) return;
-    const name = e.client_name.trim();
-    if(!clientMap[name]) clientMap[name]={name,entries:[],totalDeposit:0,totalPaid:0,totalComm:0};
+    const name=(e.client_name||'').trim();
+    if(!name)return;
+    if(!clientMap[name])clientMap[name]={name,entries:[],depts:new Set()};
     clientMap[name].entries.push(e);
-    clientMap[name].totalDeposit += +e.deposit||0;
-    clientMap[name].totalPaid += +e.amount||0;
-    clientMap[name].totalComm += +e.commission||0;
+    if(e.dept)clientMap[name].depts.add(DEPTS[e.dept]||e.dept);
   });
-
-  const clients = Object.values(clientMap).sort((a,b)=>b.entries.length-a.entries.length);
-
-  const searchEl = document.getElementById('client-search');
-  const q = searchEl ? searchEl.value.toLowerCase() : '';
-  const filtered = q ? clients.filter(c=>c.name.toLowerCase().includes(q)) : clients;
-
-  if(!filtered.length){
-    document.getElementById('clients-view-content').innerHTML=`
-      <div style="text-align:center;padding:40px;color:var(--text3)">
-        <div style="font-size:32px;margin-bottom:12px">👥</div>
-        <div style="font-size:14px;margin-bottom:8px">Нет клиентов</div>
-        <div style="font-size:12px">Добавьте ФИО клиента в заявках чтобы они появились здесь</div>
-      </div>`;
+  Object.values(clientMap).forEach(c=>{
+    let bal=0;
+    c.entries.forEach(e=>{
+      bal+=+e.deposit||0;
+      if(e.pay==='deposit')bal-=+e.amount||0;
+    });
+    c.depositBalance=bal;
+    c.totalAmount=c.entries.reduce((s,e)=>s+(+e.amount||0),0);
+  });
+  const clients=Object.values(clientMap).sort((a,b)=>b.depositBalance-a.depositBalance);
+  if(!clients.length){
+    document.getElementById('clients-view-content').innerHTML=`<div style="text-align:center;padding:60px;color:var(--text3)"><div style="font-size:32px;margin-bottom:12px">👤</div><div style="font-size:14px">Нет данных о клиентах</div><div style="font-size:12px;margin-top:4px">Добавьте ФИО клиента при создании заявки</div></div>`;
     return;
   }
+  const withDep=clients.filter(c=>c.depositBalance>0);
+  const noDep=clients.filter(c=>c.depositBalance<=0);
+  const totalDep=withDep.reduce((s,c)=>s+c.depositBalance,0);
+  let html=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+    <div class="stat-card"><div class="stat-label">Всего клиентов</div><div class="stat-value" style="color:var(--accent)">${clients.length}</div></div>
+    <div class="stat-card"><div class="stat-label">С депозитом</div><div class="stat-value" style="color:#854F0B">${withDep.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Сумма депозитов</div><div class="stat-value" style="color:var(--green)">${fmt(Math.max(0,totalDep))} ₽</div></div>
+  </div>`;
+  if(withDep.length){html+=`<div style="font-size:11px;font-weight:600;color:#854F0B;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">💰 Есть остаток депозита</div>`;html+=withDep.map(c=>renderClientRow(c)).join('');}
+  if(noDep.length){html+=`<div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:8px;margin-top:16px;text-transform:uppercase;letter-spacing:0.05em">👤 Все клиенты</div>`;html+=noDep.map(c=>renderClientRow(c)).join('');}
+  document.getElementById('clients-view-content').innerHTML=html;
+}
 
-  const html = `
-    <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
-      <input type="text" id="client-search" placeholder="🔍 Поиск по клиенту..." 
-        style="padding:8px 12px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);font-size:13px;width:250px"
-        value="${q}" oninput="renderClients()">
-      <span style="font-size:12px;color:var(--text3)">${filtered.length} клиентов</span>
-    </div>
-    ${filtered.map(c=>{
-      const isExpanded = expandedDays.has('client_'+c.name);
-      const depositBalance = c.totalDeposit; // остаток депозита
-      const lastEntry = c.entries.sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0];
-      return `<div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden">
-        <div onclick="toggleDay('client_${c.name.replace(/'/g,'')}')"
-          style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;justify-content:space-between"
-          onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="width:36px;height:36px;border-radius:50%;background:#E6F1FB;color:#0C447C;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0">
-              ${c.name.split(' ').map(w=>w[0]).slice(0,2).join('')}
-            </div>
-            <div>
-              <div style="font-size:13px;font-weight:600;color:var(--text)">${c.name}</div>
-              <div style="font-size:11px;color:var(--text3)">${c.entries.length} заявок · последняя ${lastEntry?.date||'—'}</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="text-align:right">
-              <div style="font-size:11px;color:var(--text3)">Оборот</div>
-              <div style="font-size:13px;font-weight:500;color:var(--accent)">${fmt(c.totalPaid)} ₽</div>
-            </div>
-            <div style="text-align:right">
-              <div style="font-size:11px;color:var(--text3)">Комиссия</div>
-              <div style="font-size:13px;font-weight:500;color:var(--green)">${fmt(c.totalComm)} ₽</div>
-            </div>
-            ${depositBalance>0?`<div style="text-align:right;background:#FEF3E2;border:0.5px solid #FAC775;border-radius:6px;padding:6px 10px">
-              <div style="font-size:10px;color:#633806">Депозит</div>
-              <div style="font-size:13px;font-weight:600;color:#854F0B">${fmt(depositBalance)} ₽</div>
-            </div>`:''}
-            <span style="color:var(--text3);font-size:14px">${isExpanded?'▲':'▼'}</span>
-          </div>
-        </div>
+function renderClientRow(c){
+  const ini=c.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  return `<div onclick="openClient('${c.name.replace(/'/g,"\\'")}')" style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:12px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg2)'">
+    <div style="width:36px;height:36px;border-radius:50%;background:${c.depositBalance>0?'#FEF3E2':'var(--bg3)'};color:${c.depositBalance>0?'#854F0B':'var(--text3)'};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0">${ini}</div>
+    <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--text)">${c.name}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">${[...c.depts].join(' · ')} · ${c.entries.length} заявок · ${fmt(c.totalAmount)} ₽</div></div>
+    <div style="text-align:right">${c.depositBalance>0?`<div style="font-size:15px;font-weight:600;color:#854F0B">${fmt(c.depositBalance)} ₽</div><div style="font-size:10px;color:var(--text3)">депозит</div>`:`<div style="font-size:11px;color:var(--text3)">Нет депозита</div>`}</div>
+    <div style="color:var(--text3);font-size:16px">›</div>
+  </div>`;
+}
 
-        ${isExpanded?`
-        <div style="border-top:0.5px solid var(--border);overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;min-width:600px">
-            <thead><tr style="background:var(--bg3)">
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Дата</th>
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">№ заявки</th>
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Наименование</th>
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Отдел</th>
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Сумма FCS</th>
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Депозит</th>
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Статус</th>
-              <th style="padding:7px 12px"></th>
-            </tr></thead>
-            <tbody>
-              ${c.entries.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(e=>{
-                const lead=getLeadNum(e.link||'');
-                return `<tr style="border-top:0.5px solid var(--border)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
-                  <td style="padding:8px 12px;font-size:12px;color:var(--text2)">${e.date||'—'}</td>
-                  <td style="padding:8px 12px;font-size:12px"><span style="color:var(--accent)">${lead?'#'+lead:'—'}</span></td>
-                  <td style="padding:8px 12px;font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.service||'—'}</td>
-                  <td style="padding:8px 12px;font-size:11px"><span style="color:${DEPT_C[e.dept]||'var(--text2)'}">${DEPTS[e.dept]||e.dept}</span></td>
-                  <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--accent)">${e.amount>0?fmt(e.amount)+' ₽':'—'}</td>
-                  <td style="padding:8px 12px;font-size:12px;color:${e.deposit>0?'#854F0B':'var(--text3)'};font-weight:${e.deposit>0?'600':'400'}">${e.deposit>0?fmt(e.deposit)+' ₽':'—'}</td>
-                  <td style="padding:8px 12px"><span class="${STATUS_C[e.status]||'s-pending'} s-btn">${STATUS_L[e.status]||'Ожидает'}</span></td>
-                  <td style="padding:8px 12px"><button class="btn btn-sm" onclick="openEdit('${e.id}')">✏</button></td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>`:''}
-      </div>`;
-    }).join('')}`;
+function openClient(name){activeClient=name;renderClients();}
 
-  document.getElementById('clients-view-content').innerHTML = html;
+function renderClientDetail(name){
+  const ces=entries.filter(e=>(e.client_name||'').trim()===name).sort((a,b)=>b.date.localeCompare(a.date));
+  let bal=0;const ops=[];
+  ces.slice().reverse().forEach(e=>{
+    if((+e.deposit||0)>0){bal+=+e.deposit;ops.push({date:e.date,type:'topup',amount:+e.deposit,entry:e,bal});}
+    if(e.pay==='deposit'){bal-=+e.amount||0;ops.push({date:e.date,type:'spend',amount:+e.amount||0,entry:e,bal});}
+  });
+  ops.reverse();
+  const totalAmt=ces.reduce((s,e)=>s+(+e.amount||0),0);
+  const depts=[...new Set(ces.map(e=>DEPTS[e.dept]||e.dept).filter(Boolean))];
+  const ini=name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  let html=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <button class="btn btn-sm" onclick="activeClient=null;renderClients()">← Все клиенты</button>
+    <span style="font-size:14px;font-weight:600;color:var(--text)">${name}</span>
+  </div>
+  <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;display:flex;align-items:center;gap:14px">
+    <div style="width:48px;height:48px;border-radius:50%;background:${bal>0?'#FEF3E2':'var(--bg3)'};color:${bal>0?'#854F0B':'var(--text3)'};display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;flex-shrink:0">${ini}</div>
+    <div style="flex:1"><div style="font-size:16px;font-weight:600;color:var(--text)">${name}</div><div style="font-size:12px;color:var(--text3);margin-top:2px">${depts.join(' · ')} · ${ces.length} заявок · оборот ${fmt(totalAmt)} ₽</div></div>
+    ${bal>0?`<div style="text-align:right"><div style="font-size:11px;color:var(--text3)">Остаток депозита</div><div style="font-size:22px;font-weight:600;color:#854F0B">${fmt(bal)} ₽</div></div>`:''}
+  </div>
+  ${ops.length?`<div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden">
+    <div style="padding:12px 16px;border-bottom:0.5px solid var(--border);font-size:12px;font-weight:600;color:var(--text)">💰 История депозита</div>
+    ${ops.map(op=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 16px;border-bottom:0.5px solid var(--border);font-size:12px">
+      <div><span style="color:${op.type==='topup'?'#3B6D11':'#854F0B'};font-weight:500">${op.type==='topup'?'+ Пополнение':'− Списание'}</span>
+      <span style="color:var(--text3);margin-left:8px">${op.date}</span>
+      <span style="color:var(--text2);margin-left:8px;font-size:11px">${op.entry.service||'—'}</span></div>
+      <div style="display:flex;gap:16px;align-items:center">
+        <span style="font-weight:600;color:${op.type==='topup'?'#3B6D11':'#854F0B'}">${op.type==='topup'?'+':'-'}${fmt(op.amount)} ₽</span>
+        <span style="font-size:11px;color:var(--text3);min-width:90px;text-align:right">остаток: ${fmt(op.bal)} ₽</span>
+      </div>
+    </div>`).join('')}
+  </div>`:''}
+  <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    <div style="padding:12px 16px;border-bottom:0.5px solid var(--border);font-size:12px;font-weight:600;color:var(--text)">Все заявки (${ces.length})</div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:650px">
+      <thead><tr style="background:var(--bg3)">
+        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">№</th>
+        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Дата</th>
+        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Наименование</th>
+        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Отдел</th>
+        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Сумма</th>
+        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Тип</th>
+        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Депозит ±</th>
+        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Статус</th>
+        <th></th>
+      </tr></thead>
+      <tbody>${ces.map(e=>{
+        const lead=getLeadNum(e.link||'');
+        const isDep=e.pay==='deposit';
+        const hasDep=(+e.deposit||0)>0;
+        return `<tr style="border-top:0.5px solid var(--border);${isDep?'background:#FFFBF0':''}" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='${isDep?'#FFFBF0':''}'">
+          <td style="padding:8px 12px;font-size:12px"><span style="color:var(--accent)">${lead?'#'+lead:'—'}</span></td>
+          <td style="padding:8px 12px;font-size:11px;color:var(--text2);white-space:nowrap">${e.date}</td>
+          <td style="padding:8px 12px;font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.service}</td>
+          <td style="padding:8px 12px;font-size:11px"><span style="color:${DEPT_C[e.dept]||'var(--text2)'}">${DEPTS[e.dept]||e.dept}</span></td>
+          <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--accent)">${e.amount>0?fmt(e.amount)+' ₽':'—'}</td>
+          <td style="padding:8px 12px;font-size:11px">${isDep?'<span style="color:#854F0B;font-weight:500">💰 Депозит</span>':PAYS[e.pay]||e.pay||'—'}</td>
+          <td style="padding:8px 12px;font-size:11px">${hasDep?`<span style="color:#3B6D11">+${fmt(e.deposit)} ₽</span>`:''}${isDep?`<span style="color:#854F0B">-${fmt(e.amount)} ₽</span>`:''}</td>
+          <td style="padding:8px 12px"><span class="${STATUS_C[e.status]||'s-pending'} s-btn">${STATUS_L[e.status]||'Ожидает'}</span></td>
+          <td style="padding:8px 12px"><button class="btn btn-sm" onclick="openEdit('${e.id}')">✏</button></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>
+  </div>`;
+  document.getElementById('clients-view-content').innerHTML=html;
+}
+
+function filterByClient(name){switchTab('main');document.getElementById('q').value=name;renderTable();}
+
+function loadClientNamesList(){
+  const names=[...new Set(entries.map(e=>e.client_name).filter(Boolean))];
+  const dl=document.getElementById('client-names-list');
+  if(dl)dl.innerHTML=names.map(n=>`<option value="${n}">`).join('');
 }
 
 function filterByDept(dept){
