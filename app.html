@@ -1154,7 +1154,10 @@ function renderForeignCard(){
   const canEdit = currentProfile?.role !== 'viewer';
 
   const totalComm = data.reduce((s,e)=>s+(+e.commission||0),0);
-  const totalAgent = data.reduce((s,e)=>s+(+e.agent_amount||0),0);
+
+  // Где лежит комиссия иностр. карты
+  const commOnCard = data.filter(e=>e.pay==='personal').reduce((s,e)=>s+(+e.commission||0),0);
+  const commOnAcc = data.filter(e=>['qr','link','invoice'].includes(e.pay)).reduce((s,e)=>s+(+e.commission||0),0);
 
   // Группируем по валюте
   const byCurrency = {};
@@ -1166,15 +1169,6 @@ function renderForeignCard(){
     byCurrency[cur].comm+=+e.commission||0;
   });
 
-  // По отделам
-  const byDept = {};
-  data.forEach(e=>{
-    const d=DEPTS[e.dept]||e.dept||'Другое';
-    if(!byDept[d])byDept[d]={count:0,comm:0};
-    byDept[d].count++;
-    byDept[d].comm+=+e.commission||0;
-  });
-
   const CUR_COLORS={EUR:'#818CF8',USD:'#6EE7B7',AED:'#FCD34D',TRY:'#F9A8D4',KZT:'#FCA5A5',GBP:'#93C5FD',JPY:'#A5F3FC'};
 
   if(!data.length){
@@ -1183,10 +1177,32 @@ function renderForeignCard(){
   }
 
   let html = `
-    <!-- Сводка -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-      <div class="stat-card"><div class="stat-label">Валютных операций</div><div class="stat-value" style="color:#6B3FA0">${data.length}</div></div>
-      <div class="stat-card"><div class="stat-label">Комиссия иностр. карты</div><div class="stat-value" style="color:var(--green)">${fmt(totalComm)} ₽</div><div style="font-size:10px;color:var(--text3);margin-top:2px">Со всех отделов</div></div>
+    <!-- Сводка: общая комиссия + где лежит -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="stat-card">
+        <div class="stat-label">Валютных операций</div>
+        <div class="stat-value" style="color:#6B3FA0">${data.length}</div>
+      </div>
+      <div style="background:#F5FAF0;border:0.5px solid #C0DD97;border-radius:var(--radius);padding:12px 16px">
+        <div class="stat-label">💳 Комиссия на карте РФ</div>
+        <div class="stat-value" style="color:#3B6D11">${fmt(commOnCard)} ₽</div>
+        <div style="font-size:10px;color:#5A8A50;margin-top:2px">Клиент платил переводом</div>
+      </div>
+      <div style="background:#F0F7FF;border:0.5px solid #B5D4F4;border-radius:var(--radius);padding:12px 16px">
+        <div class="stat-label">🏦 Комиссия на счёту</div>
+        <div class="stat-value" style="color:#185FA5">${fmt(commOnAcc)} ₽</div>
+        <div style="font-size:10px;color:#5A8AC0;margin-top:2px">Клиент платил по QR / счёту</div>
+      </div>
+    </div>
+
+    <!-- Итого комиссия иностр. карты -->
+    <div style="background:#F5F0FF;border:0.5px solid #C0A8F4;border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:11px;color:#6B3FA0;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Итого комиссия иностранной карты</div>
+        <div style="font-size:24px;font-weight:700;color:#6B3FA0">${fmt(totalComm)} ₽</div>
+        <div style="font-size:11px;color:#8A60C0;margin-top:3px">Со всех отделов за выбранный период</div>
+      </div>
+      <div style="font-size:40px;opacity:0.3">💳</div>
     </div>
 
     <!-- По валютам -->
@@ -1200,22 +1216,6 @@ function renderForeignCard(){
           <div style="font-size:11px;color:var(--green);margin-top:3px">комиссия: ${fmt(d.comm)} ₽</div>
         </div>`;
       }).join('')}
-    </div>
-
-    <!-- По отделам -->
-    <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px">
-      <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:var(--text)">Комиссия по отделам (иностр. карта)</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        ${Object.entries(byDept).map(([dept,d])=>{
-          const deptKey=Object.keys(DEPTS).find(k=>DEPTS[k]===dept)||'';
-          const color=DEPT_C[deptKey]||'#9A9080';
-          return `<div style="background:var(--bg3);border-radius:8px;padding:8px 12px;border-left:3px solid ${color}">
-            <div style="font-size:10px;color:${color};margin-bottom:2px">${dept}</div>
-            <div style="font-size:13px;font-weight:500;color:var(--green)">+${fmt(d.comm)} ₽</div>
-            <div style="font-size:10px;color:var(--text3)">${d.count} заявок</div>
-          </div>`;
-        }).join('')}
-      </div>
     </div>
 
     <!-- Все заявки -->
@@ -1749,7 +1749,20 @@ function openEdit(id){
   document.getElementById('m-fx-commission-pct').value = e.foreign_commission||'';
   const isForex = (e.agent_currency||'RUB') !== 'RUB';
   document.getElementById('currency-convert-block').style.display = isForex ? 'block' : 'none';
-  if(isForex) document.getElementById('currency-label').textContent = e.agent_currency;
+  if(isForex){
+    document.getElementById('currency-label').textContent = e.agent_currency;
+    // Если курс не сохранён — подтягиваем из кошелька
+    if(!e.foreign_rate){
+      getRateFromWallet(e.agent_currency, e.date).then(rate=>{
+        if(rate>0){
+          document.getElementById('m-fx-rate').value = rate.toFixed(rate<1?4:2);
+          calcFx(); calcModal();
+        }
+      });
+    } else {
+      calcFx(); calcModal();
+    }
+  }
   document.getElementById('m-agent-pay-type').value = e.agent_pay_type||'';
   document.getElementById('m-receipt').value = e.receipt_link||'';
   document.getElementById('receipt-field').style.display = e.agent_pay_type==='corp_card'?'block':'none';
