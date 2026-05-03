@@ -67,7 +67,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 /* CONTENT */
 .content{padding:16px 20px}
 
-/* STATS */
+.stat-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:12px 16px}
+.stat-label{font-size:11px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.04em}
+.stat-value{font-size:20px;font-weight:600;color:var(--text)}
 .stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
 .stat{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:12px 16px;min-width:130px}
 .stat-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px}
@@ -199,6 +201,8 @@ tr:hover td{background:var(--bg2)}
     <div class="tab" id="tab-invoice" onclick="switchTab('invoice')">📄 По счёту <span class="cnt" id="cnt-invoice"></span></div>
     <div class="tab" id="tab-dept" onclick="switchTab('dept')">📊 По отделам <span class="cnt" id="cnt-dept"></span></div>
     <div class="tab" id="tab-days" onclick="switchTab('days')">📅 По дням</div>
+    <div class="tab" id="tab-clients" onclick="switchTab('clients')">👤 Клиенты</div>
+    <div class="tab" id="tab-clients" onclick="switchTab('clients')">👥 Клиенты</div>
   </div>
 
   <!-- Bulk action bar -->
@@ -218,7 +222,8 @@ tr:hover td{background:var(--bg2)}
 
     <!-- Filters -->
     <div class="filters">
-      <input type="text" id="q" placeholder="🔍 Поиск..." style="width:180px" oninput="renderTable()">
+      <input type="text" id="q" placeholder="🔍 Поиск по заявке, клиенту..." style="width:200px" oninput="renderTable()">
+      <input type="number" id="q-amount" placeholder="💰 Сумма..." style="width:120px" oninput="renderTable()">
       <select id="f-dept" onchange="renderTable()">
         <option value="">Все направления</option>
         <option value="travel">Travel</option>
@@ -258,7 +263,7 @@ tr:hover td{background:var(--bg2)}
               <th><input type="checkbox" id="cb-all" onchange="toggleAll(this)" style="cursor:pointer"></th>
               <th>№ заявки</th><th>Статус</th><th>Дата</th><th>Отдел</th>
               <th>Наименование</th><th>Сумма FCS</th><th>Тип оплаты</th>
-              <th>Расход</th><th>Комиссия</th><th>Метки</th><th>Контрагент</th>
+              <th>Расход</th><th>Комиссия</th><th>Метки</th><th>Клиент</th><th>Контрагент</th>
               <th style="color:#60A5FA">От кого</th><th></th>
             </tr>
           </thead>
@@ -305,6 +310,11 @@ tr:hover td{background:var(--bg2)}
       <div class="content" id="days-view-content"></div>
     </div>
 
+    <!-- Клиенты -->
+    <div id="view-clients" style="display:none">
+      <div class="content" id="clients-view-content"></div>
+    </div>
+
   </div>
 </div>
 
@@ -323,7 +333,11 @@ tr:hover td{background:var(--bg2)}
     </div>
   </div>
   <div class="field"><label>Наименование *</label><input type="text" id="m-service" placeholder="Что оформляем..."></div>
-  <div class="field"><label>Контрагент</label><input type="text" id="m-agent" placeholder="Кому платим"></div>
+  <div class="field"><label>ФИО клиента</label><input type="text" id="m-client-name" placeholder="Иванов Иван Иванович" list="client-names-list"><datalist id="client-names-list"></datalist></div>
+  <div class="grid2">
+    <div class="field"><label>ФИО клиента</label><input type="text" id="m-client-name" placeholder="Иванов Иван Иванович"></div>
+    <div class="field"><label>Контрагент</label><input type="text" id="m-agent" placeholder="Кому платим"></div>
+  </div>
   <div class="grid2">
     <div class="field"><label>Сумма FCS (₽)</label><input type="number" id="m-amount" placeholder="0" oninput="calcModal()"></div>
     <div class="field"><label>Тип оплаты FCS</label>
@@ -675,6 +689,7 @@ async function loadEntries(){
 
   renderMonthBar(months);
   renderAll();
+  loadClientNamesList();
 }
 
 async function syncNow(){
@@ -973,6 +988,113 @@ function toggleDay(day){
   renderDays();
 }
 
+// ===== КЛИЕНТЫ =====
+function renderClients(){
+  // Группируем все заявки по ФИО клиента
+  const clientMap = {};
+  entries.forEach(e=>{
+    if(!e.client_name) return;
+    const name = e.client_name.trim();
+    if(!clientMap[name]) clientMap[name]={name,entries:[],totalDeposit:0,totalPaid:0,totalComm:0};
+    clientMap[name].entries.push(e);
+    clientMap[name].totalDeposit += +e.deposit||0;
+    clientMap[name].totalPaid += +e.amount||0;
+    clientMap[name].totalComm += +e.commission||0;
+  });
+
+  const clients = Object.values(clientMap).sort((a,b)=>b.entries.length-a.entries.length);
+
+  const searchEl = document.getElementById('client-search');
+  const q = searchEl ? searchEl.value.toLowerCase() : '';
+  const filtered = q ? clients.filter(c=>c.name.toLowerCase().includes(q)) : clients;
+
+  if(!filtered.length){
+    document.getElementById('clients-view-content').innerHTML=`
+      <div style="text-align:center;padding:40px;color:var(--text3)">
+        <div style="font-size:32px;margin-bottom:12px">👥</div>
+        <div style="font-size:14px;margin-bottom:8px">Нет клиентов</div>
+        <div style="font-size:12px">Добавьте ФИО клиента в заявках чтобы они появились здесь</div>
+      </div>`;
+    return;
+  }
+
+  const html = `
+    <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <input type="text" id="client-search" placeholder="🔍 Поиск по клиенту..." 
+        style="padding:8px 12px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);font-size:13px;width:250px"
+        value="${q}" oninput="renderClients()">
+      <span style="font-size:12px;color:var(--text3)">${filtered.length} клиентов</span>
+    </div>
+    ${filtered.map(c=>{
+      const isExpanded = expandedDays.has('client_'+c.name);
+      const depositBalance = c.totalDeposit; // остаток депозита
+      const lastEntry = c.entries.sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0];
+      return `<div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden">
+        <div onclick="toggleDay('client_${c.name.replace(/'/g,'')}')"
+          style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;justify-content:space-between"
+          onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:36px;height:36px;border-radius:50%;background:#E6F1FB;color:#0C447C;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0">
+              ${c.name.split(' ').map(w=>w[0]).slice(0,2).join('')}
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text)">${c.name}</div>
+              <div style="font-size:11px;color:var(--text3)">${c.entries.length} заявок · последняя ${lastEntry?.date||'—'}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="text-align:right">
+              <div style="font-size:11px;color:var(--text3)">Оборот</div>
+              <div style="font-size:13px;font-weight:500;color:var(--accent)">${fmt(c.totalPaid)} ₽</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:11px;color:var(--text3)">Комиссия</div>
+              <div style="font-size:13px;font-weight:500;color:var(--green)">${fmt(c.totalComm)} ₽</div>
+            </div>
+            ${depositBalance>0?`<div style="text-align:right;background:#FEF3E2;border:0.5px solid #FAC775;border-radius:6px;padding:6px 10px">
+              <div style="font-size:10px;color:#633806">Депозит</div>
+              <div style="font-size:13px;font-weight:600;color:#854F0B">${fmt(depositBalance)} ₽</div>
+            </div>`:''}
+            <span style="color:var(--text3);font-size:14px">${isExpanded?'▲':'▼'}</span>
+          </div>
+        </div>
+
+        ${isExpanded?`
+        <div style="border-top:0.5px solid var(--border);overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;min-width:600px">
+            <thead><tr style="background:var(--bg3)">
+              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Дата</th>
+              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">№ заявки</th>
+              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Наименование</th>
+              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Отдел</th>
+              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Сумма FCS</th>
+              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Депозит</th>
+              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Статус</th>
+              <th style="padding:7px 12px"></th>
+            </tr></thead>
+            <tbody>
+              ${c.entries.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(e=>{
+                const lead=getLeadNum(e.link||'');
+                return `<tr style="border-top:0.5px solid var(--border)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+                  <td style="padding:8px 12px;font-size:12px;color:var(--text2)">${e.date||'—'}</td>
+                  <td style="padding:8px 12px;font-size:12px"><span style="color:var(--accent)">${lead?'#'+lead:'—'}</span></td>
+                  <td style="padding:8px 12px;font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.service||'—'}</td>
+                  <td style="padding:8px 12px;font-size:11px"><span style="color:${DEPT_C[e.dept]||'var(--text2)'}">${DEPTS[e.dept]||e.dept}</span></td>
+                  <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--accent)">${e.amount>0?fmt(e.amount)+' ₽':'—'}</td>
+                  <td style="padding:8px 12px;font-size:12px;color:${e.deposit>0?'#854F0B':'var(--text3)'};font-weight:${e.deposit>0?'600':'400'}">${e.deposit>0?fmt(e.deposit)+' ₽':'—'}</td>
+                  <td style="padding:8px 12px"><span class="${STATUS_C[e.status]||'s-pending'} s-btn">${STATUS_L[e.status]||'Ожидает'}</span></td>
+                  <td style="padding:8px 12px"><button class="btn btn-sm" onclick="openEdit('${e.id}')">✏</button></td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`:''}
+      </div>`;
+    }).join('')}`;
+
+  document.getElementById('clients-view-content').innerHTML = html;
+}
+
 function filterByDept(dept){
   switchTab('main');
   document.getElementById('f-dept').value = dept;
@@ -999,9 +1121,17 @@ function getFilteredData(){
     const linkNum = (e.link||'').replace(/\D/g,'');
     return (e.service||'').toLowerCase().includes(q) ||
            (e.agent||'').toLowerCase().includes(q) ||
+           (e.client_name||'').toLowerCase().includes(q) ||
            (e.link||'').toLowerCase().includes(q) ||
            linkNum.includes(q.replace(/\D/g,''));
   });
+
+  // Поиск по сумме
+  const qAmt = document.getElementById('q-amount')?.value;
+  if(qAmt && +qAmt > 0){
+    const amt = +qAmt;
+    data = data.filter(e=>Math.abs((+e.amount||0)-amt)<1 || Math.abs((+e.agent_amount||0)-amt)<1 || Math.abs((+e.commission||0)-amt)<1);
+  }
   if(dept) data = data.filter(e=>e.dept===dept);
   if(status) data = data.filter(e=>e.status===status);
   if(pay) data = data.filter(e=>e.pay===pay);
@@ -1055,8 +1185,9 @@ function renderTable(){
       <td style="font-size:11px;color:var(--amber)">${agentAmt}</td>
       <td style="color:var(--green);white-space:nowrap">${e.commission>0?'+'+fmt(e.commission)+' ₽':'—'}</td>
       <td style="white-space:nowrap">${badges||'—'}</td>
+      <td style="font-size:11px;color:var(--text);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.client_name||''}">${e.client_name||'—'}</td>
       <td style="font-size:11px;color:var(--text2);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.agent||'—'}</td>
-      <td style="font-size:11px;color:#60A5FA;white-space:nowrap">${e.from_form?(e._submitter_name||'исполнитель'):'—'}</td>
+      <td style="font-size:11px;color:var(--accent);white-space:nowrap">${e.from_form?(e._submitter_name||'исполнитель'):'—'}</td>
       <td style="white-space:nowrap">
         ${canEdit?`<button class="btn btn-sm" onclick="openEdit('${e.id}')">✏️</button>`:''}
         ${canDelete?`<button class="btn btn-sm" onclick="deleteEntry('${e.id}')" style="color:var(--red)">🗑</button>`:''}
@@ -1072,7 +1203,7 @@ function renderTable(){
 function switchTab(t){
   activeTab = t;
   clearSelection();
-  ['main','loss','expense','corp','invoice','treasury','dept','days'].forEach(tab=>{
+  ['main','loss','expense','corp','invoice','treasury','dept','days','clients'].forEach(tab=>{
     const v = document.getElementById('view-'+tab);
     const b = document.getElementById('tab-'+tab);
     if(v) v.style.display = tab===t?'block':'none';
@@ -1081,6 +1212,7 @@ function switchTab(t){
   if(t==='treasury') renderTreasury();
   else if(t==='dept') renderDeptView();
   else if(t==='days') renderDays();
+  else if(t==='clients') renderClients();
   else renderTable();
 }
 
@@ -1104,6 +1236,8 @@ function openAddEntry(){
   document.getElementById('m-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('m-dept').value = 'logistic';
   document.getElementById('m-service').value = '';
+  document.getElementById('m-client-name').value = '';
+  document.getElementById('m-client-name').value = '';
   document.getElementById('m-agent').value = '';
   document.getElementById('m-amount').value = '';
   document.getElementById('m-pay').value = 'personal';
@@ -1144,6 +1278,8 @@ function openEdit(id){
   document.getElementById('m-date').value = e.date||'';
   document.getElementById('m-dept').value = e.dept||'logistic';
   document.getElementById('m-service').value = e.service||'';
+  document.getElementById('m-client-name').value = e.client_name||'';
+  document.getElementById('m-client-name').value = e.client_name||'';
   document.getElementById('m-agent').value = e.agent||'';
   document.getElementById('m-amount').value = e.amount||'';
   document.getElementById('m-pay').value = e.pay||'personal';
@@ -1421,6 +1557,7 @@ async function saveEntry(){
     date: document.getElementById('m-date').value,
     dept: document.getElementById('m-dept').value,
     service,
+    client_name: document.getElementById('m-client-name').value.trim()||null,
     agent: document.getElementById('m-agent').value.trim(),
     amount: +document.getElementById('m-amount').value||0,
     currency: 'RUB',
@@ -1661,7 +1798,115 @@ function showToast(msg){
   toastTimer = setTimeout(()=>t.style.display='none', 3000);
 }
 
-// ===== AUTO REFRESH — уведомление о новых заявках =====
+// ===== КЛИЕНТЫ =====
+function renderClients(){
+  // Собираем всех клиентов из всех записей
+  const clientMap = {};
+  entries.forEach(e=>{
+    const name = (e.client_name||'').trim();
+    if(!name) return;
+    if(!clientMap[name]) clientMap[name] = {
+      name, entries:[], totalDeposit:0, totalAmount:0, depts:new Set()
+    };
+    clientMap[name].entries.push(e);
+    clientMap[name].totalAmount += +e.amount||0;
+    clientMap[name].totalDeposit += +e.deposit||0;
+    if(e.dept) clientMap[name].depts.add(DEPTS[e.dept]||e.dept);
+  });
+
+  const clients = Object.values(clientMap).sort((a,b)=>b.totalDeposit-a.totalDeposit);
+
+  if(!clients.length){
+    document.getElementById('clients-view-content').innerHTML=`
+      <div style="text-align:center;padding:60px;color:var(--text3)">
+        <div style="font-size:32px;margin-bottom:12px">👤</div>
+        <div style="font-size:14px;margin-bottom:8px">Нет данных о клиентах</div>
+        <div style="font-size:12px">Добавьте ФИО клиента при создании или редактировании заявки</div>
+      </div>`;
+    return;
+  }
+
+  const withDeposit = clients.filter(c=>c.totalDeposit>0);
+  const withoutDeposit = clients.filter(c=>c.totalDeposit<=0);
+
+  let html = '';
+
+  // Статистика
+  html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+    <div class="stat-card"><div class="stat-label">Всего клиентов</div><div class="stat-value" style="color:var(--accent)">${clients.length}</div></div>
+    <div class="stat-card"><div class="stat-label">С депозитом</div><div class="stat-value" style="color:var(--amber)">${withDeposit.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Сумма депозитов</div><div class="stat-value" style="color:var(--green)">${fmt(withDeposit.reduce((s,c)=>s+c.totalDeposit,0))} ₽</div></div>
+  </div>`;
+
+  // Клиенты с депозитом
+  if(withDeposit.length){
+    html += `<div style="font-size:12px;font-weight:600;color:var(--amber);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">💰 Есть остаток депозита</div>`;
+    html += withDeposit.map(c=>renderClientCard(c)).join('');
+  }
+
+  // Остальные клиенты
+  if(withoutDeposit.length){
+    html += `<div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px;margin-top:16px;text-transform:uppercase;letter-spacing:0.05em">👤 Все клиенты</div>`;
+    html += withoutDeposit.map(c=>renderClientCard(c)).join('');
+  }
+
+  document.getElementById('clients-view-content').innerHTML = html;
+}
+
+function renderClientCard(c){
+  const initials = c.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  const lastEntries = c.entries.slice(0,3);
+  return `<div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+      <div style="width:38px;height:38px;border-radius:50%;background:${c.totalDeposit>0?'#FEF3E2':'#EFEFED'};
+        color:${c.totalDeposit>0?'#854F0B':'var(--text3)'};
+        display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0">${initials}</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:500;color:var(--text)">${c.name}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:1px">${[...c.depts].join(' · ')} · ${c.entries.length} заявок</div>
+      </div>
+      <div style="text-align:right">
+        ${c.totalDeposit>0?`
+          <div style="font-size:11px;color:var(--text3)">Остаток депозита</div>
+          <div style="font-size:16px;font-weight:600;color:#854F0B">${fmt(c.totalDeposit)} ₽</div>
+        `:`<div style="font-size:11px;color:var(--text3)">Депозита нет</div>`}
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">Всего оборот: ${fmt(c.totalAmount)} ₽</div>
+      </div>
+    </div>
+    <!-- Последние заявки -->
+    <div style="border-top:0.5px solid var(--border);padding-top:8px">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Последние заявки</div>
+      ${lastEntries.map(e=>{
+        const lead = getLeadNum(e.link||'');
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:0.5px solid var(--border);font-size:12px">
+          <div style="display:flex;gap:8px;align-items:center">
+            ${lead?`<span style="color:var(--accent)">#${lead}</span>`:''}
+            <span style="color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.service}</span>
+            <span style="color:var(--text3)">${e.date}</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="color:var(--accent);font-weight:500">${e.amount>0?fmt(e.amount)+' ₽':'—'}</span>
+            ${e.deposit>0?`<span style="color:#854F0B;font-size:11px">деп: ${fmt(e.deposit)} ₽</span>`:''}
+            <button class="btn btn-sm" onclick="openEdit('${e.id}')">✏</button>
+          </div>
+        </div>`;
+      }).join('')}
+      ${c.entries.length>3?`<div style="font-size:11px;color:var(--accent);margin-top:6px;cursor:pointer" onclick="filterByClient('${c.name}')">Показать все ${c.entries.length} заявок →</div>`:''}
+    </div>
+  </div>`;
+}
+
+function filterByClient(name){
+  switchTab('main');
+  document.getElementById('q').value = name;
+  renderTable();
+}
+
+function loadClientNamesList(){
+  const names = [...new Set(entries.map(e=>e.client_name).filter(Boolean))];
+  const dl = document.getElementById('client-names-list');
+  if(dl) dl.innerHTML = names.map(n=>`<option value="${n}">`).join('');
+}
 let lastEntryCount = 0;
 let autoRefreshTimer = null;
 
