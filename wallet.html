@@ -289,8 +289,10 @@ function renderHistory(){
       </div>
       <div style="text-align:right">
         <div style="font-weight:600;color:${isTopup?color:'#F87171'}">${isTopup?'+':'−'}${fmtCur(op.amount,op.currency)} ${sym}</div>
-        ${isTopup?`<div style="font-size:10px;color:var(--text3)">${fmt(op.rub)} ₽</div>`:''}
-        ${!isTopup?`<button onclick="window.location.href='app.html'" style="font-size:10px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;margin-top:2px">в журнале →</button>`:''}
+    ${isTopup?`<div style="display:flex;gap:6px;margin-top:4px;justify-content:flex-end">
+        <button onclick="editTopup('${op.id}')" style="font-size:10px;color:var(--text3);background:none;border:0.5px solid var(--border2);border-radius:4px;padding:2px 8px;cursor:pointer">✏ Изм.</button>
+        <button onclick="deleteTopup('${op.id}')" style="font-size:10px;color:#A32D2D;background:none;border:0.5px solid #F7C1C1;border-radius:4px;padding:2px 8px;cursor:pointer">✕ Удалить</button>
+      </div>`:`<button onclick="window.location.href='app.html'" style="font-size:10px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;margin-top:2px">в журнале →</button>`}
       </div>
     </div>`;
   }).join('');
@@ -298,6 +300,7 @@ function renderHistory(){
 
 // ===== ПОПОЛНЕНИЕ =====
 function openAddTopup(){
+  editingTopupId=null;
   document.getElementById('m-date').value=new Date().toISOString().split('T')[0];
   document.getElementById('m-amount-cur').value='';
   document.getElementById('m-amount-rub').value='';
@@ -329,17 +332,44 @@ async function saveTopup(){
   const amtCur=+document.getElementById('m-amount-cur').value||0;
   const amtRub=+document.getElementById('m-amount-rub').value||0;
   if(!date||!amtCur||!amtRub){showToast('Заполните все поля');return;}
-  const {error}=await sb.from('currency_topups').insert({
-    date,currency,
-    amount_currency:amtCur,
-    amount_rub:amtRub,
-    note:document.getElementById('m-note').value.trim()||null,
-    created_by:currentUserId
-  });
+
+  const payload={date,currency,amount_currency:amtCur,amount_rub:amtRub,
+    note:document.getElementById('m-note').value.trim()||null,created_by:currentUserId};
+
+  let error;
+  if(editingTopupId){
+    ({error}=await sb.from('currency_topups').update(payload).eq('id',editingTopupId));
+  } else {
+    ({error}=await sb.from('currency_topups').insert({...payload}));
+  }
   if(error){showToast('Ошибка: '+error.message);return;}
   closeModal();
   await loadData();
-  showToast('✓ Пополнение сохранено');
+  showToast(editingTopupId?'✓ Пополнение изменено':'✓ Пополнение сохранено');
+  editingTopupId=null;
+}
+
+let editingTopupId=null;
+
+function editTopup(id){
+  const t=topups.find(x=>x.id===id);
+  if(!t)return;
+  editingTopupId=id;
+  document.getElementById('m-date').value=t.date;
+  document.getElementById('m-currency').value=t.currency;
+  document.getElementById('m-amount-cur').value=t.amount_currency;
+  document.getElementById('m-amount-rub').value=t.amount_rub;
+  document.getElementById('m-note').value=t.note||'';
+  calcTopup();
+  document.getElementById('modal').style.display='flex';
+}
+
+async function deleteTopup(id){
+  if(!confirm('Удалить это пополнение?'))return;
+  const {error}=await sb.from('currency_topups').delete().eq('id',id);
+  if(error){showToast('Ошибка: '+error.message);return;}
+  await loadData();
+  showToast('Пополнение удалено');
 }
 
 function showToast(msg){
