@@ -6,15 +6,15 @@
 <title>FCS Finance — Журнал</title>
 <style>
 :root {
-  --bg: #0C0B09;
-  --bg2: #141210;
-  --bg3: #1C1A16;
-  --bg4: #242018;
-  --border: #2A2620;
-  --border2: #363028;
-  --text: #F0EBE0;
-  --text2: #9A9080;
-  --text3: #5A5448;
+  --bg: #F5F5F0;
+  --bg2: #FFFFFF;
+  --bg3: #F0EFE8;
+  --bg4: #E8E6DE;
+  --border: #D8D5CC;
+  --border2: #C8C5BC;
+  --text: #1A1814;
+  --text2: #5A5448;
+  --text3: #8A8478;
   --accent: #185FA5;
   --accent2: #0C447C;
   --green: #0F6E56;
@@ -391,7 +391,7 @@ tr:hover td{background:var(--bg2)}
         </div>
         <div class="field" style="margin:0"><label>Курс к ₽</label><input type="number" id="m-actual-rate" placeholder="напр. 0.21" step="0.0001" oninput="calcFxActual()" style="background:#252018;border-color:#3A3010"></div>
       </div>
-      <div id="calc-actual-box" style="display:none;background:#0C0B09;border-radius:6px;padding:8px;margin-top:8px;font-size:12px;display:none">
+      <div id="calc-actual-box" style="display:none;background:var(--bg3);border-radius:6px;padding:8px;margin-top:8px;font-size:12px;display:none">
         <div style="display:flex;justify-content:space-between;color:var(--text2)">
           <span id="calc-actual-formula">—</span>
           <span id="calc-actual-rub" style="color:#FCD34D;font-weight:600">0 ₽</span>
@@ -856,7 +856,13 @@ function getFilteredData(){
   else if(activeTab === 'corp') data = data.filter(e=>e.agent_pay_type==='corp_card');
   else if(activeTab === 'invoice') data = data.filter(e=>e.agent_pay_type==='invoice');
 
-  if(q) data = data.filter(e=>(e.service||'').toLowerCase().includes(q)||(e.agent||'').toLowerCase().includes(q));
+  if(q) data = data.filter(e=>{
+    const linkNum = (e.link||'').replace(/\D/g,'');
+    return (e.service||'').toLowerCase().includes(q) ||
+           (e.agent||'').toLowerCase().includes(q) ||
+           (e.link||'').toLowerCase().includes(q) ||
+           linkNum.includes(q.replace(/\D/g,''));
+  });
   if(dept) data = data.filter(e=>e.dept===dept);
   if(status) data = data.filter(e=>e.status===status);
   if(pay) data = data.filter(e=>e.pay===pay);
