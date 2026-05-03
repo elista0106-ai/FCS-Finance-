@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FCS Finance — Журнал</title>
+<style>
+:root {
+  --bg: #0C0B09;
+  --bg2: #141210;
+  --bg3: #1C1A16;
+  --bg4: #242018;
+  --border: #2A2620;
+  --border2: #363028;
+  --text: #F0EBE0;
+  --text2: #9A9080;
+  --text3: #5A5448;
+  --accent: #185FA5;
+  --accent2: #0C447C;
+  --green: #0F6E56;
+  --green2: #085041;
+  --red: #A32D2D;
+  --amber: #B07820;
+  --purple: #6B3FA0;
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px}
+
+/* LOADING */
+#loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:16px}
+.spinner{width:36px;height:36px;border:3px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TOPBAR */
+.topbar{background:var(--bg2);border-bottom:0.5px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:100}
+.topbar-logo{font-size:14px;font-weight:700;color:var(--text);letter-spacing:-0.02em}
+.topbar-logo span{color:var(--text3);font-weight:400}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.user-badge{display:flex;align-items:center;gap:8px;background:var(--bg3);border:0.5px solid var(--border);border-radius:999px;padding:5px 12px;font-size:12px}
+.user-dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
+
+/* BUTTONS */
+.btn{padding:6px 12px;border-radius:var(--radius-sm);border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:12px;cursor:pointer;transition:all 0.15s;white-space:nowrap}
+.btn:hover{background:var(--bg4);color:var(--text);border-color:var(--border2)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2)}
+.btn-danger{background:var(--red);border-color:var(--red);color:#fff}
+.btn-sm{padding:4px 9px;font-size:11px}
+
+/* MONTH TABS */
+.month-bar{background:var(--bg2);border-bottom:0.5px solid var(--border);padding:0 20px;display:flex;align-items:center;gap:4px;overflow-x:auto}
+.month-tab{padding:10px 14px;font-size:12px;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all 0.15s}
+.month-tab:hover{color:var(--text2)}
+.month-tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.month-add{padding:8px 12px;color:var(--text3);cursor:pointer;font-size:18px;line-height:1}
+.month-add:hover{color:var(--text)}
+
+/* MAIN TABS */
+.tabs{background:var(--bg2);border-bottom:0.5px solid var(--border);padding:0 20px;display:flex;gap:2px}
+.tab{padding:10px 14px;font-size:12px;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;white-space:nowrap}
+.tab:hover{color:var(--text2)}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.cnt{font-size:10px;opacity:0.6;margin-left:3px}
+
+/* CONTENT */
+.content{padding:16px 20px}
+
+/* STATS */
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.stat{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:12px 16px;min-width:130px}
+.stat-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px}
+.stat-value{font-size:18px;font-weight:600;color:var(--text)}
+
+/* FILTERS */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.filters input,.filters select{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);padding:6px 10px;font-size:12px;outline:none}
+.filters input::placeholder{color:var(--text3)}
+.filters input:focus,.filters select:focus{border-color:var(--accent)}
+.filters select option{background:var(--bg2)}
+
+/* TABLE */
+.table-wrap{overflow-x:auto;border-radius:var(--radius);border:0.5px solid var(--border)}
+table{width:100%;border-collapse:collapse;min-width:900px}
+th{background:var(--bg3);padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);border-bottom:0.5px solid var(--border);white-space:nowrap;font-weight:500}
+td{padding:9px 12px;border-bottom:0.5px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg2)}
+
+/* STATUS BUTTONS */
+.s-btn{padding:3px 9px;border-radius:999px;font-size:11px;font-weight:500;border:none;cursor:pointer;white-space:nowrap}
+.s-pending{background:#2A2010;color:#C4922A}
+.s-paid{background:#0A2018;color:#2ECC71}
+.s-cancelled{background:#2A1010;color:#E55}
+
+/* BADGES */
+.dept-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+.d-travel{background:#185FA5}.d-logistic{background:#0F6E56}.d-lifestyle{background:#B07820}
+.d-kbr{background:#993556}.d-internal{background:#5A5448}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;backdrop-filter:blur(4px)}
+.modal{background:var(--bg2);border:0.5px solid var(--border2);border-radius:14px;padding:24px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:16px;font-weight:600;margin-bottom:20px;color:var(--text)}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em}
+.field input,.field select,.field textarea{width:100%;padding:9px 12px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none}
+.field input:focus,.field select:focus{border-color:var(--accent)}
+.field select option{background:var(--bg3)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:0.5px solid var(--border)}
+
+/* USER MANAGEMENT */
+.user-table td,.user-table th{padding:10px 14px}
+.role-badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:500}
+.role-admin{background:#1A2535;color:#60A5FA}
+.role-manager{background:#1A2520;color:#34D399}
+.role-viewer{background:#252020;color:#9A9080}
+.role-executor{background:#251A35;color:#A78BFA}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius);padding:10px 20px;font-size:13px;z-index:9999;animation:fadeup 0.3s ease;white-space:nowrap}
+@keyframes fadeup{from{opacity:0;transform:translateX(-50%) translateY(10px)}}
+
+/* EMPTY */
+.empty{text-align:center;padding:48px 20px;color:var(--text3);font-size:13px}
+
+/* SYNC STATUS */
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;margin-right:5px}
+.sync-dot.error{background:var(--red)}
+.sync-dot.loading{background:var(--amber);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* New entry notification */
+.new-entry-toast{position:fixed;top:70px;right:20px;background:#0A2018;border:1px solid var(--green);border-radius:10px;padding:12px 16px;font-size:13px;z-index:9999;animation:slideIn 0.3s ease;max-width:300px}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* BULK BAR */
+.bulk-bar{background:#1A2030;border-bottom:0.5px solid #1E3A5F;padding:8px 20px;display:none;gap:10px;align-items:center}
+.bulk-bar.show{display:flex}
+
+/* NOTIF BADGE */
+.notif-badge{background:var(--red);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;position:absolute;top:-4px;right:-4px}
+
+/* RECEIPT */
+.receipt-link{color:#60A5FA;text-decoration:none;font-size:18px}
+.receipt-link:hover{color:#93C5FD}
+
+@media(max-width:768px){.content{padding:12px}.stats{gap:8px}.stat{min-width:110px}}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="color:var(--text3);font-size:13px">Загружаем данные...</div>
+</div>
+
+<!-- App (hidden until loaded) -->
+<div id="app" style="display:none">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-logo">🏢 FCS <span>Finance</span></div>
+
+    <button class="btn btn-sm" onclick="openAddEntry()" id="btn-add">+ Добавить</button>
+    <button class="btn btn-sm" onclick="exportExcel()">⬇ Excel</button>
+    <button class="btn btn-sm" onclick="backupData()">💾 Резерв</button>
+    <button class="btn btn-sm" onclick="syncNow()" title="Обновить из базы">🔄 <span id="sync-text">Обновить</span></button>
+    <button class="btn btn-sm" onclick="window.location.href='reconcile.html'" title="Сверка поступлений с банком">🏦 Сверка</button>
+    <button class="btn btn-sm" onclick="window.location.href='wallet.html'" title="Валютный кошелёк">💳 Кошелёк</button>
+
+    <div class="topbar-right">
+      <span style="font-size:11px;color:var(--text3)" id="sync-status">
+        <span class="sync-dot loading"></span>подключение...
+      </span>
+      <div class="user-badge">
+        <span class="user-dot" id="user-dot"></span>
+        <span id="user-name">...</span>
+        <span id="user-role" style="color:var(--text3)"></span>
+      </div>
+      <button class="btn btn-sm" onclick="openUsers()" id="btn-users" style="display:none">👥 Пользователи</button>
+      <button class="btn btn-sm" onclick="doLogout()">Выйти</button>
+    </div>
+  </div>
+
+  <!-- Month switcher -->
+  <div class="month-bar" id="month-bar"></div>
+
+  <!-- Main tabs -->
+  <div class="tabs" style="overflow-x:auto;flex-wrap:nowrap">
+    <div class="tab active" id="tab-main" onclick="switchTab('main')">Все заявки <span class="cnt" id="cnt-main"></span></div>
+    <div class="tab" id="tab-treasury" onclick="switchTab('treasury')" style="color:#F59E0B">💰 Казначей <span class="cnt" id="cnt-treasury"></span></div>
+    <div class="tab" id="tab-loss" onclick="switchTab('loss')">⚠ Потери <span class="cnt" id="cnt-loss"></span></div>
+    <div class="tab" id="tab-expense" onclick="switchTab('expense')">💼 Расходы <span class="cnt" id="cnt-expense"></span></div>
+    <div class="tab" id="tab-corp" onclick="switchTab('corp')">🏢 Корп карта <span class="cnt" id="cnt-corp"></span></div>
+    <div class="tab" id="tab-invoice" onclick="switchTab('invoice')">📄 По счёту <span class="cnt" id="cnt-invoice"></span></div>
+    <div class="tab" id="tab-dept" onclick="switchTab('dept')">📊 По отделам <span class="cnt" id="cnt-dept"></span></div>
+  </div>
+
+  <!-- Bulk action bar -->
+  <div class="bulk-bar" id="bulk-bar">
+    <span style="font-size:12px;color:#93C5FD" id="bulk-count"></span>
+    <button class="btn btn-sm btn-danger" onclick="bulkDelete()">🗑 Удалить</button>
+    <button class="btn btn-sm" onclick="bulkStatus('paid')" style="background:var(--green);color:#fff;border-color:var(--green)">✓ Оплачено</button>
+    <button class="btn btn-sm" onclick="bulkStatus('pending')">→ Ожидает</button>
+    <button class="btn btn-sm" onclick="clearSelection()">✕ Снять</button>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- Stats -->
+    <div class="stats" id="stats"></div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <input type="text" id="q" placeholder="🔍 Поиск..." style="width:180px" oninput="renderTable()">
+      <select id="f-dept" onchange="renderTable()">
+        <option value="">Все направления</option>
+        <option value="travel">Travel</option>
+        <option value="logistic">Logistics</option>
+        <option value="lifestyle">Lifestyle</option>
+        <option value="kbr">КБР</option>
+        <option value="vip">VIP ⭐</option>
+        <option value="internal">Внутренний</option>
+      </select>
+      <select id="f-status" onchange="renderTable()">
+        <option value="">Все статусы</option>
+        <option value="pending">Ожидает</option>
+        <option value="paid">Оплачено</option>
+        <option value="cancelled">Отменено</option>
+      </select>
+      <select id="f-pay" onchange="renderTable()">
+        <option value="">Все типы</option>
+        <option value="personal">Перевод на карту</option>
+        <option value="invoice">По счёту</option>
+        <option value="qr">По QR</option>
+        <option value="link">По ссылке</option>
+        <option value="foreign">Иностр. карта</option>
+        <option value="corporate">Корп карта</option>
+      </select>
+      <input type="date" id="f-from" onchange="renderTable()" title="Дата от">
+      <input type="date" id="f-to" onchange="renderTable()" title="Дата до">
+      <button class="btn btn-sm" onclick="clearFilters()">✕ Сбросить</button>
+      <span style="font-size:11px;color:var(--text3);margin-left:4px" id="count-label"></span>
+    </div>
+
+    <!-- Table -->
+    <div id="view-main">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="cb-all" onchange="toggleAll(this)" style="cursor:pointer"></th>
+              <th>№ заявки</th><th>Статус</th><th>Дата</th><th>Отдел</th>
+              <th>Наименование</th><th>Сумма FCS</th><th>Тип оплаты</th>
+              <th>Расход</th><th>Комиссия</th><th>Метки</th><th>Контрагент</th>
+              <th style="color:#60A5FA">От кого</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="empty" style="display:none">Заявок не найдено</div>
+    </div>
+
+    <!-- Other views -->
+    <div id="view-loss" style="display:none"><div class="empty">Нет потерь 🎉</div></div>
+    <div id="view-expense" style="display:none"><div class="empty">Нет расходов</div></div>
+    <div id="view-corp" style="display:none"><div class="empty">Нет заявок с корп картой</div></div>
+    <div id="view-invoice" style="display:none"><div class="empty">Нет заявок по счёту</div></div>
+
+    <!-- Казначей -->
+    <div id="view-treasury" style="display:none">
+      <div class="content">
+        <div style="background:#1A1505;border:1px solid #F59E0B33;border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;gap:24px;flex-wrap:wrap">
+          <div><div style="font-size:11px;color:#F59E0B">Ожидают оплаты</div><div style="font-size:22px;font-weight:600;color:#FCD34D" id="tr-count">0</div></div>
+          <div><div style="font-size:11px;color:#F59E0B">Сумма к оплате</div><div style="font-size:18px;font-weight:500;color:#FCD34D" id="tr-total">0 ₽</div></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>№ заявки</th><th>Дата</th><th>Отдел</th><th>Наименование</th>
+              <th>Расход</th><th>Тип оплаты</th><th style="color:#F59E0B">Реквизиты</th>
+              <th>От кого</th><th>Статус</th><th></th>
+            </tr></thead>
+            <tbody id="treasury-tbody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="treasury-empty" style="display:none">Нет заявок в очереди на оплату 🎉</div>
+      </div>
+    </div>
+
+    <!-- По отделам -->
+    <div id="view-dept" style="display:none">
+      <div class="content" id="dept-view-content"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Entry Modal -->
+<div class="modal-bg" id="modal" style="display:none">
+<div class="modal">
+  <h3 id="modal-title">Новая заявка</h3>
+  <div class="grid2">
+    <div class="field"><label>Дата оплаты FCS</label><input type="date" id="m-date"></div>
+    <div class="field"><label>Направление</label>
+      <select id="m-dept">
+        <option value="travel">Travel</option><option value="logistic">Logistics</option>
+        <option value="lifestyle">Lifestyle</option><option value="kbr">КБР</option>
+        <option value="vip">VIP ⭐</option><option value="internal">Внутренний</option>
+      </select>
+    </div>
+  </div>
+  <div class="field"><label>Наименование *</label><input type="text" id="m-service" placeholder="Что оформляем..."></div>
+  <div class="field"><label>Контрагент</label><input type="text" id="m-agent" placeholder="Кому платим"></div>
+  <div class="grid2">
+    <div class="field"><label>Сумма FCS (₽)</label><input type="number" id="m-amount" placeholder="0" oninput="calcModal()"></div>
+    <div class="field"><label>Тип оплаты FCS</label>
+      <select id="m-pay" onchange="calcModal()">
+        <option value="personal">Перевод на карту</option>
+        <option value="invoice">По счёту</option>
+        <option value="qr">По QR (1%)</option>
+        <option value="link">По ссылке (3%)</option>
+        <option value="foreign">Иностр. карта</option>
+        <option value="corporate">Корп карта</option>
+      </select>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="field"><label>Расход контрагенту</label><input type="number" id="m-agent-amount" placeholder="0" oninput="calcModal()"></div>
+    <div class="field"><label>Валюта расхода</label>
+      <select id="m-agent-currency" onchange="onCurrencyChange()">
+        <option value="RUB">RUB ₽</option><option value="USD">USD $</option>
+        <option value="EUR">EUR €</option><option value="GBP">GBP £</option>
+        <option value="AED">AED</option><option value="TRY">TRY</option>
+        <option value="KZT">KZT</option><option value="JPY">JPY ¥</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Поля конвертации — только для иностранной валюты -->
+  <div id="currency-convert-block" style="display:none;background:#1A1A0A;border:0.5px solid #3A3010;border-radius:var(--radius);padding:12px;margin-bottom:12px">
+    <div style="font-size:11px;font-weight:600;color:#FCD34D;margin-bottom:10px">💱 Конвертация валюты</div>
+    <div class="grid2">
+      <div class="field" style="margin-bottom:10px">
+        <label>Курс (1 <span id="currency-label">USD</span> = ? ₽)</label>
+        <input type="number" id="m-fx-rate" placeholder="напр. 92.50" step="0.01" oninput="calcFx()">
+      </div>
+      <div class="field" style="margin-bottom:10px">
+        <label>Комиссия банка за конвертацию (%)</label>
+        <input type="number" id="m-fx-commission-pct" placeholder="напр. 2" step="0.1" oninput="calcFx()">
+      </div>
+    </div>
+    <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--text2)">
+        <span>Сумма в валюте</span>
+        <span id="fx-foreign-amt" style="color:var(--text)">0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--text2)">
+        <span>По курсу</span>
+        <span id="fx-base-rub" style="color:var(--text)">0 ₽</span>
+      </div>
+      <div id="fx-commission-row" style="display:none;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--text2)">
+        <span id="fx-commission-label">Комиссия банка</span>
+        <span id="fx-commission-val" style="color:#F87171">0 ₽</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;padding:6px 0 3px;border-top:0.5px solid var(--border2);margin-top:4px">
+        <span>Итого расход в ₽</span>
+        <span id="fx-total-rub" style="color:#FCD34D">0 ₽</span>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-top:6px">Итоговая сумма в ₽ будет учтена в расчёте комиссии FCS</div>
+
+    <!-- Фактическое списание в другой валюте -->
+    <div style="margin-top:10px;padding-top:10px;border-top:0.5px solid #3A3010">
+      <div style="font-size:11px;font-weight:600;color:#9A8050;margin-bottom:8px">Фактически списалось (если в другой валюте)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div class="field" style="margin:0"><label>Сумма факт</label><input type="number" id="m-actual-amount" placeholder="напр. 150000" oninput="calcFxActual()"></div>
+        <div class="field" style="margin:0"><label>Валюта</label>
+          <select id="m-actual-currency" onchange="calcFxActual()" style="background:#252018;border-color:#3A3010;color:#FCD34D">
+            <option value="">— та же —</option>
+            <option value="KZT">KZT ₸</option><option value="USD">USD $</option>
+            <option value="EUR">EUR €</option><option value="AED">AED</option>
+            <option value="TRY">TRY ₺</option><option value="JPY">JPY ¥</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0"><label>Курс к ₽</label><input type="number" id="m-actual-rate" placeholder="напр. 0.21" step="0.0001" oninput="calcFxActual()" style="background:#252018;border-color:#3A3010"></div>
+      </div>
+      <div id="calc-actual-box" style="display:none;background:#0C0B09;border-radius:6px;padding:8px;margin-top:8px;font-size:12px;display:none">
+        <div style="display:flex;justify-content:space-between;color:var(--text2)">
+          <span id="calc-actual-formula">—</span>
+          <span id="calc-actual-rub" style="color:#FCD34D;font-weight:600">0 ₽</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="field"><label>Тип оплаты контрагенту</label>
+      <select id="m-agent-pay-type" onchange="onAgentPayChange()">
+        <option value="">— не указано —</option>
+        <option value="card_rf">Карта РФ</option>
+        <option value="foreign_card">Иностр. карта</option>
+        <option value="invoice">Счёт</option>
+        <option value="corp_card">Корп Карта</option>
+        <option value="cash">Наличные</option>
+      </select>
+    </div>
+    <div class="field" id="receipt-field" style="display:none">
+      <label>🧾 Ссылка на чек</label>
+      <input type="text" id="m-receipt" placeholder="Яндекс Диск...">
+    </div>
+  </div>
+  <!-- Расчёт комиссии -->
+  <div id="calc-block" style="background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius);padding:12px;margin-bottom:12px;display:none">
+    <div style="font-size:11px;font-weight:600;color:#2ECC71;margin-bottom:8px" id="calc-title">📊 Автоматический расчёт</div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--text2)">
+      <span>Приход от клиента</span><span id="calc-income" style="color:var(--text)">0 ₽</span>
+    </div>
+    <div id="calc-acq-row" style="display:none;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--text2)">
+      <span id="calc-acq-label">Эквайринг</span><span id="calc-acq" style="color:#F87171">0 ₽</span>
+    </div>
+    <div id="calc-agent-row" style="display:none;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--text2)">
+      <span>Расход контрагенту</span><span id="calc-agent" style="color:#F87171">0 ₽</span>
+    </div>
+    <div id="calc-deposit-row" style="display:none;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--text2)">
+      <span>Депозит (на след. заявку)</span><span id="calc-deposit-val" style="color:#F87171">0 ₽</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:8px 0 3px;border-top:0.5px solid var(--border2);margin-top:6px">
+      <span style="color:var(--text)" id="calc-result-label">Комиссия FCS</span><span id="calc-result" style="color:#2ECC71">0 ₽</span>
+    </div>
+    <!-- Блок разделения комиссии для валютных операций -->
+    <div id="calc-foreign-block" style="display:none;margin-top:10px;border-top:0.5px solid var(--border2);padding-top:10px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Куда идёт комиссия:</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:#0A0A1A;border:0.5px solid #2A2A6A;border-radius:6px;padding:10px">
+          <div style="font-size:10px;color:#818CF8;margin-bottom:4px">💳 Иностр. карта</div>
+          <div style="font-size:16px;font-weight:600;color:#A5B4FC" id="calc-foreign-amt">0 ₽</div>
+        </div>
+        <div style="background:var(--bg3);border:0.5px solid var(--border2);border-radius:6px;padding:10px;opacity:0.5">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px" id="calc-dept-name">Отдел</div>
+          <div style="font-size:16px;font-weight:600;color:var(--text3)" id="calc-dept-amt">0 ₽</div>
+        </div>
+      </div>
+    </div>
+    <!-- Предупреждение о минусе -->
+    <div id="calc-loss-warning" style="display:none;margin-top:10px;background:#2D0A0A;border:1px solid #7F1D1D;border-radius:8px;padding:10px">
+      <div style="font-size:12px;font-weight:600;color:#F87171;margin-bottom:4px">⚠️ Компания в минусе!</div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:#FCA5A5">
+        <span>Потеря на эквайринге:</span>
+        <span id="calc-loss-amount" style="font-weight:600">0 ₽</span>
+      </div>
+      <div style="font-size:11px;color:#F87171;margin-top:6px">Исполнитель принял сумму равную расходу — эквайринг съел прибыль. Отметьте как потерю компании ниже.</div>
+      <button type="button" onclick="markAsLoss()" style="margin-top:8px;width:100%;padding:6px;background:#7F1D1D;color:#FCA5A5;border:none;border-radius:6px;font-size:12px;cursor:pointer">
+        ⚠️ Отметить как потерю компании
+      </button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Комиссия FCS (₽) 
+      <span style="font-size:10px;color:var(--text3)" id="comm-hint"></span>
+      <span id="comm-manual-badge" style="display:none;font-size:10px;background:#1A2030;color:#60A5FA;padding:1px 6px;border-radius:999px;cursor:pointer" onclick="resetCommManual()">✏️ вручную · сбросить</span>
+    </label>
+    <input type="number" id="m-commission" placeholder="0" oninput="onCommManualEdit()" style="font-size:15px;font-weight:600;color:#2ECC71">
+  </div>
+
+  <!-- Депозит -->
+  <div style="background:#1A1A30;border:0.5px solid #2A2A50;border-radius:var(--radius);padding:12px;margin-bottom:12px">
+    <div style="font-size:11px;font-weight:600;color:#60A5FA;margin-bottom:8px">💰 Депозит / остаток от другой заявки</div>
+    <div class="grid2">
+      <div class="field" style="margin:0">
+        <label>Сумма депозита (₽)</label>
+        <input type="number" id="m-deposit" placeholder="0" oninput="calcModal()">
+      </div>
+      <div class="field" style="margin:0">
+        <label>№ заявки-источника</label>
+        <input type="text" id="m-deposit-ref" placeholder="напр. 27300000">
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-top:6px">Если клиент перевёл аванс на несколько заявок — укажите сколько зачтено в эту</div>
+  </div>
+  <div class="grid2">
+    <div class="field"><label>Статус</label>
+      <select id="m-status">
+        <option value="pending">Ожидает</option>
+        <option value="paid">Оплачено</option>
+        <option value="cancelled">Отменено</option>
+        <option value="partial">Частично</option>
+      </select>
+    </div>
+    <div class="field"><label>Ссылка AmoCRM</label>
+      <input type="text" id="m-link" placeholder="27XXXXXX или полная ссылка" oninput="updateLeadPreview()">
+    </div>
+  </div>
+  <div style="font-size:12px;color:#60A5FA;margin:-8px 0 10px" id="lead-preview"></div>
+  <div class="field"><label>Комментарий</label>
+    <textarea id="m-note" style="height:60px;resize:vertical" placeholder="Дополнительная информация..."></textarea>
+  </div>
+  <div style="display:flex;gap:10px">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
+      <input type="checkbox" id="m-loss" onchange="toggleField('loss-fields',this.checked)"> ⚠ Потеря компании
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
+      <input type="checkbox" id="m-expense" onchange="toggleField('expense-fields',this.checked)"> 💼 Расход компании
+    </label>
+  </div>
+  <div id="loss-fields" style="display:none;margin-top:10px;background:var(--bg3);border-radius:var(--radius-sm);padding:10px">
+    <div class="grid2">
+      <div class="field"><label>Сумма потери (₽)</label><input type="number" id="m-loss-amount" placeholder="0"></div>
+      <div class="field"><label>Причина</label><input type="text" id="m-loss-note" placeholder="Причина..."></div>
+    </div>
+  </div>
+  <div id="expense-fields" style="display:none;margin-top:10px;background:var(--bg3);border-radius:var(--radius-sm);padding:10px">
+    <div class="field"><label>Комментарий к расходу</label><input type="text" id="m-expense-note" placeholder="Что это за расход..."></div>
+  </div>
+  <div class="modal-actions">
+    <button class="btn" onclick="closeModal()">Отмена</button>
+    <button class="btn btn-primary" onclick="saveEntry()">💾 Сохранить</button>
+  </div>
+</div>
+</div>
+
+<!-- Users Modal -->
+<div class="modal-bg" id="users-modal" style="display:none">
+<div class="modal" style="max-width:680px">
+  <h3>👥 Управление пользователями</h3>
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <button class="btn btn-primary" onclick="openInvite()">+ Пригласить</button>
+    <span style="font-size:12px;color:var(--text3);align-self:center">Пользователи получат письмо с приглашением</span>
+  </div>
+  <div class="table-wrap">
+    <table class="user-table">
+      <thead><tr><th>Email</th><th>Имя</th><th>Роль</th><th>Статус</th><th>Последний вход</th><th></th></tr></thead>
+      <tbody id="users-tbody"></tbody>
+    </table>
+  </div>
+  <div class="modal-actions">
+    <button class="btn" onclick="document.getElementById('users-modal').style.display='none'">Закрыть</button>
+  </div>
+</div>
+</div>
+
+<!-- Invite Modal -->
+<div class="modal-bg" id="invite-modal" style="display:none">
+<div class="modal" style="max-width:420px">
+  <h3>Пригласить пользователя</h3>
+  <div class="field"><label>Email *</label><input type="email" id="inv-email" placeholder="email@company.com"></div>
+  <div class="field"><label>Имя</label><input type="text" id="inv-name" placeholder="Имя Фамилия"></div>
+  <div class="field"><label>Роль</label>
+    <select id="inv-role">
+      <option value="executor">👤 Исполнитель — только форма заявок</option>
+      <option value="viewer">👁 Просмотр — журнал без изменений</option>
+      <option value="manager">✏️ Менеджер — добавление и редактирование</option>
+      <option value="admin">👑 Администратор — полный доступ</option>
+    </select>
+  </div>
+  <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:10px;font-size:12px;color:var(--text3);margin-bottom:8px">
+    Пользователь получит письмо с ссылкой для установки пароля. После входа он попадёт в нужный раздел автоматически.
+  </div>
+  <div id="inv-error" style="display:none;color:#F87171;font-size:12px;margin-bottom:8px"></div>
+  <div class="modal-actions">
+    <button class="btn" onclick="document.getElementById('invite-modal').style.display='none'">Отмена</button>
+    <button class="btn btn-primary" onclick="sendInvite()">📧 Отправить приглашение</button>
+  </div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+// ===== SUPABASE =====
+const SB_URL = 'https://krjhnwjiorpzgqpojgjt.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtyamhud2ppb3JwemdxcG9qZ2p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTY5NzAsImV4cCI6MjA5Mjg5Mjk3MH0.fgmrOZKVDTb8TOGHTnGXoDArCfB9IUm6rCEryNFTIUs';
+let sb = null;
+if(SB_URL && SB_KEY){
+  sb = window.supabase.createClient(SB_URL, SB_KEY);
+}
+
+// ===== STATE =====
+let currentUser = null;
+let currentProfile = null;
+let entries = [];
+let activeMonth = '';
+let activeTab = 'main';
+let editId = null;
+let commManual = false;
+let selectedIds = new Set();
+
+const DEPTS = {travel:'Travel',logistic:'Logistics',lifestyle:'Lifestyle',kbr:'КБР',vip:'VIP ⭐',internal:'Внутренний'};
+const DEPT_C = {travel:'#185FA5',logistic:'#0F6E56',lifestyle:'#B07820',kbr:'#993556',vip:'#7C3AED',internal:'#5A5448'};
+const PAYS = {personal:'Перевод на карту',foreign:'Иностр. карта',corporate:'Корп карта',invoice:'По счёту',qr:'По QR',link:'По ссылке'};
+const STATUS_L = {pending:'Ожидает',paid:'Оплачено',cancelled:'Отменено',partial:'Частично'};
+const STATUS_C = {pending:'s-pending',paid:'s-paid',cancelled:'s-cancelled',partial:'s-pending'};
+const AGENT_PAY = {card_rf:'Карта РФ',foreign_card:'Иностр. карта',invoice:'Счёт',corp_card:'Корп Карта',cash:'Наличные'};
+
+function fmt(n){return Number(n||0).toLocaleString('ru-RU');}
+function getMonth(date){return (date||'').substring(0,7);}
+function getLeadNum(link){const m=(link||'').match(/(\d{7,})/);return m?m[1]:'';}
+
+// ===== AUTH CHECK =====
+async function init(){
+  if(!sb){
+    window.location.href = 'index.html';
+    return;
+  }
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){
+    window.location.href = 'index.html';
+    return;
+  }
+  currentUser = session.user;
+
+  // Получаем профиль
+  const {data:profile} = await sb.from('profiles').select('*').eq('id',currentUser.id).single();
+  currentProfile = profile;
+
+  if(profile?.role === 'executor'){
+    window.location.href = 'form.html';
+    return;
+  }
+
+  // Настраиваем UI по роли
+  document.getElementById('user-name').textContent = profile?.full_name || currentUser.email;
+  document.getElementById('user-role').textContent = {admin:'👑 Админ',manager:'✏️ Менеджер',viewer:'👁 Просмотр'}[profile?.role]||'';
+
+  if(profile?.role === 'admin'){
+    document.getElementById('btn-users').style.display = 'block';
+  }
+  if(profile?.role === 'viewer'){
+    document.getElementById('btn-add').style.display = 'none';
+  }
+
+  setSyncStatus('loading');
+  await loadEntries();
+  setSyncStatus('ok');
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+}
+
+// ===== DATA LOADING =====
+async function loadEntries(){
+  const {data, error} = await sb
+    .from('entries')
+    .select('*, profiles!entries_submitted_by_fkey(full_name, email)')
+    .order('date', {ascending:false});
+
+  if(error){ console.error(error); setSyncStatus('error'); return; }
+
+  entries = (data||[]).map(e=>({
+    ...e,
+    _submitter_name: e.profiles?.full_name || e.profiles?.email || null
+  }));
+
+  const months = [...new Set(entries.map(e=>getMonth(e.date)).filter(Boolean))].sort().reverse();
+  if(!activeMonth || !months.includes(activeMonth)){
+    activeMonth = months[0] || new Date().toISOString().substring(0,7);
+  }
+
+  // Уведомление о новых заявках от исполнителей
+  const newFromForm = entries.filter(e=>e.from_form && e.status==='pending' && getMonth(e.date)===activeMonth);
+  const pendingCount = document.getElementById('cnt-treasury');
+  if(pendingCount) pendingCount.textContent = newFromForm.length ? `(${newFromForm.length})` : '';
+
+  renderMonthBar(months);
+  renderAll();
+}
+
+async function syncNow(){
+  document.getElementById('sync-text').textContent = 'Загрузка...';
+  setSyncStatus('loading');
+  await loadEntries();
+  setSyncStatus('ok');
+  document.getElementById('sync-text').textContent = 'Обновить';
+  showToast('✓ Данные обновлены');
+}
+
+// ===== RENDER =====
+function monthEntries(){ return entries.filter(e=>getMonth(e.date)===activeMonth); }
+
+function renderMonthBar(months){
+  const bar = document.getElementById('month-bar');
+  const monthNames = {
+    '01':'Январь','02':'Февраль','03':'Март','04':'Апрель','05':'Май','06':'Июнь',
+    '07':'Июль','08':'Август','09':'Сентябрь','10':'Октябрь','11':'Ноябрь','12':'Декабрь'
+  };
+  bar.innerHTML = months.map(m=>{
+    const [y,mo]=m.split('-');
+    const cnt = entries.filter(e=>getMonth(e.date)===m).length;
+    return`<div class="month-tab${m===activeMonth?' active':''}" onclick="switchMonth('${m}')">${monthNames[mo]} ${y} <span style="opacity:0.5;font-size:10px">${cnt}</span></div>`;
+  }).join('') + `<div class="month-add" onclick="addMonth()" title="Добавить месяц">+</div>`;
+}
+
+function renderAll(){
+  renderStats();
+  renderTable();
+  updateTabCounts();
+}
+
+function renderStats(){
+  const data = monthEntries();
+  const rubEntries = data.filter(e=>e.currency==='RUB');
+  const total = rubEntries.reduce((s,e)=>s+(+e.amount||0),0);
+  const comm = data.reduce((s,e)=>s+(+e.commission||0),0);
+  const paid = data.filter(e=>e.status==='paid').length;
+  const losses = data.filter(e=>e.is_loss).length;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="stat-label">Записей</div><div class="stat-value">${data.length}</div></div>
+    <div class="stat"><div class="stat-label">Оплачено</div><div class="stat-value" style="color:#2ECC71">${paid}</div></div>
+    <div class="stat"><div class="stat-label">Сумма FCS</div><div class="stat-value" style="font-size:15px;color:#60A5FA">${fmt(total)} ₽</div></div>
+    <div class="stat"><div class="stat-label">Комиссия</div><div class="stat-value" style="font-size:15px;color:#2ECC71">${fmt(comm)} ₽</div></div>
+    ${losses?`<div class="stat"><div class="stat-label">Потери</div><div class="stat-value" style="color:#F87171">${losses}</div></div>`:''}
+  `;
+}
+
+function updateTabCounts(){
+  const data = monthEntries();
+  const pendingForm = data.filter(e=>e.from_form && e.status==='pending');
+  document.getElementById('cnt-main').textContent = `(${data.length})`;
+  document.getElementById('cnt-loss').textContent = data.filter(e=>e.is_loss).length ? `(${data.filter(e=>e.is_loss).length})` : '';
+  document.getElementById('cnt-expense').textContent = data.filter(e=>e.is_expense).length ? `(${data.filter(e=>e.is_expense).length})` : '';
+  document.getElementById('cnt-corp').textContent = data.filter(e=>e.agent_pay_type==='corp_card').length ? `(${data.filter(e=>e.agent_pay_type==='corp_card').length})` : '';
+  document.getElementById('cnt-invoice').textContent = data.filter(e=>e.agent_pay_type==='invoice').length ? `(${data.filter(e=>e.agent_pay_type==='invoice').length})` : '';
+  document.getElementById('cnt-dept').textContent = `(${data.length})`;
+  // Казначей — мигающий счётчик если есть новые
+  const trBtn = document.getElementById('tab-treasury');
+  if(pendingForm.length>0){
+    document.getElementById('cnt-treasury').textContent = `(${pendingForm.length})`;
+    if(trBtn) trBtn.style.animation = 'pulse 2s infinite';
+  } else {
+    document.getElementById('cnt-treasury').textContent = '';
+    if(trBtn) trBtn.style.animation = '';
+  }
+}
+
+// ===== КАЗНАЧЕЙ =====
+function renderTreasury(){
+  const data = monthEntries().filter(e=>e.from_form && e.status==='pending');
+  const total = data.filter(e=>e.agent_currency==='RUB').reduce((s,e)=>s+(+e.agent_amount||0),0);
+  document.getElementById('tr-count').textContent = data.length;
+  document.getElementById('tr-total').textContent = fmt(total)+' ₽';
+
+  const canEdit = currentProfile?.role !== 'viewer';
+  document.getElementById('treasury-tbody').innerHTML = data.map(e=>{
+    const lead = getLeadNum(e.link||'');
+    // Парсим реквизиты из note
+    const noteLines = (e.note||'').split('\n');
+    const rekvLines = noteLines.filter(l=>l.startsWith('Карта')||l.startsWith('Ссылка')||l.startsWith('Комментарий'));
+    const rekv = rekvLines.join(' · ') || '—';
+    return `<tr style="background:${e.from_form?'#1A1505':''}">
+      <td>${lead?`<span style="color:#60A5FA;font-size:11px">#${lead}</span>`:'—'}</td>
+      <td style="font-size:11px;white-space:nowrap">${e.date||'—'}</td>
+      <td><span style="font-size:11px;color:${DEPT_C[e.dept]||'#9A9080'}">${DEPTS[e.dept]||e.dept}</span></td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${e.service}</td>
+      <td style="font-weight:600;color:#F59E0B;white-space:nowrap">${e.agent_amount>0?fmt(e.agent_amount)+(e.agent_currency!=='RUB'?' '+e.agent_currency:' ₽'):'—'}</td>
+      <td style="font-size:11px">${e.agent_pay_type==='card_rf'?'💳 Карта РФ':e.agent_pay_type==='invoice'?'📄 Счёт':e.agent_pay_type==='corp_card'?'🏢 Корп':e.agent_pay_type||'—'}</td>
+      <td style="font-size:11px;color:#93C5FD;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${rekv}">${rekv}</td>
+      <td style="font-size:11px;color:#60A5FA">${e._submitter_name||'—'}</td>
+      <td><button class="${STATUS_C[e.status]||'s-pending'} s-btn" onclick="cycleStatus('${e.id}')">${STATUS_L[e.status]||'Ожидает'}</button></td>
+      <td style="white-space:nowrap">
+        ${canEdit?`<button class="btn btn-sm" style="background:var(--green);color:#fff;border-color:var(--green);font-size:11px" onclick="payEntry('${e.id}')">✓ Оплатить</button>`:''}
+        ${canEdit?`<button class="btn btn-sm" style="background:#2A1010;color:#F87171;border-color:#5C2020;font-size:11px" onclick="rejectEntry('${e.id}')">✗ Отклонить</button>`:''}
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('treasury-empty').style.display = data.length?'none':'block';
+}
+
+async function payEntry(id){
+  const {error} = await sb.from('entries').update({status:'paid'}).eq('id',id);
+  if(!error){ entries.find(e=>e.id===id).status='paid'; renderTreasury(); updateTabCounts(); showToast('✓ Отмечено как оплачено'); }
+}
+
+async function rejectEntry(id){
+  if(!confirm('Отклонить заявку?')) return;
+  const {error} = await sb.from('entries').update({status:'cancelled'}).eq('id',id);
+  if(!error){ entries.find(e=>e.id===id).status='cancelled'; renderTreasury(); updateTabCounts(); showToast('Заявка отклонена'); }
+}
+
+// ===== ПО ОТДЕЛАМ =====
+function renderDeptView(){
+  const data = monthEntries();
+  const depts = ['travel','logistic','lifestyle','kbr','vip','internal'];
+
+  // Считаем где лежит комиссия
+  const commOnCard = data.filter(e=>e.pay==='personal'&&e.commission>0).reduce((s,e)=>s+(+e.commission||0),0);
+  const commOnAccount = data.filter(e=>['qr','link','invoice','corporate'].includes(e.pay)&&e.commission>0).reduce((s,e)=>s+(+e.commission||0),0);
+  const totalComm = data.reduce((s,e)=>s+(+e.commission||0),0);
+
+  let html = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">
+      <div style="background:#0A2018;border:1px solid var(--green);border-radius:10px;padding:14px">
+        <div style="font-size:11px;color:#2ECC71;margin-bottom:4px">Всего комиссии</div>
+        <div style="font-size:20px;font-weight:600;color:#2ECC71">${fmt(totalComm)} ₽</div>
+      </div>
+      <div style="background:#0C1A2E;border:1px solid #185FA5;border-radius:10px;padding:14px">
+        <div style="font-size:11px;color:#60A5FA;margin-bottom:4px">💳 На карте РФ</div>
+        <div style="font-size:20px;font-weight:600;color:#60A5FA">${fmt(commOnCard)} ₽</div>
+        <div style="font-size:10px;color:#4A6A8A;margin-top:2px">Переводы на карту</div>
+      </div>
+      <div style="background:#1A1A0A;border:1px solid #F59E0B;border-radius:10px;padding:14px">
+        <div style="font-size:11px;color:#FCD34D;margin-bottom:4px">🏦 На счёту компании</div>
+        <div style="font-size:20px;font-weight:600;color:#FCD34D">${fmt(commOnAccount)} ₽</div>
+        <div style="font-size:10px;color:#8A7A4A;margin-top:2px">QR / Ссылка / Счёт</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">`;
+
+  depts.forEach(dept=>{
+    const deptData = data.filter(e=>e.dept===dept);
+    if(!deptData.length) return;
+    const total = deptData.filter(e=>e.currency==='RUB').reduce((s,e)=>s+(+e.amount||0),0);
+    const comm = deptData.reduce((s,e)=>s+(+e.commission||0),0);
+    const paid = deptData.filter(e=>e.status==='paid').length;
+    const losses = deptData.filter(e=>e.is_loss).length;
+    const color = DEPT_C[dept]||'#9A9080';
+    html+=`<div style="background:var(--bg2);border:0.5px solid var(--border);border-left:3px solid ${color};border-radius:10px;padding:14px;cursor:pointer" onclick="filterByDept('${dept}')">
+      <div style="font-size:13px;font-weight:600;color:${color};margin-bottom:10px">${DEPTS[dept]}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><div style="font-size:10px;color:var(--text3)">Заявок</div><div style="font-size:16px;font-weight:500">${deptData.length}</div></div>
+        <div><div style="font-size:10px;color:var(--text3)">Оплачено</div><div style="font-size:16px;color:#2ECC71">${paid}</div></div>
+        <div><div style="font-size:10px;color:var(--text3)">Сумма FCS</div><div style="font-size:13px;font-weight:500;color:#60A5FA">${fmt(total)} ₽</div></div>
+        <div><div style="font-size:10px;color:var(--text3)">Комиссия</div><div style="font-size:13px;font-weight:500;color:#2ECC71">${fmt(comm)} ₽</div></div>
+      </div>
+      ${losses?`<div style="margin-top:8px;font-size:11px;color:#F87171">⚠ ${losses} потер${losses===1?'я':'и'}</div>`:''}
+      <div style="margin-top:8px;font-size:11px;color:var(--text3)">Нажмите чтобы отфильтровать →</div>
+    </div>`;
+  });
+
+  html += '</div>';
+  document.getElementById('dept-view-content').innerHTML = html;
+}
+
+function filterByDept(dept){
+  switchTab('main');
+  document.getElementById('f-dept').value = dept;
+  renderTable();
+}
+
+function getFilteredData(){
+  let data = monthEntries();
+  const q = (document.getElementById('q').value||'').toLowerCase();
+  const dept = document.getElementById('f-dept').value;
+  const status = document.getElementById('f-status').value;
+  const pay = document.getElementById('f-pay').value;
+  const from = document.getElementById('f-from').value;
+  const to = document.getElementById('f-to').value;
+
+  if(activeTab === 'loss') data = data.filter(e=>e.is_loss);
+  else if(activeTab === 'expense') data = data.filter(e=>e.is_expense);
+  else if(activeTab === 'corp') data = data.filter(e=>e.agent_pay_type==='corp_card');
+  else if(activeTab === 'invoice') data = data.filter(e=>e.agent_pay_type==='invoice');
+
+  if(q) data = data.filter(e=>(e.service||'').toLowerCase().includes(q)||(e.agent||'').toLowerCase().includes(q));
+  if(dept) data = data.filter(e=>e.dept===dept);
+  if(status) data = data.filter(e=>e.status===status);
+  if(pay) data = data.filter(e=>e.pay===pay);
+  if(from) data = data.filter(e=>(e.date||'')>=from);
+  if(to) data = data.filter(e=>(e.date||'')<=to);
+
+  return data;
+}
+
+function renderTable(){
+  if(activeTab !== 'main' && activeTab !== 'loss' && activeTab !== 'expense' && activeTab !== 'corp' && activeTab !== 'invoice') return;
+  const data = getFilteredData();
+  document.getElementById('count-label').textContent = data.length + ' записей';
+
+  const canEdit = currentProfile?.role !== 'viewer';
+  const canDelete = currentProfile?.role === 'admin';
+
+  const rows = data.map(e=>{
+    const lead = getLeadNum(e.link);
+    const checked = selectedIds.has(e.id) ? 'checked' : '';
+    const badges = [
+      e.is_loss ? `<span style="background:#2A1010;color:#F87171;padding:1px 7px;border-radius:999px;font-size:10px">⚠ Потеря${e.loss_amount>0?' '+fmt(e.loss_amount)+'₽':''}</span>` : '',
+      e.is_expense ? `<span style="background:#2A1A08;color:#F59E0B;padding:1px 7px;border-radius:999px;font-size:10px">💼</span>` : '',
+      e.receipt_link ? `<a href="${e.receipt_link}" target="_blank" class="receipt-link" title="Открыть чек">🧾</a>` : '',
+    ].filter(Boolean).join(' ');
+
+    const agentAmt = e.agent_amount > 0
+      ? fmt(e.agent_amount) + (e.agent_currency && e.agent_currency!=='RUB' ? ' '+e.agent_currency : ' ₽')
+      + (e.agent_pay_type ? `<div style="font-size:10px;color:var(--text3)">${AGENT_PAY[e.agent_pay_type]||e.agent_pay_type}</div>` : '')
+      : '—';
+
+    return `<tr>
+      <td><input type="checkbox" ${checked} onchange="onRowCheck('${e.id}',this)" style="cursor:pointer"></td>
+      <td>${lead?`<span style="color:#60A5FA;cursor:pointer;font-size:11px" onclick="filterByLead('${lead}')">#${lead}</span>`:'—'}</td>
+      <td><button class="${STATUS_C[e.status]||'s-pending'} s-btn" onclick="cycleStatus('${e.id}')">${STATUS_L[e.status]||'Ожидает'}</button></td>
+      <td style="white-space:nowrap;font-size:11px;color:var(--text2)">${e.date||'—'}</td>
+      <td><span class="dept-dot d-${e.dept}"></span><span style="font-size:11px">${DEPTS[e.dept]||e.dept}</span></td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.service||''}">${e.service||'—'}</td>
+      <td style="white-space:nowrap;font-weight:600;color:#60A5FA">
+        ${e.amount>0?fmt(e.amount)+' ₽':'—'}
+        <button onclick="togglePaymentReceived('${e.id}',${!!e.payment_received},this)" 
+          title="${e.payment_received?'✓ Деньги поступили · нажмите чтобы снять отметку':'○ Нажмите чтобы отметить поступление'}"
+          style="margin-left:4px;padding:1px 5px;border-radius:4px;border:none;cursor:pointer;font-size:11px;font-weight:600;
+          background:${e.payment_received?'#0A2018':'#1A1612'};
+          color:${e.payment_received?'#2ECC71':'#5A5448'};
+          border:0.5px solid ${e.payment_received?'#0F6E56':'#2A2620'}">
+          ${e.payment_received?'✓':'○'}
+        </button>
+      </td>
+      <td style="font-size:11px;color:var(--text2)">${PAYS[e.pay]||e.pay||'—'}</td>
+      <td style="font-size:11px;color:var(--amber)">${agentAmt}</td>
+      <td style="color:#2ECC71;white-space:nowrap">${e.commission>0?'+'+fmt(e.commission)+' ₽':'—'}</td>
+      <td style="white-space:nowrap">${badges||'—'}</td>
+      <td style="font-size:11px;color:var(--text2);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.agent||'—'}</td>
+      <td style="font-size:11px;color:#60A5FA;white-space:nowrap">${e.from_form?(e._submitter_name||'исполнитель'):'—'}</td>
+      <td style="white-space:nowrap">
+        ${canEdit?`<button class="btn btn-sm" onclick="openEdit('${e.id}')">✏️</button>`:''}
+        ${canDelete?`<button class="btn btn-sm" onclick="deleteEntry('${e.id}')" style="color:var(--red)">🗑</button>`:''}
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tbody').innerHTML = rows;
+  document.getElementById('empty').style.display = data.length ? 'none' : 'block';
+}
+
+// ===== TABS =====
+function switchTab(t){
+  activeTab = t;
+  clearSelection();
+  ['main','loss','expense','corp','invoice','treasury','dept'].forEach(tab=>{
+    const v = document.getElementById('view-'+tab);
+    const b = document.getElementById('tab-'+tab);
+    if(v) v.style.display = tab===t?'block':'none';
+    if(b) b.classList.toggle('active', tab===t);
+  });
+  if(t==='treasury') renderTreasury();
+  else if(t==='dept') renderDeptView();
+  else renderTable();
+}
+
+function switchMonth(m){
+  activeMonth = m;
+  clearSelection();
+  renderMonthBar([...new Set(entries.map(e=>getMonth(e.date)).filter(Boolean))].sort().reverse());
+  renderAll();
+}
+
+function addMonth(){
+  const m = prompt('Введите месяц (ГГГГ-ММ):', new Date().toISOString().substring(0,7));
+  if(m && /^\d{4}-\d{2}$/.test(m)){ activeMonth=m; renderAll(); }
+}
+
+// ===== ENTRY CRUD =====
+function openAddEntry(){
+  editId = null;
+  commManual = false;
+  document.getElementById('modal-title').textContent = 'Новая заявка';
+  document.getElementById('m-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('m-dept').value = 'logistic';
+  document.getElementById('m-service').value = '';
+  document.getElementById('m-agent').value = '';
+  document.getElementById('m-amount').value = '';
+  document.getElementById('m-pay').value = 'personal';
+  document.getElementById('m-agent-amount').value = '';
+  document.getElementById('m-agent-currency').value = 'RUB';
+  document.getElementById('currency-convert-block').style.display = 'none';
+  document.getElementById('m-fx-rate').value = '';
+  document.getElementById('m-fx-commission-pct').value = '';
+  document.getElementById('m-agent-pay-type').value = '';
+  document.getElementById('m-receipt').value = '';
+  document.getElementById('receipt-field').style.display = 'none';
+  document.getElementById('m-commission').value = '';
+  document.getElementById('m-status').value = 'pending';
+  document.getElementById('m-link').value = '';
+  document.getElementById('m-note').value = '';
+  document.getElementById('m-loss').checked = false;
+  document.getElementById('m-expense').checked = false;
+  document.getElementById('m-loss-amount').value = '';
+  document.getElementById('m-loss-note').value = '';
+  document.getElementById('m-expense-note').value = '';
+  document.getElementById('loss-fields').style.display = 'none';
+  document.getElementById('expense-fields').style.display = 'none';
+  document.getElementById('lead-preview').textContent = '';
+  document.getElementById('comm-hint').textContent = '';
+  document.getElementById('comm-manual-badge').style.display = 'none';
+  document.getElementById('m-deposit').value = '';
+  document.getElementById('m-deposit-ref').value = '';
+  document.getElementById('calc-block').style.display = 'none';
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function openEdit(id){
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  editId = id;
+  commManual = false;
+  document.getElementById('modal-title').textContent = 'Редактировать запись';
+  document.getElementById('m-date').value = e.date||'';
+  document.getElementById('m-dept').value = e.dept||'logistic';
+  document.getElementById('m-service').value = e.service||'';
+  document.getElementById('m-agent').value = e.agent||'';
+  document.getElementById('m-amount').value = e.amount||'';
+  document.getElementById('m-pay').value = e.pay||'personal';
+  document.getElementById('m-agent-amount').value = e.agent_amount||'';
+  document.getElementById('m-agent-currency').value = e.agent_currency||'RUB';
+  document.getElementById('m-fx-rate').value = e.foreign_rate||'';
+  document.getElementById('m-fx-commission-pct').value = e.foreign_commission||'';
+  const isForex = (e.agent_currency||'RUB') !== 'RUB';
+  document.getElementById('currency-convert-block').style.display = isForex ? 'block' : 'none';
+  if(isForex) document.getElementById('currency-label').textContent = e.agent_currency;
+  document.getElementById('m-agent-pay-type').value = e.agent_pay_type||'';
+  document.getElementById('m-receipt').value = e.receipt_link||'';
+  document.getElementById('receipt-field').style.display = e.agent_pay_type==='corp_card'?'block':'none';
+  document.getElementById('m-commission').value = e.commission||'';
+  document.getElementById('m-status').value = e.status||'pending';
+  document.getElementById('m-link').value = e.link||'';
+  document.getElementById('m-note').value = e.note||'';
+  document.getElementById('m-loss').checked = !!e.is_loss;
+  document.getElementById('m-expense').checked = !!e.is_expense;
+  document.getElementById('m-loss-amount').value = e.loss_amount||'';
+  document.getElementById('m-loss-note').value = e.loss_note||'';
+  document.getElementById('m-expense-note').value = e.expense_note||'';
+  document.getElementById('loss-fields').style.display = e.is_loss?'block':'none';
+  document.getElementById('expense-fields').style.display = e.is_expense?'block':'none';
+  document.getElementById('m-deposit').value = e.deposit||'';
+  document.getElementById('m-deposit-ref').value = e.deposit_ref||'';
+  document.getElementById('comm-manual-badge').style.display = 'none';
+  updateLeadPreview();
+  calcModal();
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function closeModal(){ document.getElementById('modal').style.display = 'none'; }
+
+function toggleField(id, show){ document.getElementById(id).style.display = show?'block':'none'; }
+
+function calcFxActual(){
+  const amt = +document.getElementById('m-actual-amount').value||0;
+  const rate = +document.getElementById('m-actual-rate').value||0;
+  const cur = document.getElementById('m-actual-currency').value;
+  const box = document.getElementById('calc-actual-box');
+  if(amt>0 && rate>0 && cur){
+    const rub = Math.round(amt*rate);
+    box.style.display='block';
+    document.getElementById('calc-actual-formula').textContent=`${amt.toLocaleString('ru-RU')} ${cur} × ${rate} =`;
+    document.getElementById('calc-actual-rub').textContent=rub.toLocaleString('ru-RU')+' ₽';
+  } else {
+    box.style.display='none';
+  }
+}
+
+function onCurrencyChange(){
+  const cur = document.getElementById('m-agent-currency').value;
+  const isForex = cur !== 'RUB';
+  document.getElementById('currency-convert-block').style.display = isForex ? 'block' : 'none';
+  if(isForex){
+    document.getElementById('currency-label').textContent = cur;
+  }
+  calcFx();
+  calcModal();
+}
+
+function calcFx(){
+  const cur = document.getElementById('m-agent-currency').value;
+  const agentAmt = +document.getElementById('m-agent-amount').value||0;
+  const rate = +document.getElementById('m-fx-rate').value||0;
+  const commPct = +document.getElementById('m-fx-commission-pct').value||0;
+
+  if(cur === 'RUB' || !rate){ calcModal(); return; }
+
+  const baseRub = agentAmt * rate;
+  const commRub = Math.round(baseRub * commPct / 100);
+  const totalRub = baseRub + commRub;
+
+  document.getElementById('fx-foreign-amt').textContent = agentAmt.toLocaleString('ru-RU') + ' ' + cur;
+  document.getElementById('fx-base-rub').textContent = fmt(baseRub) + ' ₽';
+
+  const commRow = document.getElementById('fx-commission-row');
+  if(commPct > 0){
+    commRow.style.display = 'flex';
+    document.getElementById('fx-commission-label').textContent = `Комиссия банка ${commPct}%`;
+    document.getElementById('fx-commission-val').textContent = '+' + fmt(commRub) + ' ₽';
+  } else {
+    commRow.style.display = 'none';
+  }
+  document.getElementById('fx-total-rub').textContent = fmt(totalRub) + ' ₽';
+
+  calcModal();
+}
+
+function getFxTotalRub(){
+  // Возвращает итоговую сумму расхода в рублях с учётом конвертации
+  const cur = document.getElementById('m-agent-currency').value;
+  if(cur === 'RUB') return +document.getElementById('m-agent-amount').value||0;
+  const agentAmt = +document.getElementById('m-agent-amount').value||0;
+  const rate = +document.getElementById('m-fx-rate').value||0;
+  const commPct = +document.getElementById('m-fx-commission-pct').value||0;
+  if(!rate) return 0;
+  const baseRub = agentAmt * rate;
+  const commRub = Math.round(baseRub * commPct / 100);
+  return baseRub + commRub;
+}
+
+function onAgentPayChange(){
+  const val = document.getElementById('m-agent-pay-type').value;
+  document.getElementById('receipt-field').style.display = val==='corp_card'?'block':'none';
+}
+
+function updateLeadPreview(){
+  const link = document.getElementById('m-link').value;
+  const lead = getLeadNum(link);
+  document.getElementById('lead-preview').textContent = lead ? '№ заявки: #'+lead : '';
+}
+
+function markAsLoss(){
+  const acq = Math.abs(+document.getElementById('calc-acq').textContent.replace(/[^0-9]/g,''))||0;
+  const pay = document.getElementById('m-pay').value;
+  document.getElementById('m-loss').checked = true;
+  toggleField('loss-fields', true);
+  document.getElementById('m-loss-amount').value = acq;
+  document.getElementById('m-loss-note').value = 'Эквайринг '+(pay==='qr'?'1%':'3%')+' — исполнитель принял сумму равную расходу';
+  document.getElementById('m-commission').value = 0;
+  showToast('⚠️ Отмечено как потеря компании');
+}
+
+function onCommManualEdit(){
+  commManual = true;
+  document.getElementById('comm-manual-badge').style.display = 'inline';
+  document.getElementById('comm-hint').textContent = '';
+}
+
+function resetCommManual(){
+  commManual = false;
+  document.getElementById('comm-manual-badge').style.display = 'none';
+  calcModal();
+}
+
+function calcModal(){
+  const pay = document.getElementById('m-pay').value;
+  const amount = +document.getElementById('m-amount').value||0;
+  const agentAmt = +document.getElementById('m-agent-amount').value||0;
+  const agentCur = document.getElementById('m-agent-currency').value;
+  const deposit = +document.getElementById('m-deposit').value||0;
+  const isForex = agentCur !== 'RUB' && agentAmt > 0;
+
+  const calcBlock = document.getElementById('calc-block');
+  calcBlock.style.display = (amount>0 || isForex) ? 'block' : 'none';
+
+  let acq = 0;
+  if(pay==='qr') acq = Math.round(amount*0.01);
+  if(pay==='link') acq = Math.round(amount*0.03);
+
+  const agentRub = getFxTotalRub();
+
+  // Если валютная операция — вся разница идёт в комиссию иностр. карты
+  // Если рублёвая — идёт в комиссию отдела
+  const diff = Math.max(0, amount - acq - agentRub - deposit);
+  const foreignComm = isForex ? diff : 0;
+  const deptComm = isForex ? 0 : diff;
+
+  // Заголовок блока
+  document.getElementById('calc-title').textContent =
+    isForex ? '📊 Расчёт: Иностранная карта' :
+    pay==='qr' ? '📊 Расчёт: QR (эквайринг 1%)' :
+    pay==='link' ? '📊 Расчёт: По ссылке (эквайринг 3%)' : '📊 Автоматический расчёт';
+
+  document.getElementById('calc-income').textContent = fmt(amount)+' ₽';
+
+  const acqRow = document.getElementById('calc-acq-row');
+  if(acq>0){
+    acqRow.style.display='flex';
+    document.getElementById('calc-acq-label').textContent = pay==='qr'?'Эквайринг 1%':'Эквайринг 3%';
+    document.getElementById('calc-acq').textContent = '−'+fmt(acq)+' ₽';
+  } else acqRow.style.display='none';
+
+  const agentRow = document.getElementById('calc-agent-row');
+  if(agentRub>0){
+    agentRow.style.display='flex';
+    const agentLabel = isForex
+      ? `Расход (${agentAmt} ${agentCur} → ₽)`
+      : 'Расход контрагенту';
+    document.getElementById('calc-agent-row').querySelector('span').textContent = agentLabel;
+    document.getElementById('calc-agent').textContent = '−'+fmt(agentRub)+' ₽';
+  } else agentRow.style.display='none';
+
+  const depRow = document.getElementById('calc-deposit-row');
+  if(deposit>0){
+    depRow.style.display='flex';
+    document.getElementById('calc-deposit-val').textContent = '−'+fmt(deposit)+' ₽ (на депозит)';
+  } else depRow.style.display='none';
+
+  // Итоговая строка — показываем куда идёт комиссия
+  const resultEl = document.getElementById('calc-result');
+  const resultRow = resultEl.closest ? resultEl.parentElement : null;
+  if(isForex){
+    document.getElementById('calc-result').textContent = fmt(foreignComm)+' ₽';
+    document.getElementById('calc-result').style.color = '#A5B4FC';
+    // Обновляем лейбл
+    const labels = document.querySelectorAll('#calc-block .calc-row-label');
+    if(labels.length) labels[labels.length-1].textContent = '💳 Комиссия иностр. карты';
+  } else {
+    document.getElementById('calc-result').textContent = fmt(Math.max(0,diff))+' ₽';
+    document.getElementById('calc-result').style.color = diff < 0 ? '#F87171' : '#2ECC71';
+  }
+
+  // Показываем/скрываем блок "куда идёт комиссия"
+  const foreignBlock = document.getElementById('calc-foreign-block');
+  if(foreignBlock){
+    foreignBlock.style.display = isForex ? 'block' : 'none';
+    if(isForex){
+      document.getElementById('calc-foreign-amt').textContent = fmt(foreignComm)+' ₽';
+      document.getElementById('calc-dept-amt').textContent = '0 ₽';
+      document.getElementById('calc-dept-name').textContent = DEPTS[document.getElementById('m-dept').value]||'Отдел';
+    }
+  }
+
+  // Потеря при эквайринге
+  const lossWarning = document.getElementById('calc-loss-warning');
+  if(acq > 0 && diff <= 0 && amount > 0 && !isForex){
+    lossWarning.style.display = 'block';
+    document.getElementById('calc-loss-amount').textContent = fmt(acq)+' ₽';
+    if(!document.getElementById('m-loss').checked){
+      document.getElementById('m-loss-amount').value = acq;
+      document.getElementById('m-loss-note').value = 'Эквайринг '+(pay==='qr'?'1%':'3%')+' — исполнитель принял сумму равную расходу';
+    }
+  } else {
+    lossWarning.style.display = 'none';
+  }
+
+  // Обновляем поле комиссии
+  if(!commManual){
+    document.getElementById('m-commission').value = diff>0?diff:'';
+    // comm_src: если валюта — иностр карта, иначе обычная логика
+    const parts=[];
+    if(acq) parts.push(`−${fmt(acq)} эквайр.`);
+    if(agentRub) parts.push(`−${fmt(agentRub)} расход`);
+    if(deposit) parts.push(`−${fmt(deposit)} депозит`);
+    if(isForex) parts.push(`→ 💳 комиссия иностр. карты`);
+    document.getElementById('comm-hint').textContent = parts.length ? 'авто: '+parts.join(' ') : '';
+  }
+}
+
+async function saveEntry(){
+  const service = document.getElementById('m-service').value.trim();
+  if(!service){ showToast('Введите наименование'); return; }
+
+  const link = document.getElementById('m-link').value.trim();
+  const normalizedLink = /^\d+$/.test(link) ? 'https://conciergecom.amocrm.ru/leads/detail/'+link : link;
+
+  const payload = {
+    date: document.getElementById('m-date').value,
+    dept: document.getElementById('m-dept').value,
+    service,
+    agent: document.getElementById('m-agent').value.trim(),
+    amount: +document.getElementById('m-amount').value||0,
+    currency: 'RUB',
+    pay: document.getElementById('m-pay').value,
+    agent_amount: +document.getElementById('m-agent-amount').value||0,
+    agent_currency: document.getElementById('m-agent-currency').value,
+    foreign_rate: +document.getElementById('m-fx-rate').value||0,
+    foreign_commission: +document.getElementById('m-fx-commission-pct').value||0,
+    agent_pay_type: document.getElementById('m-agent-pay-type').value,
+    receipt_link: document.getElementById('m-receipt').value.trim(),
+    commission: +document.getElementById('m-commission').value||0,
+    status: document.getElementById('m-status').value,
+    link: normalizedLink,
+    note: document.getElementById('m-note').value.trim(),
+    is_loss: document.getElementById('m-loss').checked,
+    loss_amount: +document.getElementById('m-loss-amount').value||0,
+    loss_note: document.getElementById('m-loss-note').value.trim(),
+    is_expense: document.getElementById('m-expense').checked,
+    expense_note: document.getElementById('m-expense-note').value.trim(),
+    deposit: +document.getElementById('m-deposit').value||0,
+    deposit_ref: document.getElementById('m-deposit-ref').value.trim()||null,
+    submitted_by: currentUser.id,
+  };
+
+  let error;
+  if(editId){
+    ({error} = await sb.from('entries').update(payload).eq('id',editId));
+  } else {
+    ({error} = await sb.from('entries').insert(payload));
+  }
+
+  if(error){ showToast('Ошибка: '+error.message); return; }
+  closeModal();
+  await loadEntries();
+  showToast(editId ? '✓ Запись обновлена' : '✓ Запись добавлена');
+}
+
+async function cycleStatus(id){
+  if(currentProfile?.role === 'viewer'){ showToast('Нет прав'); return; }
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  const next = {pending:'paid',paid:'cancelled',cancelled:'pending'};
+  const {error} = await sb.from('entries').update({status:next[e.status]||'pending'}).eq('id',id);
+  if(!error){ e.status = next[e.status]||'pending'; renderTable(); }
+}
+
+async function deleteEntry(id){
+  if(currentProfile?.role !== 'admin'){ showToast('Нет прав'); return; }
+  if(!confirm('Удалить запись?')) return;
+  const {error} = await sb.from('entries').delete().eq('id',id);
+  if(error){ showToast('Ошибка: '+error.message); return; }
+  entries = entries.filter(e=>e.id!==id);
+  renderAll();
+  showToast('✓ Удалено');
+}
+
+// ===== SELECTION =====
+function onRowCheck(id, cb){
+  if(cb.checked) selectedIds.add(id); else selectedIds.delete(id);
+  updateBulkBar();
+}
+function toggleAll(cb){
+  getFilteredData().forEach(e=>{ if(cb.checked) selectedIds.add(e.id); else selectedIds.delete(e.id); });
+  renderTable();
+  updateBulkBar();
+}
+function clearSelection(){ selectedIds.clear(); updateBulkBar(); renderTable(); }
+function updateBulkBar(){
+  const bar = document.getElementById('bulk-bar');
+  const cnt = selectedIds.size;
+  bar.classList.toggle('show', cnt>0);
+  document.getElementById('bulk-count').textContent = `Выбрано: ${cnt}`;
+}
+async function bulkDelete(){
+  if(currentProfile?.role !== 'admin'){ showToast('Нет прав'); return; }
+  if(!confirm(`Удалить ${selectedIds.size} записей?`)) return;
+  const ids = [...selectedIds];
+  const {error} = await sb.from('entries').delete().in('id', ids);
+  if(error){ showToast('Ошибка: '+error.message); return; }
+  entries = entries.filter(e=>!ids.includes(e.id));
+  selectedIds.clear();
+  renderAll();
+  showToast(`✓ Удалено ${ids.length} записей`);
+}
+async function bulkStatus(status){
+  if(currentProfile?.role === 'viewer'){ showToast('Нет прав'); return; }
+  const ids = [...selectedIds];
+  const {error} = await sb.from('entries').update({status}).in('id',ids);
+  if(error){ showToast('Ошибка'); return; }
+  entries.forEach(e=>{ if(ids.includes(e.id)) e.status=status; });
+  renderAll();
+  showToast(`✓ Статус обновлён`);
+}
+
+// ===== USERS =====
+async function openUsers(){
+  document.getElementById('users-modal').style.display = 'flex';
+  const {data:users, error} = await sb.from('profiles').select('*').order('created_at');
+  if(error){ showToast('Ошибка загрузки'); return; }
+  const roleClass = {admin:'role-admin',manager:'role-manager',viewer:'role-viewer',executor:'role-executor'};
+  const roleLabel = {admin:'👑 Админ',manager:'✏️ Менеджер',viewer:'👁 Просмотр',executor:'👤 Исполнитель'};
+  document.getElementById('users-tbody').innerHTML = users.map(u=>`
+    <tr>
+      <td style="font-size:12px">${u.email}</td>
+      <td style="font-size:12px">${u.full_name||'—'}</td>
+      <td><span class="role-badge ${roleClass[u.role]||''}">${roleLabel[u.role]||u.role}</span></td>
+      <td><span style="color:${u.is_active?'#2ECC71':'#F87171'};font-size:11px">${u.is_active?'Активен':'Неактивен'}</span></td>
+      <td style="font-size:11px;color:var(--text3)">${u.last_login?new Date(u.last_login).toLocaleDateString('ru-RU'):'Не входил'}</td>
+      <td>
+        <select style="background:var(--bg3);border:0.5px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:11px" 
+          onchange="changeRole('${u.id}',this.value)">
+          ${['executor','viewer','manager','admin'].map(r=>`<option value="${r}"${u.role===r?' selected':''}>${roleLabel[r]}</option>`).join('')}
+        </select>
+      </td>
+    </tr>`).join('');
+}
+
+async function changeRole(userId, role){
+  const {error} = await sb.from('profiles').update({role}).eq('id',userId);
+  if(error) showToast('Ошибка: '+error.message);
+  else showToast('✓ Роль изменена');
+}
+
+function openInvite(){ document.getElementById('invite-modal').style.display='flex'; }
+
+async function sendInvite(){
+  const email = document.getElementById('inv-email').value.trim();
+  const name = document.getElementById('inv-name').value.trim();
+  const role = document.getElementById('inv-role').value;
+  if(!email){ document.getElementById('inv-error').textContent='Введите email'; document.getElementById('inv-error').style.display='block'; return; }
+
+  const {data, error} = await sb.auth.admin.inviteUserByEmail(email, {
+    data: { full_name: name, role }
+  });
+
+  if(error){
+    document.getElementById('inv-error').textContent = error.message;
+    document.getElementById('inv-error').style.display='block';
+    return;
+  }
+  document.getElementById('invite-modal').style.display='none';
+  showToast(`✓ Приглашение отправлено на ${email}`);
+}
+
+// ===== FILTERS =====
+function clearFilters(){
+  ['q','f-from','f-to'].forEach(id=>document.getElementById(id).value='');
+  ['f-dept','f-status','f-pay'].forEach(id=>document.getElementById(id).value='');
+  renderTable();
+}
+
+function filterByLead(lead){
+  document.getElementById('q').value = lead;
+  renderTable();
+}
+
+// ===== EXPORT =====
+function exportExcel(){
+  const data = getFilteredData();
+  const rows = data.map(e=>({
+    'Дата': e.date,
+    'Направление': DEPTS[e.dept]||e.dept,
+    'Наименование': e.service,
+    'Сумма FCS': e.amount,
+    'Тип оплаты': PAYS[e.pay]||e.pay,
+    'Расход': e.agent_amount,
+    'Валюта расхода': e.agent_currency,
+    'Тип оплаты контрагенту': e.agent_pay_type,
+    'Чек': e.receipt_link||'',
+    'Комиссия': e.commission,
+    'Статус': STATUS_L[e.status]||e.status,
+    'Контрагент': e.agent,
+    'Ссылка': e.link,
+    'Потеря': e.is_loss?'Да':'',
+    'Сумма потери': e.loss_amount||'',
+    'Причина потери': e.loss_note||'',
+    'Комментарий': e.note,
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Заявки');
+  XLSX.writeFile(wb, `FCS_${activeMonth}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  showToast('✓ Excel скачан');
+}
+
+function backupData(){
+  const blob = new Blob([JSON.stringify({entries, exportedAt:new Date().toISOString()},null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `FCS_backup_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  showToast('✓ Резервная копия скачана');
+}
+
+// ===== AUTH =====
+async function doLogout(){
+  await sb.auth.signOut();
+  window.location.href = 'index.html';
+}
+
+// ===== SYNC STATUS =====
+function setSyncStatus(state){
+  const el = document.getElementById('sync-status');
+  const cfg = {
+    ok: {dot:'',text:'Синхронизировано',color:'#2ECC71'},
+    loading: {dot:'loading',text:'Загружаем...',color:'#F59E0B'},
+    error: {dot:'error',text:'Ошибка соединения',color:'#F87171'},
+  };
+  const c = cfg[state]||cfg.ok;
+  el.innerHTML = `<span class="sync-dot ${c.dot}" style="background:${c.color}"></span><span style="color:${c.color}">${c.text}</span>`;
+}
+
+// ===== TOAST =====
+let toastTimer;
+async function togglePaymentReceived(id, currentState, btn){
+  const newState = !currentState;
+  const {error} = await sb.from('entries').update({
+    payment_received: newState,
+    payment_received_at: newState ? new Date().toISOString().split('T')[0] : null
+  }).eq('id', id);
+  if(error){ showToast('Ошибка: '+error.message); return; }
+  btn.textContent = newState ? '✓' : '○';
+  btn.style.background = newState ? '#0A2018' : '#1A1612';
+  btn.style.color = newState ? '#2ECC71' : '#5A5448';
+  btn.style.borderColor = newState ? '#0F6E56' : '#2A2620';
+  btn.title = newState ? '✓ Деньги поступили · нажмите чтобы снять' : '○ Нажмите чтобы отметить поступление';
+  const entry = entries.find(e=>e.id===id);
+  if(entry) entry.payment_received = newState;
+  showToast(newState ? '✓ Деньги поступили' : 'Отметка снята');
+}
+
+function showToast(msg){
+  clearTimeout(toastTimer);
+  let t = document.querySelector('.toast');
+  if(!t){ t=document.createElement('div'); t.className='toast'; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.style.display = 'block';
+  toastTimer = setTimeout(()=>t.style.display='none', 3000);
+}
+
+// ===== AUTO REFRESH — уведомление о новых заявках =====
+let lastEntryCount = 0;
+let autoRefreshTimer = null;
+
+function startAutoRefresh(){
+  autoRefreshTimer = setInterval(async ()=>{
+    if(!currentUser) return;
+    try{
+      const {data} = await sb.from('entries')
+        .select('id,service,dept,from_form,submitted_by')
+        .eq('status','pending')
+        .eq('from_form',true)
+        .order('submitted_at',{ascending:false})
+        .limit(1);
+      const count = data?.length||0;
+      if(count > 0 && lastEntryCount === 0){
+        // Новая заявка!
+        const e = data[0];
+        showNewEntryNotification(e);
+        lastEntryCount = count;
+        await loadEntries();
+      }
+    }catch(err){}
+  }, 30000); // каждые 30 сек
+}
+
+function showNewEntryNotification(entry){
+  const existing = document.querySelector('.new-entry-toast');
+  if(existing) existing.remove();
+  const el = document.createElement('div');
+  el.className = 'new-entry-toast';
+  el.innerHTML = `
+    <div style="font-weight:600;color:#2ECC71;margin-bottom:4px">🔔 Новая заявка от исполнителя!</div>
+    <div style="font-size:12px;color:var(--text2)">${entry.service||'Без названия'} · ${DEPTS[entry.dept]||entry.dept}</div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="switchTab('treasury');this.closest('.new-entry-toast').remove()" style="flex:1;padding:6px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">Посмотреть</button>
+      <button onclick="this.closest('.new-entry-toast').remove()" style="padding:6px 10px;background:var(--bg3);color:var(--text2);border:0.5px solid var(--border2);border-radius:6px;font-size:12px;cursor:pointer">✕</button>
+    </div>`;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 10000);
+}
+
+init();
+setTimeout(startAutoRefresh, 5000);
+</script>
+</body>
+</html>

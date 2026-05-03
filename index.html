@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FCS Finance — Вход</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0F0E0B;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#1A1612;border:0.5px solid #2A2520;border-radius:20px;padding:40px;width:100%;max-width:420px}
+.logo{font-size:28px;font-weight:700;color:#F5F0E8;margin-bottom:4px}
+.tagline{font-size:13px;color:#6B6560;margin-bottom:32px}
+.label{font-size:12px;color:#9A9590;margin-bottom:6px;display:block;font-weight:500}
+.input{width:100%;padding:12px 14px;background:#252018;border:1px solid #2A2520;border-radius:10px;color:#F5F0E8;font-size:14px;outline:none;transition:border-color 0.15s;margin-bottom:14px}
+.input:focus{border-color:#185FA5}
+.input::placeholder{color:#4A4540}
+.btn{width:100%;padding:13px;background:#185FA5;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:background 0.15s;margin-top:4px}
+.btn:hover{background:#0C447C}
+.btn:disabled{background:#2A2520;color:#4A4540;cursor:not-allowed}
+.error{background:#2D1515;border:1px solid #5C2020;border-radius:8px;padding:10px 12px;font-size:12px;color:#F87171;margin-top:12px;display:none}
+.forgot{text-align:center;margin-top:14px;font-size:12px;color:#6B6560}
+.forgot a{color:#185FA5;text-decoration:none}
+.setup-notice{background:#1A2030;border:1px solid #1E3A5F;border-radius:10px;padding:14px;margin-top:20px;font-size:12px;color:#93C5FD;line-height:1.7}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.divider{height:0.5px;background:#2A2520;margin:20px 0}
+.role-select{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.role-btn{padding:10px;background:#252018;border:1px solid #2A2520;border-radius:8px;color:#9A9590;font-size:12px;cursor:pointer;text-align:center;transition:all 0.15s}
+.role-btn:hover,.role-btn.active{border-color:#185FA5;background:#1A2535;color:#93C5FD}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo">🏢 FCS Finance</div>
+  <div class="tagline">Финансовый учёт · First Concierge Service</div>
+
+  <div id="login-form">
+    <label class="label">Email</label>
+    <input class="input" type="email" id="email" placeholder="your@email.com" autocomplete="email">
+
+    <label class="label">Пароль</label>
+    <input class="input" type="password" id="password" placeholder="••••••••" autocomplete="current-password"
+      onkeydown="if(event.key==='Enter')doLogin()">
+
+    <button class="btn" onclick="doLogin()" id="login-btn">Войти →</button>
+
+    <div class="error" id="error-box"></div>
+
+    <div class="forgot"><a href="#" onclick="showForgot()">Забыли пароль?</a></div>
+  </div>
+
+  <div id="forgot-form" style="display:none">
+    <label class="label">Введите ваш email</label>
+    <input class="input" type="email" id="forgot-email" placeholder="your@email.com">
+    <button class="btn" onclick="sendReset()">Отправить ссылку для сброса</button>
+    <div class="forgot" style="margin-top:12px"><a href="#" onclick="showLogin()">← Назад</a></div>
+    <div class="error" id="forgot-error"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Импорт резервной копии -->
+  <div style="background:#1A2030;border:0.5px solid #1E3A5F;border-radius:10px;padding:14px;margin-bottom:12px">
+    <div style="font-size:12px;font-weight:600;color:#93C5FD;margin-bottom:6px">📥 Перенести данные из старого журнала</div>
+    <div style="font-size:11px;color:#4A6A8A;margin-bottom:10px;line-height:1.6">Войдите сначала, затем выберите резервную копию (.json) — все заявки загрузятся в облако автоматически</div>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importBackup(this)">
+    <button onclick="checkLoginThenImport()" style="width:100%;padding:9px;background:#1E3A5F;border:0.5px solid #2A4A7F;border-radius:8px;font-size:12px;cursor:pointer;color:#93C5FD">
+      📂 Загрузить резервную копию (.json)
+    </button>
+    <div id="import-status" style="font-size:11px;margin-top:8px;display:none"></div>
+    <div id="import-progress" style="display:none;margin-top:8px">
+      <div style="background:#0C1520;border-radius:999px;height:6px;overflow:hidden">
+        <div id="import-bar" style="background:#185FA5;height:100%;width:0%;transition:width 0.3s;border-radius:999px"></div>
+      </div>
+      <div id="import-text" style="font-size:11px;color:#4A6A8A;margin-top:4px"></div>
+    </div>
+  </div>
+    <b>⚙️ Первоначальная настройка</b><br>
+    Вставьте ваш Supabase URL и ключ ниже чтобы начать работу
+  </div>
+
+  <div id="config-form" style="margin-top:12px">
+    <label class="label" style="margin-top:8px">Supabase URL</label>
+    <input class="input" type="text" id="sb-url" placeholder="https://xxx.supabase.co">
+    <label class="label">Supabase Anon Key</label>
+    <input class="input" type="text" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiJ9...">
+    <button class="btn" style="background:#252018;border:1px solid #2A2520;font-size:13px" onclick="saveConfig()">
+      💾 Сохранить конфигурацию
+    </button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+let sbClient = null;
+
+// Загружаем конфиг из localStorage
+function loadConfig(){
+  const url = 'https://krjhnwjiorpzgqpojgjt.supabase.co';
+  const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtyamhud2ppb3JwemdxcG9qZ2p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTY5NzAsImV4cCI6MjA5Mjg5Mjk3MH0.fgmrOZKVDTb8TOGHTnGXoDArCfB9IUm6rCEryNFTIUs';
+  if(url && key){
+    sbClient = window.supabase.createClient(url, key);
+    document.getElementById('config-form').style.display = 'none';
+    document.getElementById('setup-notice').style.display = 'none';
+    document.getElementById('sb-url').value = url;
+    document.getElementById('sb-key').value = key;
+    return true;
+  }
+  return false;
+}
+
+function saveConfig(){
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  if(!url || !key){ showError('Заполните оба поля'); return; }
+  if(!url.includes('supabase.co')){ showError('Неверный Supabase URL'); return; }
+  localStorage.setItem('fcs_sb_url', url);
+  localStorage.setItem('fcs_sb_key', key);
+  sbClient = window.supabase.createClient(url, key);
+  document.getElementById('config-form').style.display = 'none';
+  document.getElementById('setup-notice').style.display = 'none';
+  showError('✓ Конфигурация сохранена! Теперь войдите.', true);
+}
+
+async function doLogin(){
+  if(!sbClient){ showError('Сначала настройте Supabase ниже'); return; }
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  if(!email || !password){ showError('Введите email и пароль'); return; }
+
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Входим...';
+
+  const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
+
+  if(error){
+    btn.disabled = false;
+    btn.textContent = 'Войти →';
+    const msg = error.message.includes('Invalid login') ? 'Неверный email или пароль' :
+                 error.message.includes('Email not confirmed') ? 'Подтвердите email (проверьте почту)' :
+                 error.message;
+    showError(msg);
+    return;
+  }
+
+  // Логируем вход
+  try{
+    await sbClient.rpc('log_action', { p_action: 'login' });
+  }catch(e){}
+
+  // Получаем профиль и редиректим
+  const { data: profile } = await sbClient
+    .from('profiles')
+    .select('role, full_name')
+    .eq('id', data.user.id)
+    .single();
+
+  btn.innerHTML = '✓ Входим...';
+
+  // Редирект по роли
+  const role = profile?.role || 'viewer';
+  if(role === 'executor'){
+    window.location.href = 'form.html';
+  } else {
+    window.location.href = 'app.html';
+  }
+}
+
+async function sendReset(){
+  if(!sbClient){ showError('Сначала настройте Supabase'); return; }
+  const email = document.getElementById('forgot-email').value.trim();
+  if(!email){ showError('Введите email', false, 'forgot-error'); return; }
+
+  const { error } = await sbClient.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/reset-password.html'
+  });
+
+  if(error){ showError(error.message, false, 'forgot-error'); return; }
+  showError('✓ Письмо отправлено! Проверьте почту.', true, 'forgot-error');
+}
+
+function showError(msg, isSuccess=false, elId='error-box'){
+  const el = document.getElementById(elId);
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.style.background = isSuccess ? '#0F2D1A' : '#2D1515';
+  el.style.borderColor = isSuccess ? '#1A5C30' : '#5C2020';
+  el.style.color = isSuccess ? '#4ADE80' : '#F87171';
+}
+
+function showForgot(){
+  document.getElementById('login-form').style.display = 'none';
+  document.getElementById('forgot-form').style.display = 'block';
+}
+function showLogin(){
+  document.getElementById('forgot-form').style.display = 'none';
+  document.getElementById('login-form').style.display = 'block';
+}
+
+function checkLoginThenImport(){
+  sbClient.auth.getSession().then(({data:{session}})=>{
+    if(session){
+      document.getElementById('import-file').click();
+    } else {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      if(!email||!password){
+        showError('Сначала введите email и пароль выше, затем нажмите кнопку загрузки');
+        return;
+      }
+      sbClient.auth.signInWithPassword({email,password}).then(({data,error})=>{
+        if(error){showError('Неверный email или пароль');return;}
+        document.getElementById('import-file').click();
+      });
+    }
+  });
+}
+
+async function importBackup(input){
+  const file = input.files[0];
+  if(!file) return;
+  const status = document.getElementById('import-status');
+  const progress = document.getElementById('import-progress');
+  const bar = document.getElementById('import-bar');
+  const text = document.getElementById('import-text');
+
+  status.style.display='block';
+  status.style.color='#93C5FD';
+  status.textContent='⏳ Читаем файл...';
+
+  try{
+    const raw = await file.text();
+    const backup = JSON.parse(raw);
+    if(!backup.allMonths) throw new Error('Неверный формат файла');
+
+    const {data:{session}} = await sbClient.auth.getSession();
+    if(!session) throw new Error('Не авторизованы');
+    const uid = session.user.id;
+
+    const allEntries = [];
+    Object.values(backup.allMonths).forEach(arr=>arr.forEach(e=>allEntries.push(e)));
+    status.textContent = `Найдено ${allEntries.length} записей. Загружаем...`;
+    progress.style.display='block';
+
+    let imported=0, errors=0;
+    for(let i=0;i<allEntries.length;i+=20){
+      const batch = allEntries.slice(i,i+20).map(e=>({
+        date:e.date||new Date().toISOString().split('T')[0],
+        dept:e.dept||'logistic',
+        service:e.service||'—',
+        agent:e.agent||null,
+        amount:+e.amount||0,
+        currency:e.currency||'RUB',
+        pay:e.pay||'personal',
+        commission:+e.commission||0,
+        comm_src:e.commSrc||e.comm_src||null,
+        acq_amount:+e.acqAmount||+e.acq_amount||0,
+        agent_amount:+e.agentAmount||+e.agent_amount||0,
+        agent_currency:e.agentCurrency||e.agent_currency||'RUB',
+        agent_pay_type:e.agentPayType||e.agent_pay_type||null,
+        receipt_link:e.receiptLink||e.receipt_link||null,
+        foreign_amount:+e.foreignAmount||+e.foreign_amount||0,
+        foreign_currency:e.foreignCurrency||e.foreign_currency||null,
+        foreign_rate:+e.foreignRate||+e.foreign_rate||0,
+        foreign_commission:+e.foreignCommission||+e.foreign_commission||0,
+        deposit:+e.deposit||0,
+        deposit_ref:e.depositRef||e.deposit_ref||null,
+        is_loss:!!e.isLoss||!!e.is_loss,
+        loss_amount:+e.lossAmount||+e.loss_amount||0,
+        loss_note:e.lossNote||e.loss_note||null,
+        is_expense:!!e.isExpense||!!e.is_expense,
+        expense_note:e.expenseNote||e.expense_note||null,
+        status:e.status||'pending',
+        link:e.link||null,
+        note:e.note||null,
+        submitted_by:uid,
+        from_form:false,
+      }));
+      const {error} = await sbClient.from('entries').insert(batch);
+      if(error) errors++;
+      else imported+=batch.length;
+      const pct = Math.round((i+20)/allEntries.length*100);
+      bar.style.width=Math.min(pct,100)+'%';
+      text.textContent=`Загружено ${imported} из ${allEntries.length}...`;
+      await new Promise(r=>setTimeout(r,50));
+    }
+
+    if(errors===0){
+      status.style.color='#4ADE80';
+      status.textContent=`✅ Импорт завершён! Загружено ${imported} записей.`;
+      text.textContent='Переходим в журнал...';
+      setTimeout(()=>window.location.href='app.html', 2000);
+    } else {
+      status.style.color='#FCA5A5';
+      status.textContent=`⚠ Загружено ${imported}, ошибок: ${errors}`;
+    }
+  }catch(err){
+    status.style.color='#F87171';
+    status.textContent='❌ Ошибка: '+err.message;
+  }
+  input.value='';
+}
+
+// Проверяем авторизацию при загрузке
+loadConfig();
+if(sbClient){
+  sbClient.auth.getSession().then(({ data: { session } }) => {
+    if(session) window.location.href = 'app.html';
+  });
+}
+</script>
+</body>
+</html>

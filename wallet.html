@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FCS — Валютный кошелёк</title>
+<style>
+:root{--bg:#0C0B09;--bg2:#141210;--bg3:#1C1A16;--border:#2A2620;--border2:#363028;--text:#F0EBE0;--text2:#9A9080;--text3:#5A5448;--accent:#185FA5;--green:#0F6E56;--radius:10px;--radius-sm:6px;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}
+.topbar{background:var(--bg2);border:0.5px solid var(--border);border-radius:12px;padding:12px 18px;display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.logo{font-size:14px;font-weight:700}
+.btn{padding:6px 14px;border-radius:var(--radius-sm);border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:12px;cursor:pointer;transition:all 0.15s}
+.btn:hover{background:var(--bg2);color:var(--text)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:#0C447C}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:1fr 1fr 1fr}
+.g4{grid-template-columns:repeat(4,1fr)}
+.card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px}
+.card-title{font-size:13px;font-weight:600;margin-bottom:14px;color:var(--text)}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;padding:10px 12px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none}
+.field input:focus,.field select:focus{border-color:var(--accent)}
+.field select option{background:var(--bg3)}
+.cur-card{background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius);padding:14px;border-left:3px solid}
+.cur-name{font-size:11px;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em}
+.cur-amount{font-size:22px;font-weight:600;margin-bottom:2px}
+.cur-rub{font-size:12px;color:var(--text2)}
+.cur-rate{font-size:11px;color:var(--text3);margin-top:6px;padding-top:6px;border-top:0.5px solid var(--border)}
+.tabs{display:flex;gap:4px;margin-bottom:14px}
+.tab{padding:7px 14px;border-radius:var(--radius-sm);font-size:12px;cursor:pointer;color:var(--text3);border:0.5px solid transparent}
+.tab.active{background:var(--bg3);border-color:var(--border2);color:var(--text)}
+.tx-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:0.5px solid var(--border);font-size:12px}
+.tx-row:last-child{border-bottom:none}
+.calc-box{background:var(--bg3);border-radius:var(--radius-sm);padding:10px;margin-top:8px}
+.calc-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--text2)}
+.calc-total{display:flex;justify-content:space-between;font-size:13px;font-weight:600;padding:8px 0 3px;border-top:0.5px solid var(--border2);margin-top:4px}
+.empty{text-align:center;padding:30px;color:var(--text3);font-size:13px}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius);padding:10px 20px;font-size:13px;z-index:9999;display:none}
+#loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;font-size:13px;color:var(--text3)}
+
+/* Медиа */
+@media(max-width:600px){.g4{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="loading">⏳ Загружаем...</div>
+
+<div id="app" style="display:none">
+  <div class="topbar">
+    <div class="logo">💳 Валютный кошелёк</div>
+    <button class="btn" onclick="window.location.href='app.html'">← Журнал</button>
+    <button class="btn btn-primary" onclick="openAddTopup()">+ Пополнение</button>
+    <span style="margin-left:auto;font-size:12px;color:var(--text3)" id="last-updated"></span>
+  </div>
+
+  <!-- Остатки -->
+  <div class="grid g4" id="wallets-grid" style="margin-bottom:16px"></div>
+
+  <!-- Итого -->
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Итого в рублях (все валюты)</div>
+        <div style="font-size:24px;font-weight:600;color:#A5B4FC" id="total-rub">0 ₽</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Использовано в заявках</div>
+        <div style="font-size:18px;font-weight:500;color:#F87171" id="total-spent">0 ₽</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- История по валютам -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <div class="card-title" style="margin:0">История операций</div>
+      <select id="filter-currency" onchange="renderHistory()" style="background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:var(--radius-sm);padding:5px 10px;font-size:12px">
+        <option value="">Все валюты</option>
+        <option value="EUR">EUR</option>
+        <option value="USD">USD</option>
+        <option value="AED">AED</option>
+        <option value="TRY">TRY</option>
+        <option value="KZT">KZT</option>
+        <option value="GBP">GBP</option>
+        <option value="JPY">JPY</option>
+      </select>
+    </div>
+    <div class="tabs">
+      <div class="tab active" id="tab-all" onclick="switchHistTab('all')">Все</div>
+      <div class="tab" id="tab-topups" onclick="switchHistTab('topups')">Пополнения ↑</div>
+      <div class="tab" id="tab-spending" onclick="switchHistTab('spending')">Списания ↓</div>
+    </div>
+    <div id="history-list"></div>
+  </div>
+</div>
+
+<!-- Модалка пополнения -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px;backdrop-filter:blur(4px)">
+<div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:14px;padding:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto">
+  <h3 style="font-size:16px;font-weight:600;margin-bottom:20px">+ Пополнение валюты</h3>
+  <div class="grid g2">
+    <div class="field"><label>Дата обмена</label><input type="date" id="m-date"></div>
+    <div class="field"><label>Валюта</label>
+      <select id="m-currency" onchange="calcTopup()">
+        <option value="EUR">EUR €</option>
+        <option value="USD">USD $</option>
+        <option value="AED">AED</option>
+        <option value="TRY">TRY ₺</option>
+        <option value="KZT">KZT ₸</option>
+        <option value="GBP">GBP £</option>
+        <option value="JPY">JPY ¥</option>
+      </select>
+    </div>
+  </div>
+  <div class="grid g2">
+    <div class="field"><label>Получено валюты</label><input type="number" id="m-amount-cur" placeholder="напр. 100" oninput="calcTopup()"></div>
+    <div class="field"><label>Потрачено рублей</label><input type="number" id="m-amount-rub" placeholder="напр. 9 550" oninput="calcTopup()"></div>
+  </div>
+  <div class="calc-box" id="calc-topup" style="display:none">
+    <div class="calc-row" id="calc-topup-formula"><span>Расчёт курса</span><span>—</span></div>
+    <div class="calc-total">
+      <span style="color:var(--text)">Курс обмена</span>
+      <span style="color:#FCD34D" id="calc-topup-rate">—</span>
+    </div>
+  </div>
+  <div class="field" style="margin-top:12px"><label>Комментарий</label><input type="text" id="m-note" placeholder="напр. Обменник на Тверской"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:14px;border-top:0.5px solid var(--border)">
+    <button class="btn" onclick="closeModal()">Отмена</button>
+    <button class="btn btn-primary" onclick="saveTopup()">💾 Сохранить</button>
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SB_URL='https://krjhnwjiorpzgqpojgjt.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtyamhud2ppb3JwemdxcG9qZ2p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTY5NzAsImV4cCI6MjA5Mjg5Mjk3MH0.fgmrOZKVDTb8TOGHTnGXoDArCfB9IUm6rCEryNFTIUs';
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+
+let currentUserId=null;
+let topups=[];
+let spendings=[];
+let histTab='all';
+
+const CUR_COLORS={EUR:'#818CF8',USD:'#6EE7B7',AED:'#FCD34D',TRY:'#F9A8D4',KZT:'#FCA5A5',GBP:'#93C5FD',JPY:'#A5F3FC'};
+const CUR_SYMBOLS={EUR:'€',USD:'$',AED:'د.إ',TRY:'₺',KZT:'₸',GBP:'£',JPY:'¥'};
+
+function fmt(n){return Number(n||0).toLocaleString('ru-RU');}
+function fmtCur(n,cur){return Number(n||0).toLocaleString('ru-RU',{maximumFractionDigits:cur==='KZT'||cur==='JPY'?0:2});}
+
+async function init(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){window.location.href='index.html';return;}
+  currentUserId=session.user.id;
+  await loadData();
+  document.getElementById('loading').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('last-updated').textContent='Обновлено: '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+}
+
+async function loadData(){
+  // Загружаем только пополнения
+  const {data:t}=await sb.from('currency_topups').select('*').order('date',{ascending:false});
+  topups=t||[];
+
+  // Загружаем списания из заявок — только для валют которые есть в пополнениях
+  const topupCurrencies=new Set(topups.map(t=>t.currency));
+  if(topupCurrencies.size>0){
+    const {data:e}=await sb.from('entries')
+      .select('id,date,agent_amount,agent_currency,service,link')
+      .in('agent_currency',[...topupCurrencies])
+      .gt('agent_amount',0)
+      .order('date',{ascending:false});
+    spendings=e||[];
+  } else {
+    spendings=[];
+  }
+
+  renderWallets();
+  renderHistory();
+}
+
+// ===== КОШЕЛЬКИ =====
+function getWalletData(){
+  const wallets={};
+  // Только пополнения определяют список валют
+  topups.forEach(t=>{
+    if(!wallets[t.currency]) wallets[t.currency]={currency:t.currency,balance:0,totalTopup:0,totalSpent:0,lastRate:0,lastDate:null};
+    wallets[t.currency].balance+=+t.amount_currency;
+    wallets[t.currency].totalTopup+=+t.amount_currency;
+    const rate=+t.amount_rub/+t.amount_currency;
+    if(!wallets[t.currency].lastDate||t.date>wallets[t.currency].lastDate){
+      wallets[t.currency].lastRate=rate;
+      wallets[t.currency].lastDate=t.date;
+    }
+  });
+  // Списания только по валютам которые есть в пополнениях
+  spendings.forEach(e=>{
+    const cur=e.agent_currency;
+    if(!wallets[cur]) return; // пропускаем если нет пополнения по этой валюте
+    wallets[cur].balance-=+e.agent_amount;
+    wallets[cur].totalSpent+=+e.agent_amount;
+  });
+  return wallets;
+}
+
+function renderWallets(){
+  const wallets=getWalletData();
+  const grid=document.getElementById('wallets-grid');
+  const entries=Object.values(wallets);
+  if(!entries.length){
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text3);font-size:13px">Нет данных — добавьте пополнение</div>';
+    return;
+  }
+  grid.innerHTML=entries.map(w=>{
+    const color=CUR_COLORS[w.currency]||'#9A9080';
+    const balRub=w.balance*w.lastRate;
+    const isLow=w.balance<0;
+    return`<div class="cur-card" style="border-left-color:${color}">
+      <div class="cur-name">${w.currency} ${CUR_SYMBOLS[w.currency]||''}</div>
+      <div class="cur-amount" style="color:${isLow?'#F87171':color}">${fmtCur(w.balance,w.currency)}</div>
+      <div class="cur-rub">≈ ${fmt(Math.round(balRub))} ₽</div>
+      <div class="cur-rate">
+        Курс: ${w.lastRate>0?w.lastRate.toFixed(w.lastRate<1?4:2)+' ₽':'—'}<br>
+        Пополнено: ${fmtCur(w.totalTopup,w.currency)} · Списано: ${fmtCur(w.totalSpent,w.currency)}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Итого
+  const totalRub=Object.values(wallets).reduce((s,w)=>s+w.balance*w.lastRate,0);
+  const totalSpent=Object.values(wallets).reduce((s,w)=>s+w.totalSpent*(w.lastRate||0),0);
+  document.getElementById('total-rub').textContent=fmt(Math.round(totalRub))+' ₽';
+  document.getElementById('total-spent').textContent=fmt(Math.round(totalSpent))+' ₽';
+}
+
+// ===== ИСТОРИЯ =====
+function switchHistTab(t){
+  histTab=t;
+  ['all','topups','spending'].forEach(x=>{
+    document.getElementById('tab-'+x).classList.toggle('active',x===t);
+  });
+  renderHistory();
+}
+
+function renderHistory(){
+  const filterCur=document.getElementById('filter-currency').value;
+  const list=document.getElementById('history-list');
+
+  // Объединяем операции
+  let ops=[];
+
+  if(histTab!=='spending'){
+    topups.forEach(t=>{
+      if(filterCur&&t.currency!==filterCur) return;
+      const rate=+t.amount_rub/+t.amount_currency;
+      ops.push({date:t.date,type:'topup',currency:t.currency,amount:+t.amount_currency,rub:+t.amount_rub,rate,note:t.note||'Пополнение',id:t.id});
+    });
+  }
+
+  if(histTab!=='topups'){
+    spendings.forEach(e=>{
+      if(filterCur&&e.agent_currency!==filterCur) return;
+      const lead=(e.link||'').match(/\/leads\/detail\/(\d+)/);
+      ops.push({date:e.date,type:'spending',currency:e.agent_currency,amount:+e.agent_amount,note:e.service||(lead?'#'+lead[1]:'Заявка'),id:e.id});
+    });
+  }
+
+  ops.sort((a,b)=>b.date.localeCompare(a.date));
+
+  if(!ops.length){list.innerHTML='<div class="empty">Нет операций</div>';return;}
+
+  list.innerHTML=ops.slice(0,50).map(op=>{
+    const color=CUR_COLORS[op.currency]||'#9A9080';
+    const sym=CUR_SYMBOLS[op.currency]||'';
+    const isTopup=op.type==='topup';
+    return`<div class="tx-row">
+      <div>
+        <div style="color:var(--text);margin-bottom:2px">${op.note||'—'}</div>
+        <div style="font-size:10px;color:var(--text3)">${op.date} · ${op.currency}${isTopup&&op.rate?' · курс '+op.rate.toFixed(op.rate<1?4:2)+' ₽':''}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:600;color:${isTopup?color:'#F87171'}">${isTopup?'+':'−'}${fmtCur(op.amount,op.currency)} ${sym}</div>
+        ${isTopup?`<div style="font-size:10px;color:var(--text3)">${fmt(op.rub)} ₽</div>`:''}
+        ${!isTopup?`<button onclick="window.location.href='app.html'" style="font-size:10px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;margin-top:2px">в журнале →</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ===== ПОПОЛНЕНИЕ =====
+function openAddTopup(){
+  document.getElementById('m-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('m-amount-cur').value='';
+  document.getElementById('m-amount-rub').value='';
+  document.getElementById('m-note').value='';
+  document.getElementById('calc-topup').style.display='none';
+  document.getElementById('modal').style.display='flex';
+}
+
+function closeModal(){document.getElementById('modal').style.display='none';}
+
+function calcTopup(){
+  const amtCur=+document.getElementById('m-amount-cur').value||0;
+  const amtRub=+document.getElementById('m-amount-rub').value||0;
+  const cur=document.getElementById('m-currency').value;
+  const box=document.getElementById('calc-topup');
+  if(amtCur>0&&amtRub>0){
+    const rate=amtRub/amtCur;
+    box.style.display='block';
+    document.getElementById('calc-topup-formula').innerHTML=`<span>${fmt(amtRub)} ₽ ÷ ${fmtCur(amtCur,cur)} ${cur}</span><span>=</span>`;
+    document.getElementById('calc-topup-rate').textContent=rate.toFixed(rate<1?4:2)+' ₽ за 1 '+cur;
+  } else {
+    box.style.display='none';
+  }
+}
+
+async function saveTopup(){
+  const date=document.getElementById('m-date').value;
+  const currency=document.getElementById('m-currency').value;
+  const amtCur=+document.getElementById('m-amount-cur').value||0;
+  const amtRub=+document.getElementById('m-amount-rub').value||0;
+  if(!date||!amtCur||!amtRub){showToast('Заполните все поля');return;}
+  const {error}=await sb.from('currency_topups').insert({
+    date,currency,
+    amount_currency:amtCur,
+    amount_rub:amtRub,
+    note:document.getElementById('m-note').value.trim()||null,
+    created_by:currentUserId
+  });
+  if(error){showToast('Ошибка: '+error.message);return;}
+  closeModal();
+  await loadData();
+  showToast('✓ Пополнение сохранено');
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.style.display='block';
+  setTimeout(()=>t.style.display='none',3000);
+}
+
+init();
+</script>
+</body>
+</html>

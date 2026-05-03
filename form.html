@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Заявка на оплату — FCS</title>
+<style>
+:root{--bg:#0C0B09;--bg2:#141210;--bg3:#1C1A16;--border:#2A2620;--border2:#363028;--text:#F0EBE0;--text2:#9A9080;--text3:#5A5448;--accent:#185FA5;--green:#0F6E56;--radius:10px;--radius-sm:6px;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px 16px 60px}
+.container{max-width:540px;margin:0 auto}
+.header{background:var(--bg2);border:0.5px solid var(--border);border-radius:14px 14px 0 0;padding:20px 24px}
+.header-title{font-size:18px;font-weight:700;margin-bottom:2px}
+.header-sub{font-size:12px;color:var(--text3)}
+.user-info{margin-top:10px;padding:8px 12px;background:var(--bg3);border-radius:var(--radius-sm);font-size:12px;color:var(--text2);display:flex;justify-content:space-between;align-items:center}
+.card{background:var(--bg2);border:0.5px solid var(--border);border-left:none;border-right:none;padding:20px 24px}
+.section-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:14px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em}
+.field input,.field select,.field textarea{width:100%;padding:11px 14px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none;transition:border-color 0.15s;font-family:inherit}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent)}
+.field input::placeholder,.field textarea::placeholder{color:var(--text3)}
+.field select option{background:var(--bg3)}
+.field.required label::after{content:" *";color:#F87171}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.autocomplete-wrap{position:relative}
+.autocomplete-list{position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:0.5px solid var(--accent);border-radius:var(--radius-sm);z-index:100;max-height:180px;overflow-y:auto;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.5)}
+.autocomplete-item{padding:10px 14px;font-size:13px;cursor:pointer;border-bottom:0.5px solid var(--border)}
+.autocomplete-item:hover{background:var(--bg3);color:var(--accent)}
+.autocomplete-item:last-child{border-bottom:none}
+.calc-box{background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius);padding:14px;margin-top:8px}
+.calc-row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;color:var(--text2)}
+.calc-row.total{border-top:0.5px solid var(--border2);margin-top:8px;padding-top:10px;font-size:15px;font-weight:600;color:#2ECC71}
+.loss-warning{background:#1A0808;border:1px solid #5C1A1A;border-radius:var(--radius-sm);padding:12px;margin-top:8px;display:none}
+.file-upload{border:1.5px dashed var(--border2);border-radius:var(--radius-sm);padding:16px;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--bg3)}
+.file-upload:hover{border-color:var(--accent)}
+.file-attached{background:#0A2018;border:1px solid var(--green);border-radius:var(--radius-sm);padding:10px 12px;display:flex;align-items:center;gap:8px;font-size:12px;color:#2ECC71;margin-top:8px}
+.btn-submit{width:100%;padding:15px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;transition:background 0.15s}
+.btn-submit:hover{background:#0C447C}
+.btn-submit:disabled{background:var(--border2);color:var(--text3);cursor:not-allowed}
+.success{background:var(--bg2);border:0.5px solid var(--border);border-radius:14px;padding:40px 24px;text-align:center;display:none}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;font-size:13px;color:var(--text3)}
+</style>
+</head>
+<body>
+<div id="loading">⏳ Загружаем...</div>
+<div class="container" id="app" style="display:none">
+  <div class="header">
+    <div class="header-title">🏢 Заявка на оплату</div>
+    <div class="header-sub">First Concierge Service</div>
+    <div class="user-info"><span id="user-display">...</span><span onclick="doLogout()" style="cursor:pointer;color:var(--text3)">Выйти</span></div>
+  </div>
+  <div id="form-area">
+    <!-- Данные заявки -->
+    <div class="card">
+      <div class="section-title">📋 Данные заявки</div>
+      <div class="field required"><label>Наименование</label><input type="text" id="f-service" placeholder="напр. Оформление билетов в Рим 15.05"></div>
+      <div class="grid2">
+        <div class="field required"><label>Дата оплаты</label><input type="date" id="f-date"></div>
+        <div class="field required"><label>Направление</label>
+          <select id="f-dept">
+            <option value="">— выберите —</option>
+            <option value="travel">Travel</option>
+            <option value="logistic">Logistics</option>
+            <option value="lifestyle">Lifestyle</option>
+            <option value="kbr">КБР</option>
+            <option value="vip">VIP ⭐</option>
+            <option value="internal">Внутренний</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Ссылка AmoCRM</label><input type="text" id="f-link" placeholder="27XXXXXX или полная ссылка"></div>
+    </div>
+    <!-- Приход -->
+    <div class="card">
+      <div class="section-title">💰 Приход от клиента</div>
+      <div class="grid2">
+        <div class="field"><label>Сумма FCS (₽) <span style="font-size:10px;color:var(--text3)">необяз.</span></label><input type="number" id="f-amount" placeholder="0" oninput="calcForm()"></div>
+        <div class="field required"><label>Тип оплаты FCS</label>
+          <select id="f-pay" onchange="onPayChange()">
+            <option value="personal">Перевод на карту</option>
+            <option value="invoice">По счёту</option>
+            <option value="qr">По QR (эквайринг 1%)</option>
+            <option value="link">По ссылке (эквайринг 3%)</option>
+          </select>
+        </div>
+      </div>
+      <div class="calc-box">
+        <div class="calc-row"><span>Приход от клиента</span><span id="c-income">0 ₽</span></div>
+        <div class="calc-row" id="c-acq-row" style="display:none"><span id="c-acq-label">Эквайринг</span><span style="color:#F87171" id="c-acq">0 ₽</span></div>
+        <div class="calc-row" id="c-agent-row" style="display:none"><span>Расход контрагенту</span><span style="color:#F87171" id="c-agent-val">0 ₽</span></div>
+        <div class="calc-row total"><span>Комиссия FCS</span><span id="c-comm">0 ₽</span></div>
+      </div>
+      <div class="loss-warning" id="loss-warning">
+        <div style="font-size:12px;font-weight:600;color:#F87171;margin-bottom:4px">⚠️ Компания в минусе!</div>
+        <div style="font-size:11px;color:#FCA5A5">Приход равен расходу — эквайринг съедает прибыль. Заявка будет отмечена как потеря.</div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label>Комиссия FCS (₽) <span style="font-size:10px;color:var(--text3)">— можно изменить вручную</span></label>
+        <input type="number" id="f-commission" placeholder="0" style="font-size:16px;font-weight:600;color:#2ECC71">
+      </div>
+    </div>
+    <!-- Расход -->
+    <div class="card">
+      <div class="section-title">📤 Кому платим</div>
+      <div class="field">
+        <label>Контрагент</label>
+        <div class="autocomplete-wrap">
+          <input type="text" id="f-agent" placeholder="Начните вводить имя..." autocomplete="off" oninput="onAgentInput()" onfocus="onAgentInput()">
+          <div class="autocomplete-list" id="agent-list"></div>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Сумма расхода</label><input type="number" id="f-agent-amount" placeholder="0" oninput="calcForm()"></div>
+        <div class="field"><label>Валюта</label>
+          <select id="f-agent-currency" onchange="calcForm()">
+            <option value="RUB">RUB ₽</option><option value="USD">USD $</option><option value="EUR">EUR €</option>
+            <option value="GBP">GBP £</option><option value="AED">AED</option><option value="TRY">TRY ₺</option><option value="KZT">KZT ₸</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Тип оплаты контрагенту</label>
+        <select id="f-agent-pay-type" onchange="onAgentPayChange()">
+          <option value="">— не указано —</option>
+          <option value="card_rf">Карта РФ</option>
+          <option value="foreign_card">Иностранная карта</option>
+          <option value="cash">Наличные</option>
+        </select>
+      </div>
+      <!-- Реквизиты -->
+      <div id="payment-details" style="display:none;padding-top:8px;border-top:0.5px solid var(--border2)">
+        <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.06em">📎 Реквизиты для оплаты</div>
+        <div class="field" id="card-field" style="display:none"><label>Номер карты или телефон</label><input type="text" id="f-card-number" placeholder="4276 1234 5678 9012 или +7 999..."></div>
+        <div class="field" id="link-field" style="display:none"><label>Ссылка для оплаты</label><input type="text" id="f-payment-link" placeholder="https://..."></div>
+        <div id="invoice-field" style="display:none">
+          <label style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:6px">PDF Счёт на оплату</label>
+          <div class="file-upload" onclick="document.getElementById('f-invoice-file').click()">
+            <div style="font-size:24px;margin-bottom:6px">📄</div>
+            <div style="font-size:12px;color:var(--text3)">Нажмите чтобы прикрепить счёт (PDF или фото)</div>
+          </div>
+          <input type="file" id="f-invoice-file" accept=".pdf,image/*" style="display:none" onchange="onFileSelected(this)">
+          <div id="file-attached" style="display:none" class="file-attached">
+            <span>📎</span><span id="file-name">файл</span>
+            <button onclick="removeFile()" style="margin-left:auto;background:none;border:none;color:#F87171;cursor:pointer;font-size:18px">×</button>
+          </div>
+        </div>
+        <div class="field"><label>Комментарий к оплате</label><textarea id="f-payment-comment" placeholder="Доп. информация для казначея..." style="min-height:60px;resize:vertical"></textarea></div>
+      </div>
+    </div>
+    <!-- Доп -->
+    <div class="card" style="border-radius:0 0 14px 14px;border-bottom:0.5px solid var(--border)">
+      <div class="section-title">📝 Дополнительно</div>
+      <div class="field"><label>Комментарий</label><textarea id="f-note" style="min-height:70px;resize:vertical" placeholder="Любая важная информация..."></textarea></div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;padding:12px;background:var(--bg3);border-radius:var(--radius-sm);border:0.5px solid var(--border2)">
+        <input type="checkbox" id="f-is-loss"> <span>⚠️ Потеря компании</span>
+      </label>
+      <div id="f-loss-fields" style="display:none;margin-top:8px;background:#1A0808;border-radius:var(--radius-sm);padding:12px">
+        <div class="grid2">
+          <div class="field" style="margin:0"><label>Сумма потери (₽)</label><input type="number" id="f-loss-amount" placeholder="0"></div>
+          <div class="field" style="margin:0"><label>Причина</label><input type="text" id="f-loss-note" placeholder="Причина..."></div>
+        </div>
+      </div>
+    </div>
+    <button class="btn-submit" id="btn-submit" onclick="submitForm()">📨 Отправить заявку</button>
+  </div>
+  <div class="success" id="success">
+    <div style="font-size:48px;margin-bottom:16px">✅</div>
+    <div style="font-size:20px;font-weight:600;color:#2ECC71;margin-bottom:8px">Заявка отправлена!</div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:24px" id="success-msg"></div>
+    <button onclick="resetForm()" style="padding:12px 24px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius);color:var(--text2);font-size:14px;cursor:pointer">📝 Подать новую заявку</button>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SB_URL="https://krjhnwjiorpzgqpojgjt.supabase.co";
+const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtyamhud2ppb3JwemdxcG9qZ2p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTY5NzAsImV4cCI6MjA5Mjg5Mjk3MH0.fgmrOZKVDTb8TOGHTnGXoDArCfB9IUm6rCEryNFTIUs";
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+let currentUser=null,currentProfile=null,contractors=[],selectedFile=null;
+function fmt(n){return Number(n||0).toLocaleString("ru-RU");}
+
+async function init(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){window.location.href="index.html";return;}
+  currentUser=session.user;
+  const {data:profile}=await sb.from("profiles").select("*").eq("id",currentUser.id).single();
+  currentProfile=profile;
+  document.getElementById("user-display").textContent=profile?.full_name||currentUser.email;
+  document.getElementById("f-date").value=new Date().toISOString().split("T")[0];
+  document.getElementById("loading").style.display="none";
+  document.getElementById("app").style.display="block";
+  await loadContractors();
+  calcForm();
+  document.getElementById("f-is-loss").addEventListener("change",function(){
+    document.getElementById("f-loss-fields").style.display=this.checked?"block":"none";
+  });
+  document.addEventListener("click",e=>{
+    if(!e.target.closest(".autocomplete-wrap"))document.getElementById("agent-list").style.display="none";
+  });
+}
+
+async function loadContractors(){
+  try{
+    const {data}=await sb.from("entries").select("agent").not("agent","is",null).limit(500);
+    contractors=[...new Set((data||[]).map(e=>e.agent).filter(Boolean).map(a=>a.trim()))].sort();
+  }catch(e){contractors=[];}
+}
+
+function onAgentInput(){
+  const val=(document.getElementById("f-agent").value||"").toLowerCase().trim();
+  const list=document.getElementById("agent-list");
+  if(!val){list.style.display="none";return;}
+  const matches=contractors.filter(c=>c.toLowerCase().includes(val)).slice(0,8);
+  if(!matches.length){list.style.display="none";return;}
+  list.innerHTML=matches.map(c=>`<div class="autocomplete-item" onclick="selectAgent(this.textContent.trim())">${c}</div>`).join("");
+  list.style.display="block";
+}
+
+function selectAgent(name){
+  document.getElementById("f-agent").value=name;
+  document.getElementById("agent-list").style.display="none";
+}
+
+function onPayChange(){
+  const pay=document.getElementById("f-pay").value;
+  const sel=document.getElementById("f-agent-pay-type");
+  if(pay==="personal"){
+    sel.innerHTML=`<option value="">— не указано —</option><option value="card_rf">Карта РФ</option><option value="foreign_card">Иностранная карта</option><option value="cash">Наличные</option>`;
+  }else{
+    sel.innerHTML=`<option value="">— не указано —</option><option value="invoice">Счёт</option><option value="corp_card">Корп. карта</option>`;
+  }
+  calcForm();
+}
+
+function onAgentPayChange(){
+  const val=document.getElementById("f-agent-pay-type").value;
+  document.getElementById("payment-details").style.display=val?"block":"none";
+  document.getElementById("card-field").style.display=(val==="card_rf"||val==="foreign_card")?"block":"none";
+  document.getElementById("link-field").style.display=val==="corp_card"?"block":"none";
+  document.getElementById("invoice-field").style.display=val==="invoice"?"block":"none";
+}
+
+function onFileSelected(input){
+  const file=input.files[0];if(!file)return;
+  selectedFile=file;
+  document.getElementById("file-name").textContent=file.name;
+  document.getElementById("file-attached").style.display="flex";
+}
+
+function removeFile(){
+  selectedFile=null;
+  document.getElementById("f-invoice-file").value="";
+  document.getElementById("file-attached").style.display="none";
+}
+
+function calcForm(){
+  const pay=document.getElementById("f-pay").value;
+  const income=+document.getElementById("f-amount").value||0;
+  const agentAmt=+document.getElementById("f-agent-amount").value||0;
+  const agentCur=document.getElementById("f-agent-currency").value;
+  let acq=0;
+  if(pay==="qr")acq=Math.round(income*0.01);
+  if(pay==="link")acq=Math.round(income*0.03);
+  const agentRub=agentCur==="RUB"?agentAmt:0;
+  const comm=income-acq-agentRub;
+  document.getElementById("c-income").textContent=fmt(income)+" ₽";
+  const acqRow=document.getElementById("c-acq-row");
+  if(acq>0){acqRow.style.display="flex";document.getElementById("c-acq-label").textContent=pay==="qr"?"Эквайринг 1%":"Эквайринг 3%";document.getElementById("c-acq").textContent="−"+fmt(acq)+" ₽";}
+  else acqRow.style.display="none";
+  const agRow=document.getElementById("c-agent-row");
+  if(agentRub>0){agRow.style.display="flex";document.getElementById("c-agent-val").textContent="−"+fmt(agentRub)+" ₽";}
+  else agRow.style.display="none";
+  const commEl=document.getElementById("c-comm");
+  commEl.textContent=fmt(Math.max(0,comm))+" ₽";
+  commEl.style.color=comm<0?"#F87171":"#2ECC71";
+  document.getElementById("f-commission").value=Math.max(0,comm)||"";
+  const warn=document.getElementById("loss-warning");
+  if(acq>0&&comm<=0&&income>0){
+    warn.style.display="block";
+    document.getElementById("f-is-loss").checked=true;
+    document.getElementById("f-loss-fields").style.display="block";
+    document.getElementById("f-loss-amount").value=acq;
+    document.getElementById("f-loss-note").value="Эквайринг "+(pay==="qr"?"1%":"3%")+" — приход равен расходу";
+  }else{warn.style.display="none";}
+}
+
+async function submitForm(){
+  const service=document.getElementById("f-service").value.trim();
+  const dept=document.getElementById("f-dept").value;
+  const date=document.getElementById("f-date").value;
+  if(!service||!dept||!date){alert("Заполните: Наименование, Направление, Дата");return;}
+  const btn=document.getElementById("btn-submit");
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Отправляем...';
+  const link=document.getElementById("f-link").value.trim();
+  const normalizedLink=/^\d+$/.test(link)?"https://conciergecom.amocrm.ru/leads/detail/"+link:link;
+  const pay=document.getElementById("f-pay").value;
+  const amount=+document.getElementById("f-amount").value||0;
+  const agentAmt=+document.getElementById("f-agent-amount").value||0;
+  const agentCur=document.getElementById("f-agent-currency").value;
+  const isLoss=document.getElementById("f-is-loss").checked;
+  const agentPayType=document.getElementById("f-agent-pay-type").value;
+  const cardNum=document.getElementById("f-card-number").value.trim();
+  const paymentLink=document.getElementById("f-payment-link").value.trim();
+  const payComment=document.getElementById("f-payment-comment").value.trim();
+  let treasuryInfo="";
+  if(cardNum)treasuryInfo+="Карта/телефон: "+cardNum+"\n";
+  if(paymentLink)treasuryInfo+="Ссылка: "+paymentLink+"\n";
+  if(payComment)treasuryInfo+="Комментарий: "+payComment;
+  const noteText=[document.getElementById("f-note").value.trim(),treasuryInfo].filter(Boolean).join("\n---\n");
+  let receiptLink=null;
+  if(selectedFile){
+    try{
+      const fileExt=selectedFile.name.split(".").pop();
+      const fileName="invoices/"+Date.now()+"_"+currentUser.id+"."+fileExt;
+      const {error:fe}=await sb.storage.from("documents").upload(fileName,selectedFile);
+      if(!fe){const {data:{publicUrl}}=sb.storage.from("documents").getPublicUrl(fileName);receiptLink=publicUrl;}
+    }catch(e){}
+  }
+  const payload={date,dept,service,
+    agent:document.getElementById("f-agent").value.trim()||null,
+    amount,currency:"RUB",pay,
+    agent_amount:agentAmt,agent_currency:agentCur,agent_pay_type:agentPayType||null,
+    receipt_link:receiptLink,
+    commission:+document.getElementById("f-commission").value||0,
+    status:"pending",link:normalizedLink||null,note:noteText||null,
+    is_loss:isLoss,loss_amount:isLoss?+document.getElementById("f-loss-amount").value||0:0,
+    loss_note:isLoss?document.getElementById("f-loss-note").value.trim():null,
+    is_expense:false,submitted_by:currentUser.id,from_form:true
+  };
+  const {error}=await sb.from("entries").insert(payload);
+  btn.disabled=false;btn.innerHTML="📨 Отправить заявку";
+  if(error){alert("Ошибка: "+error.message);return;}
+  const leadMatch=normalizedLink?.match(/\/leads\/detail\/(\d+)/);
+  document.getElementById("success-msg").innerHTML="<b>"+service+"</b><br>"+(leadMatch?"№ заявки: #"+leadMatch[1]+"<br>":"")+"Сумма: "+fmt(amount)+" ₽ · Комиссия: "+fmt(+document.getElementById("f-commission").value||0)+" ₽<br><br>✅ Заявка добавлена в журнал";
+  document.getElementById("form-area").style.display="none";
+  document.getElementById("success").style.display="block";
+}
+
+function resetForm(){
+  document.getElementById("form-area").style.display="block";
+  document.getElementById("success").style.display="none";
+  ["f-service","f-agent","f-link","f-note","f-loss-note","f-card-number","f-payment-link","f-payment-comment"].forEach(id=>document.getElementById(id).value="");
+  ["f-amount","f-agent-amount","f-commission","f-loss-amount"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("f-date").value=new Date().toISOString().split("T")[0];
+  document.getElementById("f-dept").value="";
+  document.getElementById("f-pay").value="personal";
+  document.getElementById("f-agent-currency").value="RUB";
+  document.getElementById("f-agent-pay-type").value="";
+  document.getElementById("f-is-loss").checked=false;
+  document.getElementById("f-loss-fields").style.display="none";
+  document.getElementById("payment-details").style.display="none";
+  document.getElementById("loss-warning").style.display="none";
+  selectedFile=null;document.getElementById("file-attached").style.display="none";
+  onPayChange();calcForm();window.scrollTo({top:0,behavior:"smooth"});
+}
+
+async function doLogout(){await sb.auth.signOut();window.location.href="index.html";}
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FCS — Сверка поступлений</title>
+<style>
+:root{--bg:#0C0B09;--bg2:#141210;--bg3:#1C1A16;--border:#2A2620;--border2:#363028;--text:#F0EBE0;--text2:#9A9080;--text3:#5A5448;--accent:#185FA5;--green:#0F6E56;--red:#A32D2D;--amber:#B07820;--radius:10px;--radius-sm:6px;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}
+.topbar{background:var(--bg2);border:0.5px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.logo{font-size:14px;font-weight:700}
+.btn{padding:6px 14px;border-radius:var(--radius-sm);border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:12px;cursor:pointer;transition:all 0.15s;white-space:nowrap}
+.btn:hover{background:var(--bg2);color:var(--text)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:#0C447C}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stat{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.stat-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px}
+.stat-value{font-size:20px;font-weight:600}
+.section{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden}
+.section-header{padding:14px 18px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.section-title{font-size:14px;font-weight:600}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:500}
+.badge-green{background:#0A2018;color:#2ECC71}
+.badge-red{background:#2A1010;color:#F87171}
+.badge-amber{background:#1A1505;color:#FCD34D}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:600px}
+th{background:var(--bg3);padding:9px 14px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);border-bottom:0.5px solid var(--border);font-weight:500;white-space:nowrap}
+td{padding:9px 14px;border-bottom:0.5px solid var(--border);font-size:12px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#141210}
+.check-btn{width:28px;height:28px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:14px;transition:all 0.15s}
+.check-btn:hover{border-color:var(--accent)}
+.check-btn.received{background:#0A2018;border-color:var(--green);color:#2ECC71}
+.check-btn.not-received{background:#2A1010;border-color:var(--red);color:#F87171}
+.upload-area{border:2px dashed var(--border2);border-radius:var(--radius);padding:24px;text-align:center;cursor:pointer;margin:16px;transition:all 0.15s}
+.upload-area:hover{border-color:var(--accent);background:#0C1A2E}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading{text-align:center;padding:40px;color:var(--text3)}
+input[type=file]{display:none}
+.tolerance-note{font-size:11px;color:var(--text3);margin-top:4px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">🏦 Сверка поступлений</div>
+  <button class="btn" onclick="window.location.href='app.html'">← Журнал</button>
+  <button class="btn btn-primary" onclick="document.getElementById('f-excel').click()">📂 Загрузить выписку</button>
+  <input type="file" id="f-excel" accept=".xlsx,.xls" onchange="loadExcel(this)">
+  <button class="btn btn-primary" onclick="runReconcile()" id="btn-reconcile" style="display:none">🔍 Сверить с журналом</button>
+  <span id="status-text" style="font-size:12px;color:var(--text3)">Загрузите выписку из банка чтобы начать сверку</span>
+</div>
+
+<!-- Статистика -->
+<div class="stats" id="stats" style="display:none">
+  <div class="stat">
+    <div class="stat-label">Поступлений в выписке</div>
+    <div class="stat-value" id="s-total">0</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">✅ Найдено в журнале</div>
+    <div class="stat-value" style="color:#2ECC71" id="s-matched">0</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">❓ Не найдено в журнале</div>
+    <div class="stat-value" style="color:#F59E0B" id="s-unmatched">0</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">⚠️ Заявки без поступления</div>
+    <div class="stat-value" style="color:#F87171" id="s-missing">0</div>
+  </div>
+</div>
+
+<!-- Найденные совпадения -->
+<div class="section" id="section-matched" style="display:none">
+  <div class="section-header">
+    <div class="section-title">✅ Найдено в журнале</div>
+    <span class="badge badge-green" id="cnt-matched">0</span>
+    <div class="tolerance-note">Допуск ±100 ₽ на погрешность</div>
+    <button class="btn btn-primary" onclick="markAllMatched()" style="margin-left:auto;font-size:11px">✓ Отметить все как поступившие</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Дата выписки</th><th>Сумма выписки</th>
+        <th>Заявка в журнале</th><th>Дата заявки</th><th>Сумма FCS</th><th>Наименование</th>
+        <th>Поступило ✓</th>
+      </tr></thead>
+      <tbody id="tbody-matched"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Не найдены в журнале -->
+<div class="section" id="section-unmatched" style="display:none">
+  <div class="section-header">
+    <div class="section-title">❓ Поступления без заявки в журнале</div>
+    <span class="badge badge-amber" id="cnt-unmatched">0</span>
+    <div class="tolerance-note" style="margin-left:auto">Деньги пришли, но заявки нет — возможно не внесена</div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Дата</th><th>Сумма</th><th>Статус</th></tr></thead>
+      <tbody id="tbody-unmatched"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Заявки без поступления -->
+<div class="section" id="section-missing" style="display:none">
+  <div class="section-header">
+    <div class="section-title">⚠️ Заявки без поступления в выписке</div>
+    <span class="badge badge-red" id="cnt-missing">0</span>
+    <div class="tolerance-note" style="margin-left:auto">Заявки есть, но деньги не пришли</div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Дата</th><th>Наименование</th><th>Сумма FCS</th><th>Статус</th><th>Поступило ✓</th>
+      </tr></thead>
+      <tbody id="tbody-missing"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="loading" id="loading" style="display:none">
+  <span class="spinner"></span> Сверяем данные...
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const SB_URL='https://krjhnwjiorpzgqpojgjt.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtyamhud2ppb3JwemdxcG9qZ2p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTY5NzAsImV4cCI6MjA5Mjg5Mjk3MH0.fgmrOZKVDTb8TOGHTnGXoDArCfB9IUm6rCEryNFTIUs';
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+
+let bankPayments=[];
+let journalEntries=[];
+let matchResults=[];
+
+function fmt(n){return Number(n||0).toLocaleString('ru-RU');}
+
+// Auth check
+sb.auth.getSession().then(({data:{session}})=>{
+  if(!session) window.location.href='index.html';
+});
+
+// ===== ЗАГРУЗКА ВЫПИСКИ =====
+function loadExcel(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+
+      bankPayments=[];
+      for(let i=1;i<data.length;i++){
+        const row=data[i];
+        if(!row||!row[0]||!row[2]) continue;
+        // Date: "30.04.2026\n23:12" format
+        const dateStr=String(row[0]).split('\n')[0].trim();
+        const parts=dateStr.split('.');
+        if(parts.length<3) continue;
+        const date=`${parts[2]}-${parts[1]}-${parts[0]}`;
+        // Amount: "+4 000.00 ₽"
+        const amtStr=String(row[2]).replace(/[^\d.,]/g,'').replace(',','.');
+        const amount=parseFloat(amtStr)||0;
+        if(amount>0) bankPayments.push({date,amount,original:String(row[2])});
+      }
+
+      document.getElementById('status-text').textContent=`Загружено ${bankPayments.length} поступлений из выписки`;
+      document.getElementById('btn-reconcile').style.display='block';
+    }catch(err){
+      alert('Ошибка чтения файла: '+err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ===== СВЕРКА =====
+async function runReconcile(){
+  document.getElementById('loading').style.display='block';
+  document.getElementById('stats').style.display='none';
+
+  // Загружаем заявки из Supabase где тип оплаты = personal (перевод на карту) и сумма > 0
+  const {data,error}=await sb.from('entries')
+    .select('id,date,amount,service,status,payment_received,link')
+    .eq('pay','personal')
+    .gt('amount',0)
+    .order('date',{ascending:false});
+
+  if(error){alert('Ошибка загрузки: '+error.message);return;}
+  journalEntries=data||[];
+
+  // Алгоритм сверки — ищем совпадения по сумме (с допуском ±100₽) и дате (±2 дня)
+  const TOLERANCE=100; // ₽
+  const DATE_TOLERANCE=2; // дней
+
+  const matched=[];
+  const unmatchedBank=[];
+  const usedEntryIds=new Set();
+  const usedPaymentIdxs=new Set();
+
+  bankPayments.forEach((payment,pi)=>{
+    const payDate=new Date(payment.date);
+    // Ищем заявку с похожей суммой и датой
+    let bestMatch=null;
+    let bestDiff=Infinity;
+
+    journalEntries.forEach(entry=>{
+      if(usedEntryIds.has(entry.id)) return;
+      const diff=Math.abs(entry.amount-payment.amount);
+      if(diff>TOLERANCE) return;
+      const entryDate=new Date(entry.date);
+      const dayDiff=Math.abs((payDate-entryDate)/(1000*60*60*24));
+      if(dayDiff>DATE_TOLERANCE) return;
+      // Совпадение! Берём лучшее (наименьшая разница суммы)
+      if(diff<bestDiff){bestDiff=diff;bestMatch=entry;}
+    });
+
+    if(bestMatch){
+      matched.push({payment,entry:bestMatch,diff:bestDiff});
+      usedEntryIds.add(bestMatch.id);
+      usedPaymentIdxs.add(pi);
+    } else {
+      unmatchedBank.push(payment);
+    }
+  });
+
+  // Заявки без поступления
+  const missingEntries=journalEntries.filter(e=>!usedEntryIds.has(e.id)&&!e.payment_received);
+
+  matchResults=matched;
+
+  // Отображаем результаты
+  renderResults(matched,unmatchedBank,missingEntries);
+  document.getElementById('loading').style.display='none';
+  document.getElementById('stats').style.display='grid';
+  document.getElementById('s-total').textContent=bankPayments.length;
+  document.getElementById('s-matched').textContent=matched.length;
+  document.getElementById('s-unmatched').textContent=unmatchedBank.length;
+  document.getElementById('s-missing').textContent=missingEntries.length;
+}
+
+function renderResults(matched,unmatched,missing){
+  // Совпадения
+  if(matched.length){
+    document.getElementById('section-matched').style.display='block';
+    document.getElementById('cnt-matched').textContent=matched.length;
+    document.getElementById('tbody-matched').innerHTML=matched.map((m,i)=>{
+      const lead=getLeadNum(m.entry.link||'');
+      const isReceived=m.entry.payment_received;
+      return`<tr>
+        <td style="white-space:nowrap">${m.payment.date}</td>
+        <td style="font-weight:600;color:#60A5FA">${fmt(m.payment.amount)} ₽</td>
+        <td>${lead?`<span style="color:#60A5FA">#${lead}</span>`:'—'}</td>
+        <td style="white-space:nowrap;color:var(--text2)">${m.entry.date}</td>
+        <td style="font-weight:600">${fmt(m.entry.amount)} ₽${m.diff>0?`<span style="font-size:10px;color:var(--text3)"> (±${fmt(m.diff)})</span>`:''}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${m.entry.service}</td>
+        <td>
+          <button class="check-btn ${isReceived?'received':''}" 
+            onclick="toggleReceived('${m.entry.id}',this,'${m.payment.date}')" 
+            title="${isReceived?'Поступило ✓':'Отметить как поступившее'}">
+            ${isReceived?'✓':'○'}
+          </button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Не найдены
+  if(unmatched.length){
+    document.getElementById('section-unmatched').style.display='block';
+    document.getElementById('cnt-unmatched').textContent=unmatched.length;
+    document.getElementById('tbody-unmatched').innerHTML=unmatched.map(p=>`
+      <tr>
+        <td style="white-space:nowrap;color:var(--text2)">${p.date}</td>
+        <td style="font-weight:600;color:#FCD34D">${fmt(p.amount)} ₽</td>
+        <td><span style="font-size:11px;color:#F59E0B">Заявка не найдена — возможно не внесена или сумма отличается</span></td>
+      </tr>`).join('');
+  }
+
+  // Без поступления
+  if(missing.length){
+    document.getElementById('section-missing').style.display='block';
+    document.getElementById('cnt-missing').textContent=missing.length;
+    document.getElementById('tbody-missing').innerHTML=missing.map(e=>{
+      const lead=getLeadNum(e.link||'');
+      return`<tr>
+        <td style="white-space:nowrap;color:var(--text2)">${e.date}</td>
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${e.service}</td>
+        <td style="font-weight:600;color:#F87171">${fmt(e.amount)} ₽</td>
+        <td><span style="font-size:11px;padding:2px 8px;border-radius:999px;background:#2A1010;color:#F87171">${e.status==='paid'?'Оплачено':e.status==='pending'?'Ожидает':'Отменено'}</span></td>
+        <td>
+          <button class="check-btn ${e.payment_received?'received':''}"
+            onclick="toggleReceived('${e.id}',this,null)"
+            title="Отметить вручную">
+            ${e.payment_received?'✓':'○'}
+          </button>
+          <button class="check-btn not-received" 
+            onclick="toggleNotReceived('${e.id}',this)"
+            title="Не поступило" style="margin-left:4px">
+            ✗
+          </button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+// ===== ОТМЕТКИ =====
+async function toggleReceived(entryId,btn,paymentDate){
+  const isNowReceived=!btn.classList.contains('received');
+  const {error}=await sb.from('entries').update({
+    payment_received:isNowReceived,
+    payment_received_at:isNowReceived?(paymentDate||new Date().toISOString().split('T')[0]):null
+  }).eq('id',entryId);
+
+  if(error){alert('Ошибка: '+error.message);return;}
+  btn.classList.toggle('received',isNowReceived);
+  btn.textContent=isNowReceived?'✓':'○';
+  btn.title=isNowReceived?'Поступило ✓':'Отметить как поступившее';
+}
+
+async function toggleNotReceived(entryId,btn){
+  const {error}=await sb.from('entries').update({
+    payment_received:false,
+    payment_received_at:null
+  }).eq('id',entryId);
+  if(!error) showToast('Отмечено как не поступившее');
+}
+
+async function markAllMatched(){
+  if(!matchResults.length) return;
+  const updates=matchResults.map(m=>
+    sb.from('entries').update({
+      payment_received:true,
+      payment_received_at:m.payment.date
+    }).eq('id',m.entry.id)
+  );
+  await Promise.all(updates);
+  // Обновляем кнопки
+  document.querySelectorAll('#tbody-matched .check-btn').forEach(btn=>{
+    btn.classList.add('received');
+    btn.textContent='✓';
+  });
+  showToast(`✓ Отмечено ${matchResults.length} поступлений`);
+}
+
+function getLeadNum(link){
+  const m=(link||'').match(/(\d{7,})/);
+  return m?m[1]:'';
+}
+
+let toastTimer;
+function showToast(msg){
+  clearTimeout(toastTimer);
+  let t=document.querySelector('.toast');
+  if(!t){t=document.createElement('div');t.className='toast';t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--bg3);border:0.5px solid var(--border2);border-radius:10px;padding:10px 20px;font-size:13px;z-index:9999';document.body.appendChild(t);}
+  t.textContent=msg;t.style.display='block';
+  toastTimer=setTimeout(()=>t.style.display='none',3000);
+}
+</script>
+</body>
+</html>

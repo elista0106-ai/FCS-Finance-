@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FCS — Импорт данных</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0C0B09;color:#F0EBE0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#141210;border:0.5px solid #2A2620;border-radius:16px;padding:32px;width:100%;max-width:520px}
+h2{font-size:18px;font-weight:600;margin-bottom:6px}
+.sub{font-size:13px;color:#6B6560;margin-bottom:24px}
+.step{background:#1C1A16;border-radius:10px;padding:16px;margin-bottom:12px;border:0.5px solid #2A2620}
+.step-num{width:24px;height:24px;border-radius:50%;background:#185FA5;color:#fff;font-size:12px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;margin-right:8px;vertical-align:middle}
+.step-title{font-size:13px;font-weight:500;vertical-align:middle}
+.step-body{margin-top:10px;font-size:12px;color:#9A9080;line-height:1.7}
+.progress{background:#252018;border-radius:999px;height:8px;margin:12px 0;overflow:hidden}
+.progress-bar{background:#185FA5;height:100%;border-radius:999px;transition:width 0.3s;width:0%}
+.log{background:#0C0B09;border-radius:8px;padding:12px;font-size:11px;font-family:monospace;color:#4A9A6A;max-height:200px;overflow-y:auto;margin-top:10px;display:none}
+.btn{width:100%;padding:13px;background:#185FA5;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px}
+.btn:hover{background:#0C447C}
+.btn:disabled{background:#252018;color:#4A4540;cursor:not-allowed}
+.btn-file{background:#1C1A16;border:0.5px solid #2A2620;color:#9A9080}
+.btn-file:hover{background:#252018;color:#F0EBE0}
+.status{text-align:center;padding:20px;display:none}
+.status-icon{font-size:48px;margin-bottom:12px}
+.status-title{font-size:18px;font-weight:600;margin-bottom:6px}
+.status-sub{font-size:13px;color:#6B6560;line-height:1.6}
+input[type=file]{display:none}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0}
+.stat{background:#0C0B09;border-radius:8px;padding:10px;text-align:center}
+.stat-val{font-size:20px;font-weight:600;color:#185FA5}
+.stat-label{font-size:10px;color:#5A5448;margin-top:2px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>📥 Импорт данных в FCS Finance</h2>
+  <div class="sub">Перенос данных из резервной копии в облако</div>
+
+  <div id="main-area">
+    <div class="step">
+      <span class="step-num">1</span>
+      <span class="step-title">Выберите резервную копию (.json)</span>
+      <div class="step-body">
+        Файл который вы скачали через кнопку «💾 Резерв» из старого журнала
+      </div>
+      <button class="btn btn-file" onclick="document.getElementById('f').click()" style="margin-top:10px">
+        📂 Выбрать файл...
+      </button>
+      <input type="file" id="f" accept=".json" onchange="loadFile(this)">
+      <div id="file-info" style="display:none;margin-top:10px">
+        <div class="stats">
+          <div class="stat"><div class="stat-val" id="s-months">0</div><div class="stat-label">Месяцев</div></div>
+          <div class="stat"><div class="stat-val" id="s-entries">0</div><div class="stat-label">Записей</div></div>
+          <div class="stat"><div class="stat-val" id="s-months2">0</div><div class="stat-label">С данными</div></div>
+        </div>
+        <div style="font-size:11px;color:#4A9A6A">✓ Файл загружен и готов к импорту</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-num">2</span>
+      <span class="step-title">Импортировать в Supabase</span>
+      <div class="step-body">
+        Данные будут загружены в вашу базу данных. Уже существующие записи не будут дублироваться.
+      </div>
+      <div class="progress" id="progress-wrap" style="display:none">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <div id="progress-text" style="font-size:12px;color:#9A9080;margin-top:6px;display:none"></div>
+      <div class="log" id="log"></div>
+      <button class="btn" id="btn-import" onclick="startImport()" disabled style="margin-top:12px">
+        🚀 Начать импорт
+      </button>
+    </div>
+  </div>
+
+  <div class="status" id="status-ok">
+    <div class="status-icon">✅</div>
+    <div class="status-title" style="color:#2ECC71">Импорт завершён!</div>
+    <div class="status-sub" id="status-msg"></div>
+    <button class="btn" onclick="window.location.href='app.html'" style="margin-top:16px">
+      → Открыть журнал
+    </button>
+  </div>
+
+  <div class="status" id="status-err">
+    <div class="status-icon">❌</div>
+    <div class="status-title" style="color:#F87171">Ошибка импорта</div>
+    <div class="status-sub" id="err-msg"></div>
+    <button class="btn" onclick="location.reload()" style="margin-top:16px;background:#2A1010">
+      Попробовать снова
+    </button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SB_URL = 'https://krjhnwjiorpzgqpojgjt.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtyamhud2ppb3JwemdxcG9qZ2p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTY5NzAsImV4cCI6MjA5Mjg5Mjk3MH0.fgmrOZKVDTb8TOGHTnGXoDArCfB9IUm6rCEryNFTIUs';
+const sbClient = window.supabase.createClient(SB_URL, SB_KEY);
+
+let backupData = null;
+let currentUserId = null;
+
+// Check auth
+sbClient.auth.getSession().then(({data:{session}})=>{
+  if(!session){ window.location.href='index.html'; return; }
+  currentUserId = session.user.id;
+});
+
+function loadFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      backupData = JSON.parse(e.target.result);
+      if(!backupData.allMonths) throw new Error('Неверный формат');
+      const months = Object.keys(backupData.allMonths);
+      const total = Object.values(backupData.allMonths).reduce((s,a)=>s+a.length,0);
+      const withData = months.filter(m=>backupData.allMonths[m].length>0).length;
+      document.getElementById('s-months').textContent = months.length;
+      document.getElementById('s-entries').textContent = total;
+      document.getElementById('s-months2').textContent = withData;
+      document.getElementById('file-info').style.display='block';
+      document.getElementById('btn-import').disabled = false;
+    }catch(err){
+      alert('Ошибка чтения файла: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function log(msg, color='#4A9A6A'){
+  const el = document.getElementById('log');
+  el.style.display='block';
+  el.innerHTML += `<div style="color:${color}">${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function setProgress(pct, text){
+  document.getElementById('progress-wrap').style.display='block';
+  document.getElementById('progress-bar').style.width = pct+'%';
+  document.getElementById('progress-text').style.display='block';
+  document.getElementById('progress-text').textContent = text;
+}
+
+async function startImport(){
+  if(!backupData) return;
+  document.getElementById('btn-import').disabled = true;
+
+  const allEntries = [];
+  Object.entries(backupData.allMonths).forEach(([month, entries])=>{
+    entries.forEach(e => allEntries.push({...e, _month: month}));
+  });
+
+  log(`Начинаем импорт ${allEntries.length} записей...`);
+  setProgress(0, 'Подготовка...');
+
+  let imported = 0;
+  let skipped = 0;
+  let errors = 0;
+  const BATCH = 20;
+
+  for(let i=0; i<allEntries.length; i+=BATCH){
+    const batch = allEntries.slice(i, i+BATCH);
+    const rows = batch.map(e => ({
+      date: e.date || new Date().toISOString().split('T')[0],
+      dept: e.dept || 'logistic',
+      service: e.service || '—',
+      agent: e.agent || null,
+      amount: +e.amount || 0,
+      currency: e.currency || 'RUB',
+      pay: e.pay || 'personal',
+      commission: +e.commission || 0,
+      comm_src: e.commSrc || e.comm_src || null,
+      acq_amount: +e.acqAmount || +e.acq_amount || 0,
+      agent_amount: +e.agentAmount || +e.agent_amount || 0,
+      agent_currency: e.agentCurrency || e.agent_currency || 'RUB',
+      agent_pay_type: e.agentPayType || e.agent_pay_type || null,
+      receipt_link: e.receiptLink || e.receipt_link || null,
+      foreign_amount: +e.foreignAmount || +e.foreign_amount || 0,
+      foreign_currency: e.foreignCurrency || e.foreign_currency || null,
+      foreign_rate: +e.foreignRate || +e.foreign_rate || 0,
+      foreign_commission: +e.foreignCommission || +e.foreign_commission || 0,
+      deposit: +e.deposit || 0,
+      deposit_ref: e.depositRef || e.deposit_ref || null,
+      is_loss: !!e.isLoss || !!e.is_loss,
+      loss_amount: +e.lossAmount || +e.loss_amount || 0,
+      loss_note: e.lossNote || e.loss_note || null,
+      is_expense: !!e.isExpense || !!e.is_expense,
+      expense_note: e.expenseNote || e.expense_note || null,
+      status: e.status || 'pending',
+      link: e.link || null,
+      note: e.note || null,
+      submitted_by: currentUserId,
+      from_form: false,
+    }));
+
+    const {error} = await sbClient.from('entries').insert(rows);
+    if(error){
+      log(`⚠ Пакет ${i/BATCH+1}: ${error.message}`, '#F87171');
+      errors += batch.length;
+    } else {
+      imported += batch.length;
+      log(`✓ Загружено ${imported}/${allEntries.length} записей`);
+    }
+
+    const pct = Math.round((i+BATCH)/allEntries.length*100);
+    setProgress(Math.min(pct,100), `Загружено ${imported} из ${allEntries.length}...`);
+    await new Promise(r=>setTimeout(r,100));
+  }
+
+  setProgress(100, 'Готово!');
+
+  if(errors === 0){
+    document.getElementById('status-msg').innerHTML =
+      `Успешно загружено <b>${imported} записей</b> за ${Object.keys(backupData.allMonths).length} месяцев.<br><br>
+       Все ваши данные теперь в облаке и доступны с любого компьютера!`;
+    document.getElementById('main-area').style.display='none';
+    document.getElementById('status-ok').style.display='block';
+  } else {
+    document.getElementById('err-msg').innerHTML =
+      `Загружено: ${imported}, ошибок: ${errors}.<br>Попробуйте снова.`;
+    document.getElementById('status-err').style.display='block';
+  }
+}
+</script>
+</body>
+</html>
