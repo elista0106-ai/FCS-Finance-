@@ -200,6 +200,7 @@ tr:hover td{background:var(--bg2)}
     <div class="tab" id="tab-corp" onclick="switchTab('corp')">🏢 Корп карта <span class="cnt" id="cnt-corp"></span></div>
     <div class="tab" id="tab-invoice" onclick="switchTab('invoice')">📄 По счёту <span class="cnt" id="cnt-invoice"></span></div>
     <div class="tab" id="tab-dept" onclick="switchTab('dept')">📊 По отделам <span class="cnt" id="cnt-dept"></span></div>
+    <div class="tab" id="tab-analytics" onclick="switchTab('analytics')">📈 Аналитика</div>
     <div class="tab" id="tab-days" onclick="switchTab('days')">📅 По дням</div>
     <div class="tab" id="tab-clients" onclick="switchTab('clients')">👤 Клиенты</div>
     <div class="tab" id="tab-clients" onclick="switchTab('clients')">👥 Клиенты</div>
@@ -304,6 +305,11 @@ tr:hover td{background:var(--bg2)}
     <!-- По отделам -->
     <div id="view-dept" style="display:none">
       <div class="content" id="dept-view-content"></div>
+    </div>
+
+    <!-- Аналитика -->
+    <div id="view-analytics" style="display:none">
+      <div class="content" id="analytics-content"></div>
     </div>
 
     <!-- По дням -->
@@ -806,52 +812,70 @@ async function rejectEntry(id){
 }
 
 // ===== ПО ОТДЕЛАМ =====
+let activeDept = null;
+
 function renderDeptView(){
+  if(activeDept){ renderDeptDetail(activeDept); return; }
   const data = monthEntries();
   const depts = ['travel','logistic','lifestyle','kbr','vip','internal'];
 
-  // Считаем где лежит комиссия
-  const commOnCard = data.filter(e=>e.pay==='personal'&&e.commission>0).reduce((s,e)=>s+(+e.commission||0),0);
-  const commOnAccount = data.filter(e=>['qr','link','invoice','corporate'].includes(e.pay)&&e.commission>0).reduce((s,e)=>s+(+e.commission||0),0);
+  // Общая сводка комиссии
   const totalComm = data.reduce((s,e)=>s+(+e.commission||0),0);
+  const commCard = data.filter(e=>e.pay==='personal').reduce((s,e)=>s+(+e.commission||0),0);
+  const commAcc = data.filter(e=>['qr','link','invoice'].includes(e.pay)).reduce((s,e)=>s+(+e.commission||0),0);
+  const commFx = data.filter(e=>e.agent_currency&&e.agent_currency!=='RUB').reduce((s,e)=>s+(+e.commission||0),0);
 
   let html = `
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">
-      <div style="background:#0A2018;border:1px solid var(--green);border-radius:10px;padding:14px">
-        <div style="font-size:11px;color:#2ECC71;margin-bottom:4px">Всего комиссии</div>
-        <div style="font-size:20px;font-weight:600;color:#2ECC71">${fmt(totalComm)} ₽</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+      <div class="stat-card"><div class="stat-label">Всего комиссии</div><div class="stat-value" style="color:var(--green)">${fmt(totalComm)} ₽</div></div>
+      <div style="background:#F0F7FF;border:0.5px solid #B5D4F4;border-radius:var(--radius);padding:12px 16px">
+        <div class="stat-label">💳 На карте РФ</div>
+        <div class="stat-value" style="color:#185FA5">${fmt(commCard)} ₽</div>
+        <div style="font-size:10px;color:#5A8AC0;margin-top:2px">Переводы на карту</div>
       </div>
-      <div style="background:#0C1A2E;border:1px solid #185FA5;border-radius:10px;padding:14px">
-        <div style="font-size:11px;color:#60A5FA;margin-bottom:4px">💳 На карте РФ</div>
-        <div style="font-size:20px;font-weight:600;color:#60A5FA">${fmt(commOnCard)} ₽</div>
-        <div style="font-size:10px;color:#4A6A8A;margin-top:2px">Переводы на карту</div>
-      </div>
-      <div style="background:#1A1A0A;border:1px solid #F59E0B;border-radius:10px;padding:14px">
-        <div style="font-size:11px;color:#FCD34D;margin-bottom:4px">🏦 На счёту компании</div>
-        <div style="font-size:20px;font-weight:600;color:#FCD34D">${fmt(commOnAccount)} ₽</div>
-        <div style="font-size:10px;color:#8A7A4A;margin-top:2px">QR / Ссылка / Счёт</div>
+      <div style="background:#F5FAF0;border:0.5px solid #C0DD97;border-radius:var(--radius);padding:12px 16px">
+        <div class="stat-label">🏦 На счёту компании</div>
+        <div class="stat-value" style="color:#3B6D11">${fmt(commAcc)} ₽</div>
+        <div style="font-size:10px;color:#5A8A50;margin-top:2px">QR / Ссылка / Счёт</div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">`;
 
   depts.forEach(dept=>{
-    const deptData = data.filter(e=>e.dept===dept);
-    if(!deptData.length) return;
-    const total = deptData.filter(e=>e.currency==='RUB').reduce((s,e)=>s+(+e.amount||0),0);
-    const comm = deptData.reduce((s,e)=>s+(+e.commission||0),0);
-    const paid = deptData.filter(e=>e.status==='paid').length;
-    const losses = deptData.filter(e=>e.is_loss).length;
+    const dd = data.filter(e=>e.dept===dept);
+    if(!dd.length) return;
+    const total = dd.reduce((s,e)=>s+(+e.amount||0),0);
+    const comm = dd.reduce((s,e)=>s+(+e.commission||0),0);
+    const commOnCard = dd.filter(e=>e.pay==='personal').reduce((s,e)=>s+(+e.commission||0),0);
+    const commOnAcc = dd.filter(e=>['qr','link','invoice'].includes(e.pay)).reduce((s,e)=>s+(+e.commission||0),0);
+    const paid = dd.filter(e=>e.status==='paid').length;
+    const pending = dd.filter(e=>e.status==='pending').length;
+    const losses = dd.filter(e=>e.is_loss).length;
     const color = DEPT_C[dept]||'#9A9080';
-    html+=`<div style="background:var(--bg2);border:0.5px solid var(--border);border-left:3px solid ${color};border-radius:10px;padding:14px;cursor:pointer" onclick="filterByDept('${dept}')">
-      <div style="font-size:13px;font-weight:600;color:${color};margin-bottom:10px">${DEPTS[dept]}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><div style="font-size:10px;color:var(--text3)">Заявок</div><div style="font-size:16px;font-weight:500">${deptData.length}</div></div>
-        <div><div style="font-size:10px;color:var(--text3)">Оплачено</div><div style="font-size:16px;color:#2ECC71">${paid}</div></div>
-        <div><div style="font-size:10px;color:var(--text3)">Сумма FCS</div><div style="font-size:13px;font-weight:500;color:#60A5FA">${fmt(total)} ₽</div></div>
-        <div><div style="font-size:10px;color:var(--text3)">Комиссия</div><div style="font-size:13px;font-weight:500;color:#2ECC71">${fmt(comm)} ₽</div></div>
+    html+=`<div style="background:var(--bg2);border:0.5px solid var(--border);border-left:3px solid ${color};border-radius:10px;padding:14px;cursor:pointer;transition:box-shadow 0.15s"
+      onclick="activeDept='${dept}';renderDeptView()"
+      onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow=''">
+      <div style="font-size:14px;font-weight:600;color:${color};margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+        <span>${DEPTS[dept]}</span>
+        <span style="font-size:11px;color:var(--text3)">→</span>
       </div>
-      ${losses?`<div style="margin-top:8px;font-size:11px;color:#F87171">⚠ ${losses} потер${losses===1?'я':'и'}</div>`:''}
-      <div style="margin-top:8px;font-size:11px;color:var(--text3)">Нажмите чтобы отфильтровать →</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div><div style="font-size:10px;color:var(--text3)">Заявок</div><div style="font-size:16px;font-weight:500">${dd.length}</div></div>
+        <div><div style="font-size:10px;color:var(--text3)">Сумма FCS</div><div style="font-size:14px;font-weight:500;color:var(--accent)">${fmt(total)} ₽</div></div>
+      </div>
+      <div style="background:var(--bg3);border-radius:8px;padding:10px;margin-bottom:8px">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:6px">Комиссия отдела</div>
+        <div style="font-size:18px;font-weight:600;color:var(--green);margin-bottom:6px">${fmt(comm)} ₽</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${commOnCard>0?`<span style="font-size:10px;padding:2px 7px;border-radius:4px;background:#F0F7FF;color:#185FA5;border:0.5px solid #B5D4F4">💳 ${fmt(commOnCard)} ₽</span>`:''}
+          ${commOnAcc>0?`<span style="font-size:10px;padding:2px 7px;border-radius:4px;background:#F5FAF0;color:#3B6D11;border:0.5px solid #C0DD97">🏦 ${fmt(commOnAcc)} ₽</span>`:''}
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${paid?`<span style="font-size:10px;padding:2px 7px;border-radius:999px;background:#EAF3DE;color:#27500A;border:0.5px solid #C0DD97">${paid} оплачено</span>`:''}
+        ${pending?`<span style="font-size:10px;padding:2px 7px;border-radius:999px;background:#FEF3E2;color:#633806;border:0.5px solid #FAC775">${pending} ожидает</span>`:''}
+        ${losses?`<span style="font-size:10px;padding:2px 7px;border-radius:999px;background:#FCEBEB;color:#791F1F;border:0.5px solid #F7C1C1">⚠ ${losses} потер${losses===1?'я':'и'}</span>`:''}
+      </div>
     </div>`;
   });
 
@@ -859,361 +883,255 @@ function renderDeptView(){
   document.getElementById('dept-view-content').innerHTML = html;
 }
 
-// ===== ПО ДНЯМ =====
-let expandedDays = new Set();
-
-function renderDays(){
-  const data = monthEntries();
-  const dayMap = {};
-  data.forEach(e=>{
-    const d = e.date||'';
-    if(!dayMap[d]) dayMap[d]=[];
-    dayMap[d].push(e);
-  });
-  const days = Object.keys(dayMap).sort().reverse();
-  if(!days.length){
-    document.getElementById('days-view-content').innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">Нет данных за этот месяц</div>';
-    return;
-  }
-
+function renderDeptDetail(dept){
+  const data = monthEntries().filter(e=>e.dept===dept);
+  const color = DEPT_C[dept]||'#9A9080';
+  const total = data.reduce((s,e)=>s+(+e.amount||0),0);
+  const comm = data.reduce((s,e)=>s+(+e.commission||0),0);
+  const commCard = data.filter(e=>e.pay==='personal').reduce((s,e)=>s+(+e.commission||0),0);
+  const commAcc = data.filter(e=>['qr','link','invoice'].includes(e.pay)).reduce((s,e)=>s+(+e.commission||0),0);
+  const commFx = data.filter(e=>e.agent_currency&&e.agent_currency!=='RUB').reduce((s,e)=>s+(+e.commission||0),0);
+  const paid = data.filter(e=>e.status==='paid').length;
+  const pending = data.filter(e=>e.status==='pending').length;
+  const losses = data.filter(e=>e.is_loss).reduce((s,e)=>s+(+e.loss_amount||0),0);
   const canEdit = currentProfile?.role !== 'viewer';
 
-  const html = days.map(day=>{
-    const dayEntries = dayMap[day];
-    const isExpanded = expandedDays.has(day);
-    const totalIncome = dayEntries.reduce((s,e)=>s+(+e.amount||0),0);
-    const totalAgent = dayEntries.filter(e=>e.agent_currency==='RUB').reduce((s,e)=>s+(+e.agent_amount||0),0);
-    const totalComm = dayEntries.reduce((s,e)=>s+(+e.commission||0),0);
-    const paid = dayEntries.filter(e=>e.status==='paid').length;
-    const pending = dayEntries.filter(e=>e.status==='pending').length;
-    // Где лежит комиссия
-    const commCard = dayEntries.filter(e=>e.pay==='personal').reduce((s,e)=>s+(+e.commission||0),0);
-    const commAcc = dayEntries.filter(e=>['qr','link','invoice'].includes(e.pay)).reduce((s,e)=>s+(+e.commission||0),0);
-    const commFx = dayEntries.filter(e=>e.agent_currency&&e.agent_currency!=='RUB').reduce((s,e)=>s+(+e.commission||0),0);
-    // Способы оплаты
-    const payCount = {};
-    dayEntries.forEach(e=>{ const p=PAYS[e.pay]||e.pay; payCount[p]=(payCount[p]||0)+1; });
-    const payStr = Object.entries(payCount).map(([p,n])=>`${p}: ${n}`).join(' · ');
+  let html = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <button class="btn btn-sm" onclick="activeDept=null;renderDeptView()">← Все отделы</button>
+      <span style="font-size:15px;font-weight:600;color:${color}">${DEPTS[dept]}</span>
+    </div>
 
-    // Форматируем дату по-русски
-    const dateObj = new Date(day+'T00:00:00');
-    const dateRu = dateObj.toLocaleDateString('ru-RU',{day:'numeric',month:'long',weekday:'short'});
+    <!-- Сводка -->
+    <div style="background:var(--bg2);border:0.5px solid var(--border);border-left:3px solid ${color};border-radius:var(--radius);padding:16px;margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+        <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Заявок</div><div style="font-size:20px;font-weight:600;color:var(--text)">${data.length}</div></div>
+        <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Сумма FCS</div><div style="font-size:18px;font-weight:600;color:var(--accent)">${fmt(total)} ₽</div></div>
+        <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Комиссия</div><div style="font-size:18px;font-weight:600;color:var(--green)">${fmt(comm)} ₽</div></div>
+        <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Потери</div><div style="font-size:18px;font-weight:600;color:var(--red)">${losses>0?fmt(losses)+' ₽':'0'}</div></div>
+      </div>
 
-    const rowsHtml = isExpanded ? `
-      <div style="overflow-x:auto;border-top:0.5px solid var(--border)">
-        <table style="width:100%;border-collapse:collapse;min-width:700px">
-          <thead>
-            <tr style="background:var(--bg3)">
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">№ заявки</th>
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Наименование</th>
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Отдел</th>
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Сумма FCS</th>
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Тип оплаты</th>
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Расход</th>
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Комиссия</th>
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Статус</th>
-              <th style="padding:7px 12px"></th>
-            </tr>
-          </thead>
+      <!-- Где лежит комиссия -->
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Где лежит комиссия</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="background:#F0F7FF;border:0.5px solid #B5D4F4;border-radius:8px;padding:10px;${commCard<=0?'opacity:0.4':''}">
+          <div style="font-size:10px;color:#185FA5;margin-bottom:3px">💳 На карте РФ</div>
+          <div style="font-size:16px;font-weight:600;color:#185FA5">${fmt(commCard)} ₽</div>
+          <div style="font-size:10px;color:#5A8AC0;margin-top:2px">Переводы на карту</div>
+        </div>
+        <div style="background:#F5FAF0;border:0.5px solid #C0DD97;border-radius:8px;padding:10px;${commAcc<=0?'opacity:0.4':''}">
+          <div style="font-size:10px;color:#3B6D11;margin-bottom:3px">🏦 На счёту</div>
+          <div style="font-size:16px;font-weight:600;color:#3B6D11">${fmt(commAcc)} ₽</div>
+          <div style="font-size:10px;color:#5A8A50;margin-top:2px">QR / Счёт / Ссылка</div>
+        </div>
+        <div style="background:#F5F0FF;border:0.5px solid #C0A8F4;border-radius:8px;padding:10px;${commFx<=0?'opacity:0.4':''}">
+          <div style="font-size:10px;color:#6B3FA0;margin-bottom:3px">💱 Иностр. карта</div>
+          <div style="font-size:16px;font-weight:600;color:#6B3FA0">${fmt(commFx)} ₽</div>
+          <div style="font-size:10px;color:#8A60C0;margin-top:2px">Валютные операции</div>
+        </div>
+      </div>
+
+      <!-- Статусы -->
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        ${paid?`<span style="padding:3px 10px;border-radius:999px;background:#EAF3DE;color:#27500A;border:0.5px solid #C0DD97;font-size:12px">${paid} оплачено</span>`:''}
+        ${pending?`<span style="padding:3px 10px;border-radius:999px;background:#FEF3E2;color:#633806;border:0.5px solid #FAC775;font-size:12px">${pending} ожидает</span>`:''}
+      </div>
+    </div>
+
+    <!-- Все заявки отдела -->
+    <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden">
+      <div style="padding:12px 16px;border-bottom:0.5px solid var(--border);font-size:12px;font-weight:600;color:var(--text)">Все заявки — ${DEPTS[dept]} (${data.length})</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:750px">
+          <thead><tr style="background:var(--bg3)">
+            <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">№</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Дата</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Наименование</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Сумма FCS</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Тип оплаты</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Расход</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Комиссия</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Где</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Статус</th>
+            <th></th>
+          </tr></thead>
           <tbody>
-            ${dayEntries.map(e=>{
+            ${data.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(e=>{
               const lead = getLeadNum(e.link||'');
-              const agentAmt = e.agent_amount>0 ? `${fmt(e.agent_amount)} ${e.agent_currency!=='RUB'?e.agent_currency:'₽'}` : '—';
+              const where = e.pay==='personal'?'💳 Карта':['qr','link','invoice'].includes(e.pay)?'🏦 Счёт':e.agent_currency&&e.agent_currency!=='RUB'?'💱 Иностр.':'—';
+              const whereColor = e.pay==='personal'?'#185FA5':['qr','link','invoice'].includes(e.pay)?'#3B6D11':'#6B3FA0';
               return `<tr style="border-top:0.5px solid var(--border)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
                 <td style="padding:8px 12px;font-size:12px"><span style="color:var(--accent)">${lead?'#'+lead:'—'}</span></td>
-                <td style="padding:8px 12px;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.service||'—'}</td>
-                <td style="padding:8px 12px;font-size:12px"><span style="color:${DEPT_C[e.dept]||'var(--text2)'}">${DEPTS[e.dept]||e.dept}</span></td>
+                <td style="padding:8px 12px;font-size:11px;color:var(--text2);white-space:nowrap">${e.date}</td>
+                <td style="padding:8px 12px;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.service}</td>
                 <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--accent)">${e.amount>0?fmt(e.amount)+' ₽':'—'}</td>
                 <td style="padding:8px 12px;font-size:11px;color:var(--text2)">${PAYS[e.pay]||e.pay||'—'}</td>
-                <td style="padding:8px 12px;font-size:11px;color:var(--text2)">${agentAmt}</td>
-                <td style="padding:8px 12px;font-size:12px;color:var(--green);font-weight:500">${e.commission>0?'+'+fmt(e.commission)+' ₽':'—'}</td>
+                <td style="padding:8px 12px;font-size:11px;color:var(--text2)">${e.agent_amount>0?fmt(e.agent_amount)+(e.agent_currency!=='RUB'?' '+e.agent_currency:' ₽'):'—'}</td>
+                <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--green)">${e.commission>0?'+'+fmt(e.commission)+' ₽':'—'}</td>
+                <td style="padding:8px 12px;font-size:11px;color:${whereColor}">${where}</td>
                 <td style="padding:8px 12px"><span class="${STATUS_C[e.status]||'s-pending'} s-btn">${STATUS_L[e.status]||'Ожидает'}</span></td>
                 <td style="padding:8px 12px">${canEdit?`<button class="btn btn-sm" onclick="openEdit('${e.id}')">✏</button>`:''}</td>
               </tr>`;
             }).join('')}
           </tbody>
         </table>
-      </div>` : '';
-
-    return `<div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden">
-      <!-- Заголовок дня -->
-      <div onclick="toggleDay('${day}')" style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;justify-content:space-between;user-select:none"
-        onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
-        <div style="display:flex;align-items:center;gap:12px">
-          <span style="font-size:13px;font-weight:600;color:var(--text)">${dateRu}</span>
-          <span style="font-size:11px;color:var(--text3)">${dayEntries.length} заявок</span>
-          <span style="font-size:11px;font-weight:500;color:var(--accent)">${fmt(totalIncome)} ₽</span>
-          <span style="font-size:11px;color:var(--green)">+${fmt(totalComm)} ₽ комиссия</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          ${paid?`<span style="background:#EAF3DE;color:#27500A;border:0.5px solid #C0DD97;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500">${paid} оплачено</span>`:''}
-          ${pending?`<span style="background:#FEF3E2;color:#633806;border:0.5px solid #FAC775;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500">${pending} ожидает</span>`:''}
-          <span style="color:var(--text3);font-size:14px">${isExpanded?'▲':'▼'}</span>
-        </div>
       </div>
-
-      <!-- Итоги дня (показываем всегда) -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0;border-top:0.5px solid var(--border)">
-        <div style="padding:10px 14px;border-right:0.5px solid var(--border)">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Поступило от клиентов</div>
-          <div style="font-size:13px;font-weight:500;color:var(--accent)">${fmt(totalIncome)} ₽</div>
-        </div>
-        <div style="padding:10px 14px;border-right:0.5px solid var(--border)">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Оплачено контрагентам</div>
-          <div style="font-size:13px;font-weight:500;color:var(--red)">${fmt(totalAgent)} ₽</div>
-        </div>
-        <div style="padding:10px 14px;border-right:0.5px solid var(--border)">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Комиссия FCS</div>
-          <div style="font-size:13px;font-weight:500;color:var(--green)">${fmt(totalComm)} ₽</div>
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">
-            ${commCard>0?`💳 карта: ${fmt(commCard)} ₽ `:''}
-            ${commAcc>0?`🏦 счёт: ${fmt(commAcc)} ₽`:''}
-            ${commFx>0?`💱 иностр: ${fmt(commFx)} ₽`:''}
-          </div>
-        </div>
-        <div style="padding:10px 14px">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Способы оплаты</div>
-          <div style="font-size:10px;color:var(--text2);line-height:1.6">${payStr}</div>
-        </div>
-      </div>
-
-      ${rowsHtml}
     </div>`;
-  }).join('');
 
-  document.getElementById('days-view-content').innerHTML = html;
+  document.getElementById('dept-view-content').innerHTML = html;
 }
 
-function toggleDay(day){
-  if(expandedDays.has(day)) expandedDays.delete(day);
-  else expandedDays.add(day);
-  renderDays();
-}
-
-// ===== КЛИЕНТЫ =====
-let activeClient = null;
-function renderClients(){
-  if(activeClient){renderClientDetail(activeClient);return;}
-  const clientMap={};
-  entries.forEach(e=>{
-    const name=(e.client_name||'').trim();
-    if(!name)return;
-    if(!clientMap[name])clientMap[name]={name,entries:[],depts:new Set()};
-    clientMap[name].entries.push(e);
-    if(e.dept)clientMap[name].depts.add(DEPTS[e.dept]||e.dept);
-  });
-  Object.values(clientMap).forEach(c=>{
-    let bal=0;
-    c.entries.forEach(e=>{
-      bal+=+e.deposit||0;
-      if(e.pay==='deposit')bal-=+e.amount||0;
-    });
-    c.depositBalance=bal;
-    c.totalAmount=c.entries.reduce((s,e)=>s+(+e.amount||0),0);
-  });
-  const clients=Object.values(clientMap).sort((a,b)=>b.depositBalance-a.depositBalance);
-  if(!clients.length){
-    document.getElementById('clients-view-content').innerHTML=`<div style="text-align:center;padding:60px;color:var(--text3)"><div style="font-size:32px;margin-bottom:12px">👤</div><div style="font-size:14px">Нет данных о клиентах</div><div style="font-size:12px;margin-top:4px">Добавьте ФИО клиента при создании заявки</div></div>`;
+// ===== АНАЛИТИКА =====
+function renderAnalytics(){
+  const data = monthEntries();
+  if(!data.length){
+    document.getElementById('analytics-content').innerHTML='<div style="text-align:center;padding:60px;color:var(--text3)">Нет данных за этот месяц</div>';
     return;
   }
-  const withDep=clients.filter(c=>c.depositBalance>0);
-  const noDep=clients.filter(c=>c.depositBalance<=0);
-  const totalDep=withDep.reduce((s,c)=>s+c.depositBalance,0);
-  let html=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
-    <div class="stat-card"><div class="stat-label">Всего клиентов</div><div class="stat-value" style="color:var(--accent)">${clients.length}</div></div>
-    <div class="stat-card"><div class="stat-label">С депозитом</div><div class="stat-value" style="color:#854F0B">${withDep.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Сумма депозитов</div><div class="stat-value" style="color:var(--green)">${fmt(Math.max(0,totalDep))} ₽</div></div>
-  </div>`;
-  if(withDep.length){html+=`<div style="font-size:11px;font-weight:600;color:#854F0B;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">💰 Есть остаток депозита</div>`;html+=withDep.map(c=>renderClientRow(c)).join('');}
-  if(noDep.length){html+=`<div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:8px;margin-top:16px;text-transform:uppercase;letter-spacing:0.05em">👤 Все клиенты</div>`;html+=noDep.map(c=>renderClientRow(c)).join('');}
-  document.getElementById('clients-view-content').innerHTML=html;
-}
 
-function renderClientRow(c){
-  const ini=c.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-  return `<div onclick="openClient('${c.name.replace(/'/g,"\\'")}')" style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:12px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg2)'">
-    <div style="width:36px;height:36px;border-radius:50%;background:${c.depositBalance>0?'#FEF3E2':'var(--bg3)'};color:${c.depositBalance>0?'#854F0B':'var(--text3)'};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0">${ini}</div>
-    <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--text)">${c.name}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">${[...c.depts].join(' · ')} · ${c.entries.length} заявок · ${fmt(c.totalAmount)} ₽</div></div>
-    <div style="text-align:right">${c.depositBalance>0?`<div style="font-size:15px;font-weight:600;color:#854F0B">${fmt(c.depositBalance)} ₽</div><div style="font-size:10px;color:var(--text3)">депозит</div>`:`<div style="font-size:11px;color:var(--text3)">Нет депозита</div>`}</div>
-    <div style="color:var(--text3);font-size:16px">›</div>
-  </div>`;
-}
+  const totalIncome = data.reduce((s,e)=>s+(+e.amount||0),0);
+  const totalAgent = data.filter(e=>e.agent_currency==='RUB').reduce((s,e)=>s+(+e.agent_amount||0),0);
+  const totalComm = data.reduce((s,e)=>s+(+e.commission||0),0);
+  const totalLoss = data.filter(e=>e.is_loss).reduce((s,e)=>s+(+e.loss_amount||0),0);
+  const paid = data.filter(e=>e.status==='paid').length;
+  const pending = data.filter(e=>e.status==='pending').length;
 
-function openClient(name){activeClient=name;renderClients();}
+  // По типам оплаты
+  const byPay = {};
+  data.forEach(e=>{const p=PAYS[e.pay]||e.pay||'Другое';byPay[p]=(byPay[p]||0)+(+e.amount||0);});
 
-function renderClientDetail(name, pFrom, pTo){
-  pFrom=pFrom||''; pTo=pTo||'';
-  const allCes=entries.filter(e=>(e.client_name||'').trim()===name).sort((a,b)=>b.date.localeCompare(a.date));
-  let bal=0;const allOps=[];
-  allCes.slice().reverse().forEach(e=>{
-    if((+e.deposit||0)>0){bal+=+e.deposit;allOps.push({date:e.date,type:'topup',amount:+e.deposit,entry:e,bal,pay:e.pay});}
-    if(e.pay==='deposit'){bal-=+e.amount||0;allOps.push({date:e.date,type:'spend',amount:+e.amount||0,entry:e,bal,pay:e.pay});}
+  // По отделам
+  const byDept = {};
+  data.forEach(e=>{
+    const d=DEPTS[e.dept]||e.dept||'Другое';
+    if(!byDept[d])byDept[d]={income:0,comm:0,count:0};
+    byDept[d].income+=+e.amount||0;
+    byDept[d].comm+=+e.commission||0;
+    byDept[d].count++;
   });
-  allOps.reverse();
-  const ops=allOps.filter(o=>(!pFrom||o.date>=pFrom)&&(!pTo||o.date<=pTo));
-  const ces=allCes.filter(e=>(!pFrom||e.date>=pFrom)&&(!pTo||e.date<=pTo));
-  const totalTopup=allOps.filter(o=>o.type==='topup').reduce((s,o)=>s+o.amount,0);
-  const totalSpent=allOps.filter(o=>o.type==='spend').reduce((s,o)=>s+o.amount,0);
-  const totalAmt=allCes.reduce((s,e)=>s+(+e.amount||0),0);
-  const depts=[...new Set(allCes.map(e=>DEPTS[e.dept]||e.dept).filter(Boolean))];
-  const ini=name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-  // Где лежит депозит
-  const onCard=allOps.filter(o=>o.type==='topup'&&['personal','card_rf'].includes(o.pay)).reduce((s,o)=>s+o.amount,0);
-  const onAcc=allOps.filter(o=>o.type==='topup'&&['qr','link','invoice'].includes(o.pay)).reduce((s,o)=>s+o.amount,0);
-  const ratio=onCard+onAcc||1;
-  const balCard=Math.max(0,onCard-(onCard/ratio)*totalSpent);
-  const balAcc=Math.max(0,onAcc-(onAcc/ratio)*totalSpent);
 
-  const safeN=name.replace(/'/g,"\\'");
-  let html=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-    <button class="btn btn-sm" onclick="activeClient=null;renderClients()">← Все клиенты</button>
-    <span style="font-size:14px;font-weight:600;color:var(--text)">${name}</span>
-    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <input type="date" id="cl-from" value="${pFrom}" onchange="renderClientDetail('${safeN}',this.value,document.getElementById('cl-to').value)"
-        style="padding:5px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);font-size:12px">
-      <span style="font-size:12px;color:var(--text3)">—</span>
-      <input type="date" id="cl-to" value="${pTo}" onchange="renderClientDetail('${safeN}',document.getElementById('cl-from').value,this.value)"
-        style="padding:5px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);font-size:12px">
-      ${pFrom||pTo?`<button class="btn btn-sm" onclick="renderClientDetail('${safeN}','','')">✕</button>`:''}
-      <button class="btn btn-sm" style="background:var(--accent);color:#fff;border-color:var(--accent)" onclick="printClientPDF('${safeN}','${pFrom}','${pTo}')">📄 PDF</button>
+  // Комиссия где лежит
+  const commCard = data.filter(e=>e.pay==='personal').reduce((s,e)=>s+(+e.commission||0),0);
+  const commAcc = data.filter(e=>['qr','link','invoice'].includes(e.pay)).reduce((s,e)=>s+(+e.commission||0),0);
+  const commFx = data.filter(e=>e.agent_currency&&e.agent_currency!=='RUB').reduce((s,e)=>s+(+e.commission||0),0);
+
+  // Топ наименований по сумме
+  const byService = {};
+  data.forEach(e=>{const s=e.service||'—';if(!byService[s])byService[s]=0;byService[s]+=+e.amount||0;});
+  const topServices = Object.entries(byService).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  const maxPayVal = Math.max(...Object.values(byPay),1);
+  const maxDeptComm = Math.max(...Object.values(byDept).map(d=>d.comm),1);
+
+  let html = `
+    <!-- Общая сводка -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+      <div class="stat-card"><div class="stat-label">Поступило от клиентов</div><div class="stat-value" style="color:var(--accent)">${fmt(totalIncome)} ₽</div><div style="font-size:10px;color:var(--text3);margin-top:3px">${data.length} заявок</div></div>
+      <div class="stat-card"><div class="stat-label">Выплачено контрагентам</div><div class="stat-value" style="color:var(--red)">${fmt(totalAgent)} ₽</div></div>
+      <div class="stat-card"><div class="stat-label">Комиссия FCS</div><div class="stat-value" style="color:var(--green)">${fmt(totalComm)} ₽</div><div style="font-size:10px;color:var(--text3);margin-top:3px">${totalIncome>0?((totalComm/totalIncome)*100).toFixed(1):'0'}% от оборота</div></div>
+      <div class="stat-card"><div class="stat-label">Потери</div><div class="stat-value" style="color:var(--red)">${totalLoss>0?fmt(totalLoss)+' ₽':'0 ₽'}</div></div>
     </div>
-  </div>
-  <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px">
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-      <div style="width:48px;height:48px;border-radius:50%;background:${bal>0?'#FEF3E2':'var(--bg3)'};color:${bal>0?'#854F0B':'var(--text3)'};display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;flex-shrink:0">${ini}</div>
-      <div style="flex:1"><div style="font-size:16px;font-weight:600;color:var(--text)">${name}</div><div style="font-size:12px;color:var(--text3);margin-top:2px">${depts.join(' · ')} · ${allCes.length} заявок · ${fmt(totalAmt)} ₽</div></div>
-      ${bal>0?`<div style="text-align:right;background:#FEF3E2;border:0.5px solid #FAC775;border-radius:10px;padding:10px 16px"><div style="font-size:10px;color:#633806;margin-bottom:2px">Остаток депозита</div><div style="font-size:22px;font-weight:700;color:#854F0B">${fmt(bal)} ₽</div></div>`:''}
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
-      <div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Пополнено</div><div style="font-size:16px;font-weight:600;color:#3B6D11">+${fmt(totalTopup)} ₽</div></div>
-      <div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Использовано</div><div style="font-size:16px;font-weight:600;color:#854F0B">-${fmt(totalSpent)} ₽</div></div>
-      <div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Остаток</div><div style="font-size:16px;font-weight:600;color:#854F0B">${fmt(bal)} ₽</div></div>
-    </div>
-    ${(onCard>0||onAcc>0)?`<div style="font-size:11px;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Где лежит депозит</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div style="background:#F0F7FF;border:0.5px solid #B5D4F4;border-radius:8px;padding:10px 14px${onCard<=0?';opacity:0.5':''}"><div style="font-size:10px;color:#185FA5;margin-bottom:4px">💳 На карте РФ</div><div style="font-size:18px;font-weight:600;color:#185FA5">${fmt(Math.round(balCard))} ₽</div></div>
-      <div style="background:#F5FAF0;border:0.5px solid #C0DD97;border-radius:8px;padding:10px 14px${onAcc<=0?';opacity:0.5':''}"><div style="font-size:10px;color:#3B6D11;margin-bottom:4px">🏦 На счёту компании</div><div style="font-size:18px;font-weight:600;color:#3B6D11">${fmt(Math.round(balAcc))} ₽</div></div>
-    </div>`:''}
-  </div>
-  ${ops.length?`<div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden">
-    <div style="padding:12px 16px;border-bottom:0.5px solid var(--border);font-size:12px;font-weight:600;color:var(--text);display:flex;justify-content:space-between"><span>💰 История депозита</span><span style="color:#854F0B">${fmt(bal)} ₽ остаток</span></div>
-    ${ops.map(op=>{
-      const lead=getLeadNum(op.entry.link||'');
-      const payLoc=['personal','card_rf'].includes(op.entry.pay)?'💳 Карта РФ':['qr','link','invoice'].includes(op.entry.pay)?'🏦 Счёт':'';
-      const isCard=op.entry.pay==='personal';
-      return `<div style="background:${op.type==='spend'?'#FFFBF0':'var(--bg2)'};border-bottom:0.5px solid var(--border);padding:10px 16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px">
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-            <span style="color:${op.type==='topup'?'#3B6D11':'#854F0B'};font-weight:600">${op.type==='topup'?'↑ Пополнение':'↓ Списание'}</span>
-            <span style="color:var(--text3)">${op.date}</span>
-            ${payLoc?`<span style="font-size:10px;padding:2px 7px;border-radius:4px;background:${isCard?'#F0F7FF':'#F5FAF0'};color:${isCard?'#185FA5':'#3B6D11'};border:0.5px solid ${isCard?'#B5D4F4':'#C0DD97'}">${payLoc}</span>`:''}
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+
+      <!-- Где лежит комиссия -->
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text)">Где лежит комиссия</div>
+        <div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+            <span style="color:var(--text2)">💳 На карте РФ</span>
+            <span style="color:#185FA5;font-weight:500">${fmt(commCard)} ₽</span>
           </div>
-          <div style="display:flex;gap:14px;align-items:center">
-            <span style="font-weight:600;color:${op.type==='topup'?'#3B6D11':'#854F0B'}">${op.type==='topup'?'+':'-'}${fmt(op.amount)} ₽</span>
-            <span style="font-size:11px;color:var(--text3);min-width:130px;text-align:right">остаток: ${fmt(op.bal)} ₽</span>
+          <div style="background:var(--bg3);border-radius:999px;height:8px;overflow:hidden">
+            <div style="background:#185FA5;height:100%;width:${totalComm>0?(commCard/totalComm*100).toFixed(1):0}%;border-radius:999px"></div>
           </div>
         </div>
-        ${op.type==='spend'?`<div style="margin-top:8px;background:var(--bg2);border:0.5px solid #FAC775;border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
-          <div style="display:flex;gap:10px;align-items:center;font-size:12px;flex-wrap:wrap">
-            ${lead?`<span style="color:var(--accent);font-weight:500">#${lead}</span>`:''}
-            <span style="color:var(--text)">${op.entry.service||'—'}</span>
-            <span class="${STATUS_C[op.entry.status]||'s-pending'} s-btn">${STATUS_L[op.entry.status]||'Ожидает'}</span>
-            <span style="color:var(--text3);font-size:11px">${DEPTS[op.entry.dept]||op.entry.dept||''}</span>
+        <div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+            <span style="color:var(--text2)">🏦 На счёту компании</span>
+            <span style="color:#3B6D11;font-weight:500">${fmt(commAcc)} ₽</span>
           </div>
-          <button class="btn btn-sm" onclick="openEdit('${op.entry.id}')">✏ Изменить</button>
-        </div>`:''}
-      </div>`;
-    }).join('')}
-  </div>`:`<div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:24px;text-align:center;color:var(--text3);margin-bottom:12px">Нет операций с депозитом</div>`}
-  <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden">
-    <div style="padding:12px 16px;border-bottom:0.5px solid var(--border);font-size:12px;font-weight:600;color:var(--text)">Все заявки (${ces.length})</div>
-    ${ces.length?`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:650px">
-      <thead><tr style="background:var(--bg3)">
-        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">№</th>
-        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Дата</th>
-        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Наименование</th>
-        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Отдел</th>
-        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Сумма</th>
-        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Тип</th>
-        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Депозит ±</th>
-        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Статус</th>
-        <th></th>
-      </tr></thead>
-      <tbody>${ces.map(e=>{
-        const lead=getLeadNum(e.link||'');
-        const isDep=e.pay==='deposit';
-        const hasDep=(+e.deposit||0)>0;
-        return `<tr style="border-top:0.5px solid var(--border);${isDep?'background:#FFFBF0':''}" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='${isDep?'#FFFBF0':''}'">
-          <td style="padding:8px 12px;font-size:12px"><span style="color:var(--accent)">${lead?'#'+lead:'—'}</span></td>
-          <td style="padding:8px 12px;font-size:11px;color:var(--text2);white-space:nowrap">${e.date}</td>
-          <td style="padding:8px 12px;font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.service}</td>
-          <td style="padding:8px 12px;font-size:11px"><span style="color:${DEPT_C[e.dept]||'var(--text2)'}">${DEPTS[e.dept]||e.dept}</span></td>
-          <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--accent)">${e.amount>0?fmt(e.amount)+' ₽':'—'}</td>
-          <td style="padding:8px 12px;font-size:11px">${isDep?'<span style="color:#854F0B;font-weight:500">💰 Депозит</span>':PAYS[e.pay]||e.pay||'—'}</td>
-          <td style="padding:8px 12px;font-size:11px">${hasDep?`<span style="color:#3B6D11">+${fmt(e.deposit)} ₽</span>`:''}${isDep?`<span style="color:#854F0B">-${fmt(e.amount)} ₽</span>`:''}</td>
-          <td style="padding:8px 12px"><span class="${STATUS_C[e.status]||'s-pending'} s-btn">${STATUS_L[e.status]||'Ожидает'}</span></td>
-          <td style="padding:8px 12px"><button class="btn btn-sm" onclick="openEdit('${e.id}')">✏</button></td>
-        </tr>`;
-      }).join('')}</tbody>
-    </table></div>`:`<div style="padding:24px;text-align:center;color:var(--text3)">Нет заявок</div>`}
-  </div>`;
-  document.getElementById('clients-view-content').innerHTML=html;
-}
+          <div style="background:var(--bg3);border-radius:999px;height:8px;overflow:hidden">
+            <div style="background:#3B6D11;height:100%;width:${totalComm>0?(commAcc/totalComm*100).toFixed(1):0}%;border-radius:999px"></div>
+          </div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+            <span style="color:var(--text2)">💱 Иностранная карта</span>
+            <span style="color:#6B3FA0;font-weight:500">${fmt(commFx)} ₽</span>
+          </div>
+          <div style="background:var(--bg3);border-radius:999px;height:8px;overflow:hidden">
+            <div style="background:#6B3FA0;height:100%;width:${totalComm>0?(commFx/totalComm*100).toFixed(1):0}%;border-radius:999px"></div>
+          </div>
+        </div>
+      </div>
 
-function printClientPDF(name,pFrom,pTo){
-  const allCes=entries.filter(e=>(e.client_name||'').trim()===name).sort((a,b)=>b.date.localeCompare(a.date));
-  let bal=0;const allOps=[];
-  allCes.slice().reverse().forEach(e=>{
-    if((+e.deposit||0)>0){bal+=+e.deposit;allOps.push({date:e.date,type:'topup',amount:+e.deposit,entry:e,bal});}
-    if(e.pay==='deposit'){bal-=+e.amount||0;allOps.push({date:e.date,type:'spend',amount:+e.amount||0,entry:e,bal});}
-  });
-  allOps.reverse();
-  const ops=allOps.filter(o=>(!pFrom||o.date>=pFrom)&&(!pTo||o.date<=pTo));
-  const totalTopup=allOps.filter(o=>o.type==='topup').reduce((s,o)=>s+o.amount,0);
-  const totalSpent=allOps.filter(o=>o.type==='spend').reduce((s,o)=>s+o.amount,0);
-  const periodStr=pFrom||pTo?`${pFrom||'начало'} — ${pTo||'сегодня'}`:'За всё время';
-  const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Выписка — ${name}</title>
-  <style>body{font-family:Arial,sans-serif;font-size:12px;color:#1A1A18;margin:30px;line-height:1.5}
-  h1{font-size:18px;margin-bottom:4px}.sub{color:#5A5A52;font-size:11px;margin-bottom:20px}
-  .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px}
-  .stat{border:1px solid #DDDDD8;border-radius:6px;padding:10px;text-align:center}
-  .stat-label{font-size:10px;color:#8A8A82;text-transform:uppercase;margin-bottom:4px}
-  .stat-val{font-size:16px;font-weight:700}
-  table{width:100%;border-collapse:collapse;margin-top:16px}
-  th{background:#F4F4F2;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;color:#8A8A82;border-bottom:1px solid #DDDDD8;font-weight:600}
-  td{padding:8px 10px;border-bottom:1px solid #EFEFED;font-size:12px;vertical-align:top}
-  .entry-sub{font-size:11px;color:#5A5A52;margin-top:4px;padding:4px 8px;background:#FFFBF0;border-left:2px solid #FAC775;border-radius:2px}
-  .footer{margin-top:30px;font-size:10px;color:#8A8A82;border-top:1px solid #DDDDD8;padding-top:10px}
-  @media print{body{margin:15px}}</style></head><body>
-  <h1>Выписка по депозиту</h1>
-  <div class="sub">Клиент: <strong>${name}</strong> &nbsp;·&nbsp; Период: ${periodStr} &nbsp;·&nbsp; Дата: ${new Date().toLocaleDateString('ru-RU')}</div>
-  <div class="g3">
-    <div class="stat"><div class="stat-label">Пополнено</div><div class="stat-val" style="color:#3B6D11">+${fmt(totalTopup)} ₽</div></div>
-    <div class="stat"><div class="stat-label">Использовано</div><div class="stat-val" style="color:#854F0B">-${fmt(totalSpent)} ₽</div></div>
-    <div class="stat"><div class="stat-label">Остаток</div><div class="stat-val" style="color:#854F0B">${fmt(bal)} ₽</div></div>
-  </div>
-  <table><thead><tr><th>Дата</th><th>Операция</th><th>Наименование</th><th>№ заявки</th><th>Сумма</th><th>Остаток</th></tr></thead>
-  <tbody>${ops.map(op=>{
-    const lead=getLeadNum(op.entry.link||'');
-    return `<tr><td>${op.date}</td>
-      <td style="color:${op.type==='topup'?'#3B6D11':'#854F0B'};font-weight:600">${op.type==='topup'?'↑ Пополнение':'↓ Списание'}</td>
-      <td>${op.entry.service||'—'}${op.type==='spend'&&lead?`<div class="entry-sub">#${lead}</div>`:''}</td>
-      <td>${lead?'#'+lead:'—'}</td>
-      <td style="color:${op.type==='topup'?'#3B6D11':'#854F0B'};font-weight:600">${op.type==='topup'?'+':'-'}${fmt(op.amount)} ₽</td>
-      <td>${fmt(op.bal)} ₽</td></tr>`;
-  }).join('')}</tbody></table>
-  <div class="footer">First Concierge Service · FCS Finance · ${new Date().toLocaleString('ru-RU')}</div>
-  <script>window.onload=()=>{window.print();}<\/script></body></html>`);
-  w.document.close();
-}
+      <!-- Статусы заявок -->
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text)">Статусы заявок</div>
+        ${[['Оплачено',paid,'#27500A','#EAF3DE','#C0DD97'],['Ожидает',pending,'#633806','#FEF3E2','#FAC775'],['Отменено',data.filter(e=>e.status==='cancelled').length,'#791F1F','#FCEBEB','#F7C1C1']].map(([label,count,tc,bg,border])=>count>0?`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border)">
+          <span style="font-size:12px;color:var(--text2)">${label}</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="background:var(--bg3);border-radius:999px;height:6px;width:100px;overflow:hidden">
+              <div style="background:${tc};height:100%;width:${(count/data.length*100).toFixed(0)}%;border-radius:999px"></div>
+            </div>
+            <span style="font-size:12px;font-weight:500;color:${tc};min-width:40px;text-align:right">${count}</span>
+            <span style="font-size:10px;padding:2px 7px;border-radius:999px;background:${bg};color:${tc};border:0.5px solid ${border}">${(count/data.length*100).toFixed(0)}%</span>
+          </div>
+        </div>`:'').join('')}
+      </div>
+    </div>
 
-function filterByClient(name){switchTab('main');document.getElementById('q').value=name;renderTable();}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
 
-function loadClientNamesList(){
-  const names=[...new Set(entries.map(e=>e.client_name).filter(Boolean))];
-  const dl=document.getElementById('client-names-list');
-  if(dl)dl.innerHTML=names.map(n=>`<option value="${n}">`).join('');
+      <!-- Типы оплаты -->
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text)">Типы оплаты от клиентов</div>
+        ${Object.entries(byPay).sort((a,b)=>b[1]-a[1]).map(([pay,amt])=>`
+        <div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+            <span style="color:var(--text2)">${pay}</span>
+            <span style="color:var(--text);font-weight:500">${fmt(amt)} ₽</span>
+          </div>
+          <div style="background:var(--bg3);border-radius:999px;height:6px;overflow:hidden">
+            <div style="background:var(--accent);height:100%;width:${(amt/maxPayVal*100).toFixed(0)}%;border-radius:999px;opacity:0.7"></div>
+          </div>
+        </div>`).join('')}
+      </div>
+
+      <!-- Комиссия по отделам -->
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text)">Комиссия по отделам</div>
+        ${Object.entries(byDept).sort((a,b)=>b[1].comm-a[1].comm).map(([dept,d])=>{
+          const deptKey = Object.keys(DEPTS).find(k=>DEPTS[k]===dept)||'';
+          const color = DEPT_C[deptKey]||'#9A9080';
+          return `<div style="margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+              <span style="color:${color}">${dept}</span>
+              <span style="color:var(--green);font-weight:500">+${fmt(d.comm)} ₽</span>
+            </div>
+            <div style="background:var(--bg3);border-radius:999px;height:6px;overflow:hidden">
+              <div style="background:${color};height:100%;width:${(d.comm/maxDeptComm*100).toFixed(0)}%;border-radius:999px;opacity:0.7"></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Топ наименований -->
+    <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text)">Топ-5 услуг по сумме</div>
+      <table style="width:100%;border-collapse:collapse">
+        ${topServices.map(([s,amt],i)=>`<tr style="border-top:${i>0?'0.5px solid var(--border)':'none'}">
+          <td style="padding:8px 0;font-size:12px;color:var(--text3);width:24px">${i+1}</td>
+          <td style="padding:8px 12px;font-size:12px;color:var(--text)">${s}</td>
+          <td style="padding:8px 0;font-size:12px;font-weight:500;color:var(--accent);text-align:right;white-space:nowrap">${fmt(amt)} ₽</td>
+        </tr>`).join('')}
+      </table>
+    </div>`;
+
+  document.getElementById('analytics-content').innerHTML = html;
 }
 
 function filterByDept(dept){
@@ -1262,6 +1180,89 @@ function getFilteredData(){
   return data;
 }
 
+function buildSmartHints(allData){
+  // Пункт 1: группируем по номеру сделки AmoCRM
+  const leadMap = {};
+  allData.forEach(e=>{
+    const lead = getLeadNum(e.link||'');
+    if(!lead) return;
+    if(!leadMap[lead]) leadMap[lead]=[];
+    leadMap[lead].push(e);
+  });
+
+  // Пункт 2: группируем по клиенту
+  const clientMap = {};
+  allData.forEach(e=>{
+    const name = (e.client_name||'').trim();
+    if(!name) return;
+    if(!clientMap[name]) clientMap[name]={income:0,spent:0};
+    clientMap[name].income += +e.amount||0;
+    if(e.pay==='deposit') clientMap[name].spent += +e.amount||0;
+    clientMap[name].income += +e.deposit||0; // депозит пополнение
+  });
+
+  return {leadMap, clientMap};
+}
+
+function getEntryHints(e, leadMap, clientMap){
+  const hints = [];
+  const lead = getLeadNum(e.link||'');
+
+  // Пункт 1: несколько заявок по одной сделке
+  if(lead && leadMap[lead] && leadMap[lead].length > 1){
+    const group = leadMap[lead];
+    const totalComm = group.reduce((s,x)=>s+(+x.commission||0),0);
+    const commSet = [...new Set(group.map(x=>+x.commission||0))];
+    const isSameComm = commSet.length === 1 && commSet[0] > 0;
+    hints.push(`<span title="По сделке #${lead} найдено ${group.length} заявок${isSameComm?' — комиссия одинакова, проверь дубль!':' — комиссии разные, проверь'}"
+      style="cursor:pointer;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;
+      background:${isSameComm?'#FEF3E2':'#FFFBF0'};
+      color:${isSameComm?'#854F0B':'#633806'};
+      border:0.5px solid ${isSameComm?'#FAC775':'#F59E0B'}"
+      onclick="document.getElementById('q').value='${lead}';renderTable()">
+      ⚠ ${group.length} заявки по сделке
+    </span>`);
+  }
+
+  // Пункт 2: остаток у клиента
+  const name = (e.client_name||'').trim();
+  if(name && clientMap[name]){
+    const {income, spent} = clientMap[name];
+    const balance = income - spent;
+    if(balance > 0 && balance < income){
+      hints.push(`<span title="Клиент ${name}: поступило ${fmt(income)} ₽, использовано ${fmt(spent)} ₽, остаток ${fmt(balance)} ₽"
+        style="padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;
+        background:#F0F7FF;color:#185FA5;border:0.5px solid #B5D4F4">
+        ↕ Остаток ${fmt(balance)} ₽
+      </span>`);
+    }
+  }
+
+  // Пункт 3: разные счета (приход на счёт, расход с карты или наоборот)
+  const incomeOnAccount = ['qr','link','invoice'].includes(e.pay);
+  const incomeOnCard = e.pay === 'personal';
+  const spentFromCard = ['card_rf'].includes(e.agent_pay_type);
+  const spentFromAccount = ['corp_card','invoice'].includes(e.agent_pay_type);
+
+  if(e.amount > 0 && e.agent_amount > 0){
+    if(incomeOnAccount && spentFromCard){
+      hints.push(`<span title="Приход на счёт компании (${PAYS[e.pay]}), расход с карты РФ — нужен взаимозачёт"
+        style="padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;
+        background:#FFF7E6;color:#B45309;border:0.5px solid #FCD34D">
+        🔄 Разные счета
+      </span>`);
+    } else if(incomeOnCard && spentFromAccount){
+      hints.push(`<span title="Приход на карту РФ, расход со счёта компании — нужен взаимозачёт"
+        style="padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;
+        background:#FFF7E6;color:#B45309;border:0.5px solid #FCD34D">
+        🔄 Разные счета
+      </span>`);
+    }
+  }
+
+  return hints.join(' ');
+}
+
 function renderTable(){
   if(activeTab !== 'main' && activeTab !== 'loss' && activeTab !== 'expense' && activeTab !== 'corp' && activeTab !== 'invoice') return;
   const data = getFilteredData();
@@ -1270,13 +1271,18 @@ function renderTable(){
   const canEdit = currentProfile?.role !== 'viewer';
   const canDelete = currentProfile?.role === 'admin';
 
+  // Умные подсказки по всем данным месяца
+  const {leadMap, clientMap} = buildSmartHints(monthEntries());
+
   const rows = data.map(e=>{
     const lead = getLeadNum(e.link);
     const checked = selectedIds.has(e.id) ? 'checked' : '';
+    const smartHints = getEntryHints(e, leadMap, clientMap);
     const badges = [
-      e.is_loss ? `<span style="background:#2A1010;color:#F87171;padding:1px 7px;border-radius:999px;font-size:10px">⚠ Потеря${e.loss_amount>0?' '+fmt(e.loss_amount)+'₽':''}</span>` : '',
-      e.is_expense ? `<span style="background:#2A1A08;color:#F59E0B;padding:1px 7px;border-radius:999px;font-size:10px">💼</span>` : '',
+      e.is_loss ? `<span style="background:#FCEBEB;color:#791F1F;padding:1px 7px;border-radius:999px;font-size:10px;border:0.5px solid #F7C1C1">⚠ Потеря${e.loss_amount>0?' '+fmt(e.loss_amount)+'₽':''}</span>` : '',
+      e.is_expense ? `<span style="background:#FEF3E2;color:#633806;padding:1px 7px;border-radius:999px;font-size:10px;border:0.5px solid #FAC775">💼</span>` : '',
       e.receipt_link ? `<a href="${e.receipt_link}" target="_blank" class="receipt-link" title="Открыть чек">🧾</a>` : '',
+      smartHints,
     ].filter(Boolean).join(' ');
 
     const agentAmt = e.agent_amount > 0
@@ -1324,7 +1330,7 @@ function renderTable(){
 function switchTab(t){
   activeTab = t;
   clearSelection();
-  ['main','loss','expense','corp','invoice','treasury','dept','days','clients'].forEach(tab=>{
+  ['main','loss','expense','corp','invoice','treasury','dept','analytics','days','clients'].forEach(tab=>{
     const v = document.getElementById('view-'+tab);
     const b = document.getElementById('tab-'+tab);
     if(v) v.style.display = tab===t?'block':'none';
@@ -1332,6 +1338,7 @@ function switchTab(t){
   });
   if(t==='treasury') renderTreasury();
   else if(t==='dept') renderDeptView();
+  else if(t==='analytics') renderAnalytics();
   else if(t==='days') renderDays();
   else if(t==='clients') renderClients();
   else renderTable();
