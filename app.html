@@ -199,6 +199,7 @@ tr:hover td{background:var(--bg2)}
     <div class="tab" id="tab-expense" onclick="switchTab('expense')">💼 Расходы <span class="cnt" id="cnt-expense"></span></div>
     <div class="tab" id="tab-corp" onclick="switchTab('corp')">🏢 Корп карта <span class="cnt" id="cnt-corp"></span></div>
     <div class="tab" id="tab-invoice" onclick="switchTab('invoice')">📄 По счёту <span class="cnt" id="cnt-invoice"></span></div>
+    <div class="tab" id="tab-foreign" onclick="switchTab('foreign')" style="color:#6B3FA0">💳 Иностр. карта <span class="cnt" id="cnt-foreign"></span></div>
     <div class="tab" id="tab-dept" onclick="switchTab('dept')">📊 По отделам <span class="cnt" id="cnt-dept"></span></div>
     <div class="tab" id="tab-analytics" onclick="switchTab('analytics')">📈 Аналитика</div>
     <div class="tab" id="tab-days" onclick="switchTab('days')">📅 По дням</div>
@@ -326,10 +327,11 @@ tr:hover td{background:var(--bg2)}
     </div>
 
     <!-- Other views -->
-    <div id="view-loss" style="display:none"><div class="empty">Нет потерь 🎉</div></div>
-    <div id="view-expense" style="display:none"><div class="empty">Нет расходов</div></div>
-    <div id="view-corp" style="display:none"><div class="empty">Нет заявок с корп картой</div></div>
-    <div id="view-invoice" style="display:none"><div class="empty">Нет заявок по счёту</div></div>
+    <div id="view-loss" style="display:none"><div class="content" id="view-loss-content"></div></div>
+    <div id="view-expense" style="display:none"><div class="content" id="view-expense-content"></div></div>
+    <div id="view-corp" style="display:none"><div class="content" id="view-corp-content"></div></div>
+    <div id="view-invoice" style="display:none"><div class="content" id="view-invoice-content"></div></div>
+    <div id="view-foreign" style="display:none"><div class="content" id="view-foreign-content"></div></div>
 
     <!-- Казначей -->
     <div id="view-treasury" style="display:none">
@@ -804,7 +806,10 @@ function updateTabCounts(){
   document.getElementById('cnt-loss').textContent = data.filter(e=>e.is_loss).length ? `(${data.filter(e=>e.is_loss).length})` : '';
   document.getElementById('cnt-expense').textContent = data.filter(e=>e.is_expense).length ? `(${data.filter(e=>e.is_expense).length})` : '';
   document.getElementById('cnt-corp').textContent = data.filter(e=>e.agent_pay_type==='corp_card').length ? `(${data.filter(e=>e.agent_pay_type==='corp_card').length})` : '';
-  document.getElementById('cnt-invoice').textContent = data.filter(e=>e.agent_pay_type==='invoice').length ? `(${data.filter(e=>e.agent_pay_type==='invoice').length})` : '';
+  document.getElementById('cnt-invoice').textContent = data.filter(e=>e.agent_pay_type==='invoice'||e.pay==='invoice').length ? `(${data.filter(e=>e.agent_pay_type==='invoice'||e.pay==='invoice').length})` : '';
+  const foreignCount = data.filter(e=>e.agent_currency&&e.agent_currency!=='RUB'&&e.agent_amount>0).length;
+  const foreignEl = document.getElementById('cnt-foreign');
+  if(foreignEl) foreignEl.textContent = foreignCount ? `(${foreignCount})` : '';
   document.getElementById('cnt-dept').textContent = `(${data.length})`;
   // Казначей — мигающий счётчик если есть новые
   const trBtn = document.getElementById('tab-treasury');
@@ -1031,7 +1036,233 @@ function renderDeptDetail(dept){
   document.getElementById('dept-view-content').innerHTML = html;
 }
 
-// ===== АНАЛИТИКА =====
+// ===== SUB TABS (Потери, Расходы, Корп карта, По счёту) =====
+function renderSubTab(tab){
+  const data = monthEntries();
+  const canEdit = currentProfile?.role !== 'viewer';
+  const canDelete = currentProfile?.role === 'admin';
+
+  let filtered, title, color, summaryHtml;
+
+  if(tab==='loss'){
+    filtered = data.filter(e=>e.is_loss);
+    title = '⚠ Потери компании';
+    color = 'var(--red)';
+    const totalLoss = filtered.reduce((s,e)=>s+(+e.loss_amount||0),0);
+    const byDept = {};
+    filtered.forEach(e=>{const d=DEPTS[e.dept]||e.dept;byDept[d]=(byDept[d]||0)+(+e.loss_amount||0);});
+    summaryHtml = `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+        <div class="stat-card"><div class="stat-label">Потерь всего</div><div class="stat-value" style="color:var(--red)">${filtered.length}</div></div>
+        <div class="stat-card"><div class="stat-label">Сумма потерь</div><div class="stat-value" style="color:var(--red)">${fmt(totalLoss)} ₽</div></div>
+        <div class="stat-card"><div class="stat-label">По отделам</div><div style="font-size:11px;color:var(--text2);margin-top:4px">${Object.entries(byDept).map(([d,v])=>`${d}: ${fmt(v)} ₽`).join(' · ')}</div></div>
+      </div>`;
+  } else if(tab==='expense'){
+    filtered = data.filter(e=>e.is_expense);
+    title = '💼 Расходы компании';
+    color = 'var(--amber)';
+    const totalExp = filtered.reduce((s,e)=>s+(+e.agent_amount||0),0);
+    const byType = {};
+    filtered.forEach(e=>{const t=PAYS[e.pay]||e.pay||'Другое';byType[t]=(byType[t]||0)+(+e.agent_amount||0);});
+    summaryHtml = `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+        <div class="stat-card"><div class="stat-label">Расходов всего</div><div class="stat-value" style="color:var(--amber)">${filtered.length}</div></div>
+        <div class="stat-card"><div class="stat-label">Сумма расходов</div><div class="stat-value" style="color:var(--amber)">${fmt(totalExp)} ₽</div></div>
+        <div class="stat-card"><div class="stat-label">По типам</div><div style="font-size:11px;color:var(--text2);margin-top:4px">${Object.entries(byType).map(([t,v])=>`${t}: ${fmt(v)} ₽`).join(' · ')}</div></div>
+      </div>`;
+  } else if(tab==='corp'){
+    filtered = data.filter(e=>e.agent_pay_type==='corp_card');
+    title = '🏢 Корп карта';
+    color = '#6B3FA0';
+    const totalCorpSpent = filtered.reduce((s,e)=>s+(+e.agent_amount||0),0);
+    const totalCorpComm = filtered.reduce((s,e)=>s+(+e.commission||0),0);
+    summaryHtml = `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+        <div class="stat-card"><div class="stat-label">Заявок</div><div class="stat-value" style="color:#6B3FA0">${filtered.length}</div></div>
+        <div class="stat-card"><div class="stat-label">Потрачено с корп карты</div><div class="stat-value" style="color:#6B3FA0">${fmt(totalCorpSpent)} ₽</div></div>
+        <div class="stat-card"><div class="stat-label">Комиссия</div><div class="stat-value" style="color:var(--green)">${fmt(totalCorpComm)} ₽</div></div>
+      </div>`;
+  } else if(tab==='invoice'){
+    filtered = data.filter(e=>e.agent_pay_type==='invoice'||e.pay==='invoice');
+    title = '📄 По счёту';
+    color = '#185FA5';
+    const totalInvIncome = filtered.reduce((s,e)=>s+(+e.amount||0),0);
+    const totalInvSpent = filtered.reduce((s,e)=>s+(+e.agent_amount||0),0);
+    const totalInvComm = filtered.reduce((s,e)=>s+(+e.commission||0),0);
+    summaryHtml = `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+        <div class="stat-card"><div class="stat-label">Заявок</div><div class="stat-value" style="color:#185FA5">${filtered.length}</div></div>
+        <div class="stat-card"><div class="stat-label">Поступило по счёту</div><div class="stat-value" style="color:#185FA5">${fmt(totalInvIncome)} ₽</div></div>
+        <div class="stat-card"><div class="stat-label">Оплачено по счёту</div><div class="stat-value" style="color:var(--red)">${fmt(totalInvSpent)} ₽</div></div>
+        <div class="stat-card"><div class="stat-label">Комиссия</div><div class="stat-value" style="color:var(--green)">${fmt(totalInvComm)} ₽</div></div>
+      </div>`;
+  }
+
+  if(!filtered.length){
+    document.getElementById(`view-${tab}-content`).innerHTML = `<div style="text-align:center;padding:60px;color:var(--text3)"><div style="font-size:32px;margin-bottom:12px">${tab==='loss'?'🎉':'📭'}</div><div style="font-size:14px">Нет записей за этот период</div></div>`;
+    return;
+  }
+
+  const tableRows = filtered.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(e=>{
+    const lead = getLeadNum(e.link||'');
+    return `<tr style="border-top:0.5px solid var(--border)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+      <td style="padding:8px 12px;font-size:12px">
+        ${lead?`<span style="color:var(--accent);cursor:pointer" onclick="filterByLead('${lead}')">#${lead}</span>`:'—'}
+        <button onclick="toggleFlag('${e.id}',${!!e.flagged},this)" style="margin-left:3px;padding:1px 4px;border:none;background:none;cursor:pointer;font-size:12px;opacity:${e.flagged?'1':'0.25'}" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='${e.flagged?'1':'0.25'}'">🚩</button>
+      </td>
+      <td style="padding:8px 12px;font-size:11px;color:var(--text2);white-space:nowrap">${e.date}</td>
+      <td style="padding:8px 12px"><span class="dept-dot d-${e.dept}"></span><span style="font-size:11px;color:${DEPT_C[e.dept]||'var(--text2)'}">${DEPTS[e.dept]||e.dept}</span></td>
+      <td style="padding:8px 12px;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.service||'—'}</td>
+      <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--accent)">${e.amount>0?fmt(e.amount)+' ₽':'—'}</td>
+      <td style="padding:8px 12px;font-size:11px;color:var(--text2)">${PAYS[e.pay]||e.pay||'—'}</td>
+      <td style="padding:8px 12px;font-size:11px;color:var(--amber)">${e.agent_amount>0?fmt(e.agent_amount)+(e.agent_currency!=='RUB'?' '+e.agent_currency:' ₽'):'—'}</td>
+      <td style="padding:8px 12px;font-size:12px;color:var(--green);font-weight:500">${e.commission>0?'+'+fmt(e.commission)+' ₽':'—'}</td>
+      ${tab==='loss'?`<td style="padding:8px 12px;font-size:12px;color:var(--red);font-weight:500">${e.loss_amount>0?fmt(e.loss_amount)+' ₽':'—'}</td><td style="padding:8px 12px;font-size:11px;color:var(--text2)">${e.loss_note||'—'}</td>`:''}
+      ${tab==='expense'?`<td style="padding:8px 12px;font-size:11px;color:var(--text2)">${e.expense_note||'—'}</td>`:''}
+      <td style="padding:8px 12px"><button class="${STATUS_C[e.status]||'s-pending'} s-btn" onclick="cycleStatus('${e.id}')">${STATUS_L[e.status]||'Ожидает'}</button></td>
+      <td style="padding:8px 12px">${canEdit?`<button class="btn btn-sm" onclick="openEdit('${e.id}')">✏</button>`:''}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById(`view-${tab}-content`).innerHTML = `
+    ${summaryHtml}
+    <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden">
+      <div style="padding:12px 16px;border-bottom:0.5px solid var(--border);font-size:13px;font-weight:600;color:${color}">${title} (${filtered.length})</div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:700px">
+        <thead><tr style="background:var(--bg3)">
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">№</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Дата</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Отдел</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Наименование</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Сумма FCS</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Тип оплаты</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Расход</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Комиссия</th>
+          ${tab==='loss'?'<th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Сумма потери</th><th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Причина</th>':''}
+          ${tab==='expense'?'<th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Описание</th>':''}
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Статус</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table></div>
+    </div>`;
+}
+
+// ===== ИНОСТРАННАЯ КАРТА =====
+function renderForeignCard(){
+  const data = monthEntries().filter(e=>e.agent_currency && e.agent_currency!=='RUB' && e.agent_amount>0);
+  const canEdit = currentProfile?.role !== 'viewer';
+
+  const totalComm = data.reduce((s,e)=>s+(+e.commission||0),0);
+  const totalAgent = data.reduce((s,e)=>s+(+e.agent_amount||0),0);
+
+  // Группируем по валюте
+  const byCurrency = {};
+  data.forEach(e=>{
+    const cur = e.agent_currency;
+    if(!byCurrency[cur]) byCurrency[cur]={count:0,amount:0,comm:0};
+    byCurrency[cur].count++;
+    byCurrency[cur].amount+=+e.agent_amount||0;
+    byCurrency[cur].comm+=+e.commission||0;
+  });
+
+  // По отделам
+  const byDept = {};
+  data.forEach(e=>{
+    const d=DEPTS[e.dept]||e.dept||'Другое';
+    if(!byDept[d])byDept[d]={count:0,comm:0};
+    byDept[d].count++;
+    byDept[d].comm+=+e.commission||0;
+  });
+
+  const CUR_COLORS={EUR:'#818CF8',USD:'#6EE7B7',AED:'#FCD34D',TRY:'#F9A8D4',KZT:'#FCA5A5',GBP:'#93C5FD',JPY:'#A5F3FC'};
+
+  if(!data.length){
+    document.getElementById('view-foreign-content').innerHTML=`<div style="text-align:center;padding:60px;color:var(--text3)"><div style="font-size:32px;margin-bottom:12px">💳</div><div style="font-size:14px">Нет валютных операций за этот месяц</div></div>`;
+    return;
+  }
+
+  let html = `
+    <!-- Сводка -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="stat-card"><div class="stat-label">Валютных операций</div><div class="stat-value" style="color:#6B3FA0">${data.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Комиссия иностр. карты</div><div class="stat-value" style="color:var(--green)">${fmt(totalComm)} ₽</div><div style="font-size:10px;color:var(--text3);margin-top:2px">Со всех отделов</div></div>
+    </div>
+
+    <!-- По валютам -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:14px">
+      ${Object.entries(byCurrency).map(([cur,d])=>{
+        const color=CUR_COLORS[cur]||'#9A9080';
+        return `<div style="background:var(--bg2);border:0.5px solid var(--border);border-left:3px solid ${color};border-radius:var(--radius);padding:12px">
+          <div style="font-size:12px;font-weight:600;color:${color};margin-bottom:6px">${cur}</div>
+          <div style="font-size:10px;color:var(--text3)">Операций: ${d.count}</div>
+          <div style="font-size:14px;font-weight:500;color:${color};margin-top:2px">${d.amount.toLocaleString('ru-RU',{maximumFractionDigits:2})} ${cur}</div>
+          <div style="font-size:11px;color:var(--green);margin-top:3px">комиссия: ${fmt(d.comm)} ₽</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- По отделам -->
+    <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:var(--text)">Комиссия по отделам (иностр. карта)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${Object.entries(byDept).map(([dept,d])=>{
+          const deptKey=Object.keys(DEPTS).find(k=>DEPTS[k]===dept)||'';
+          const color=DEPT_C[deptKey]||'#9A9080';
+          return `<div style="background:var(--bg3);border-radius:8px;padding:8px 12px;border-left:3px solid ${color}">
+            <div style="font-size:10px;color:${color};margin-bottom:2px">${dept}</div>
+            <div style="font-size:13px;font-weight:500;color:var(--green)">+${fmt(d.comm)} ₽</div>
+            <div style="font-size:10px;color:var(--text3)">${d.count} заявок</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Все заявки -->
+    <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden">
+      <div style="padding:12px 16px;border-bottom:0.5px solid var(--border);font-size:13px;font-weight:600;color:#6B3FA0">💳 Все валютные операции (${data.length})</div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:750px">
+        <thead><tr style="background:var(--bg3)">
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">№</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Дата</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Отдел</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Наименование</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Сумма FCS</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Расход в валюте</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Курс</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Комиссия</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Статус</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+          ${data.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(e=>{
+            const lead=getLeadNum(e.link||'');
+            const color=CUR_COLORS[e.agent_currency]||'#9A9080';
+            const rate=e.foreign_rate>0?e.foreign_rate.toFixed(e.foreign_rate<1?4:2):'—';
+            return `<tr style="border-top:0.5px solid var(--border)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+              <td style="padding:8px 12px;font-size:12px">
+                ${lead?`<span style="color:var(--accent);cursor:pointer" onclick="filterByLead('${lead}')">#${lead}</span>`:'—'}
+                <button onclick="toggleFlag('${e.id}',${!!e.flagged},this)" style="margin-left:3px;padding:1px 4px;border:none;background:none;cursor:pointer;font-size:12px;opacity:${e.flagged?'1':'0.25'}" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='${e.flagged?'1':'0.25'}'">🚩</button>
+              </td>
+              <td style="padding:8px 12px;font-size:11px;color:var(--text2);white-space:nowrap">${e.date}</td>
+              <td style="padding:8px 12px"><span style="font-size:11px;color:${DEPT_C[e.dept]||'var(--text2)'}">${DEPTS[e.dept]||e.dept}</span></td>
+              <td style="padding:8px 12px;font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.service}</td>
+              <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--accent)">${e.amount>0?fmt(e.amount)+' ₽':'—'}</td>
+              <td style="padding:8px 12px;font-size:12px;font-weight:500">
+                <span style="color:${color}">${e.agent_amount.toLocaleString('ru-RU',{maximumFractionDigits:2})} ${e.agent_currency}</span>
+              </td>
+              <td style="padding:8px 12px;font-size:11px;color:var(--text2)">${rate!=='—'?rate+' ₽':'—'}</td>
+              <td style="padding:8px 12px;font-size:12px;font-weight:500;color:#6B3FA0">${e.commission>0?'+'+fmt(e.commission)+' ₽':'—'}</td>
+              <td style="padding:8px 12px"><button class="${STATUS_C[e.status]||'s-pending'} s-btn" onclick="cycleStatus('${e.id}')">${STATUS_L[e.status]||'Ожидает'}</button></td>
+              <td style="padding:8px 12px">${canEdit?`<button class="btn btn-sm" onclick="openEdit('${e.id}')">✏</button>`:''}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+
+  document.getElementById('view-foreign-content').innerHTML = html;
+}
 function renderAnalytics(){
   const data = monthEntries();
   if(!data.length){
@@ -1426,7 +1657,7 @@ function renderTable(){
 function switchTab(t){
   activeTab = t;
   clearSelection();
-  ['main','loss','expense','corp','invoice','treasury','dept','analytics','days','clients'].forEach(tab=>{
+  ['main','loss','expense','corp','invoice','foreign','treasury','dept','analytics','days','clients'].forEach(tab=>{
     const v = document.getElementById('view-'+tab);
     const b = document.getElementById('tab-'+tab);
     if(v) v.style.display = tab===t?'block':'none';
@@ -1437,6 +1668,11 @@ function switchTab(t){
   else if(t==='analytics') renderAnalytics();
   else if(t==='days') renderDays();
   else if(t==='clients') renderClients();
+  else if(t==='loss') renderSubTab('loss');
+  else if(t==='expense') renderSubTab('expense');
+  else if(t==='corp') renderSubTab('corp');
+  else if(t==='invoice') renderSubTab('invoice');
+  else if(t==='foreign') renderForeignCard();
   else renderTable();
 }
 
