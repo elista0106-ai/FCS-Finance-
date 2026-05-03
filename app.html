@@ -1428,6 +1428,22 @@ function getFxTotalRub(){
   return baseRub + commRub;
 }
 
+function onPayChange(){
+  const pay = document.getElementById('m-pay').value;
+  const amtField = document.getElementById('m-amount');
+  if(pay === 'deposit'){
+    // При депозитной оплате — клиент не переводит деньги
+    amtField.value = '0';
+    amtField.style.background = 'var(--bg4)';
+    amtField.title = 'При оплате из депозита сумма FCS = 0';
+    // Подсказка
+    showToast('💰 Расход контрагенту спишется с депозита клиента');
+  } else {
+    amtField.style.background = '';
+    amtField.title = '';
+  }
+}
+
 function onAgentPayChange(){
   const val = document.getElementById('m-agent-pay-type').value;
   document.getElementById('receipt-field').style.display = val==='corp_card'?'block':'none';
@@ -1469,9 +1485,10 @@ function calcModal(){
   const agentCur = document.getElementById('m-agent-currency').value;
   const deposit = +document.getElementById('m-deposit').value||0;
   const isForex = agentCur !== 'RUB' && agentAmt > 0;
+  const isDepositPay = pay === 'deposit';
 
   const calcBlock = document.getElementById('calc-block');
-  calcBlock.style.display = (amount>0 || isForex) ? 'block' : 'none';
+  calcBlock.style.display = (amount>0 || agentAmt>0 || isDepositPay) ? 'block' : 'none';
 
   let acq = 0;
   if(pay==='qr') acq = Math.round(amount*0.01);
@@ -1479,19 +1496,40 @@ function calcModal(){
 
   const agentRub = getFxTotalRub();
 
-  // Если валютная операция — вся разница идёт в комиссию иностр. карты
-  // Если рублёвая — идёт в комиссию отдела
-  const diff = Math.max(0, amount - acq - agentRub - deposit);
-  const foreignComm = isForex ? diff : 0;
-  const deptComm = isForex ? 0 : diff;
+  // Для депозитной оплаты — расход списывается с депозита клиента
+  let diff, foreignComm, deptComm;
+  if(isDepositPay){
+    // Клиент платит из депозита → расход = agentRub, доход от клиента = 0
+    // Комиссия = 0 (деньги не проходят через нас)
+    diff = 0;
+    foreignComm = 0;
+    deptComm = 0;
+  } else {
+    diff = Math.max(0, amount - acq - agentRub - deposit);
+    foreignComm = isForex ? diff : 0;
+    deptComm = isForex ? 0 : diff;
+  }
 
   // Заголовок блока
   document.getElementById('calc-title').textContent =
+    isDepositPay ? '💰 Расчёт: Депозит клиента' :
     isForex ? '📊 Расчёт: Иностранная карта' :
     pay==='qr' ? '📊 Расчёт: QR (эквайринг 1%)' :
     pay==='link' ? '📊 Расчёт: По ссылке (эквайринг 3%)' : '📊 Автоматический расчёт';
 
-  document.getElementById('calc-income').textContent = fmt(amount)+' ₽';
+  // Строка прихода — для депозита показываем "Списание с депозита"
+  const incomeEl = document.getElementById('calc-income');
+  const incomeRow = incomeEl.closest ? incomeEl.parentElement : null;
+  if(isDepositPay){
+    incomeEl.textContent = fmt(agentRub) + ' ₽';
+    incomeEl.parentElement.querySelector('span').textContent = 'Списание с депозита клиента';
+    incomeEl.style.color = '#854F0B';
+  } else {
+    incomeEl.textContent = fmt(amount)+' ₽';
+    incomeEl.style.color = 'var(--text)';
+    if(incomeEl.parentElement.querySelector('span'))
+      incomeEl.parentElement.querySelector('span').textContent = 'Приход от клиента';
+  }
 
   const acqRow = document.getElementById('calc-acq-row');
   if(acq>0){
@@ -1501,11 +1539,9 @@ function calcModal(){
   } else acqRow.style.display='none';
 
   const agentRow = document.getElementById('calc-agent-row');
-  if(agentRub>0){
+  if(agentRub>0 && !isDepositPay){
     agentRow.style.display='flex';
-    const agentLabel = isForex
-      ? `Расход (${agentAmt} ${agentCur} → ₽)`
-      : 'Расход контрагенту';
+    const agentLabel = isForex ? `Расход (${agentAmt} ${agentCur} → ₽)` : 'Расход контрагенту';
     document.getElementById('calc-agent-row').querySelector('span').textContent = agentLabel;
     document.getElementById('calc-agent').textContent = '−'+fmt(agentRub)+' ₽';
   } else agentRow.style.display='none';
