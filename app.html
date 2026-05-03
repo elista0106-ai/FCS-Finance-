@@ -6,21 +6,21 @@
 <title>FCS Finance — Журнал</title>
 <style>
 :root {
-  --bg: #F5F5F0;
+  --bg: #F4F4F2;
   --bg2: #FFFFFF;
-  --bg3: #F0EFE8;
-  --bg4: #E8E6DE;
-  --border: #D8D5CC;
-  --border2: #C8C5BC;
-  --text: #1A1814;
-  --text2: #5A5448;
-  --text3: #8A8478;
+  --bg3: #EFEFED;
+  --bg4: #E8E8E4;
+  --border: #DDDDD8;
+  --border2: #CACAC4;
+  --text: #1A1A18;
+  --text2: #5A5A52;
+  --text3: #8A8A82;
   --accent: #185FA5;
   --accent2: #0C447C;
-  --green: #0F6E56;
-  --green2: #085041;
+  --green: #3B6D11;
+  --green2: #27500A;
   --red: #A32D2D;
-  --amber: #B07820;
+  --amber: #854F0B;
   --purple: #6B3FA0;
   --radius: 10px;
   --radius-sm: 6px;
@@ -901,20 +901,20 @@ function renderTable(){
       <td style="white-space:nowrap;font-size:11px;color:var(--text2)">${e.date||'—'}</td>
       <td><span class="dept-dot d-${e.dept}"></span><span style="font-size:11px">${DEPTS[e.dept]||e.dept}</span></td>
       <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.service||''}">${e.service||'—'}</td>
-      <td style="white-space:nowrap;font-weight:600;color:#60A5FA">
+      <td style="white-space:nowrap;font-weight:600;color:var(--accent)">
         ${e.amount>0?fmt(e.amount)+' ₽':'—'}
         <button onclick="togglePaymentReceived('${e.id}',${!!e.payment_received},this)" 
           title="${e.payment_received?'✓ Деньги поступили · нажмите чтобы снять отметку':'○ Нажмите чтобы отметить поступление'}"
-          style="margin-left:4px;padding:1px 5px;border-radius:4px;border:none;cursor:pointer;font-size:11px;font-weight:600;
-          background:${e.payment_received?'#0A2018':'#1A1612'};
-          color:${e.payment_received?'#2ECC71':'#5A5448'};
-          border:0.5px solid ${e.payment_received?'#0F6E56':'#2A2620'}">
+          style="margin-left:4px;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;transition:all 0.15s;
+          background:${e.payment_received?'#EAF3DE':'#F4F4F2'};
+          color:${e.payment_received?'#27500A':'#8A8A82'};
+          border:1px solid ${e.payment_received?'#639922':'#CACAC4'}">
           ${e.payment_received?'✓':'○'}
         </button>
       </td>
       <td style="font-size:11px;color:var(--text2)">${PAYS[e.pay]||e.pay||'—'}</td>
       <td style="font-size:11px;color:var(--amber)">${agentAmt}</td>
-      <td style="color:#2ECC71;white-space:nowrap">${e.commission>0?'+'+fmt(e.commission)+' ₽':'—'}</td>
+      <td style="color:var(--green);white-space:nowrap">${e.commission>0?'+'+fmt(e.commission)+' ₽':'—'}</td>
       <td style="white-space:nowrap">${badges||'—'}</td>
       <td style="font-size:11px;color:var(--text2);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.agent||'—'}</td>
       <td style="font-size:11px;color:#60A5FA;white-space:nowrap">${e.from_form?(e._submitter_name||'исполнитель'):'—'}</td>
@@ -1479,9 +1479,9 @@ async function togglePaymentReceived(id, currentState, btn){
   }).eq('id', id);
   if(error){ showToast('Ошибка: '+error.message); return; }
   btn.textContent = newState ? '✓' : '○';
-  btn.style.background = newState ? '#0A2018' : '#1A1612';
-  btn.style.color = newState ? '#2ECC71' : '#5A5448';
-  btn.style.borderColor = newState ? '#0F6E56' : '#2A2620';
+  btn.style.background = newState ? '#EAF3DE' : '#F4F4F2';
+  btn.style.color = newState ? '#27500A' : '#8A8A82';
+  btn.style.borderColor = newState ? '#639922' : '#CACAC4';
   btn.title = newState ? '✓ Деньги поступили · нажмите чтобы снять' : '○ Нажмите чтобы отметить поступление';
   const entry = entries.find(e=>e.id===id);
   if(entry) entry.payment_received = newState;
