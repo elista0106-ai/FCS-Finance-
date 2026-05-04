@@ -1866,6 +1866,14 @@ async function getRateFromWallet(currency, date){
       return rate;
     }
     showToast(`Нет пополнений ${currency} в кошельке — введите курс вручную`);
+    // Подсвечиваем поле курса чтобы было понятно что нужно заполнить
+    const rateField = document.getElementById('m-fx-rate');
+    if(rateField){
+      rateField.style.borderColor = '#F59E0B';
+      rateField.style.background = '#FFFBF0';
+      rateField.placeholder = 'Введите курс вручную!';
+      rateField.focus();
+    }
   }catch(e){ console.warn('Rate fetch error:', e); }
   return 0;
 }
