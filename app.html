@@ -424,7 +424,7 @@ tr:hover td{background:var(--bg2)}
   </div>
 
   <!-- Поля конвертации — только для иностранной валюты -->
-  <div id="currency-convert-block" style="display:none;background:#1A1A0A;border:0.5px solid #3A3010;border-radius:var(--radius);padding:12px;margin-bottom:12px">
+  <div id="currency-convert-block" style="display:none;background:#F5F0FF;border:0.5px solid #C0A8F4;border-radius:var(--radius);padding:12px;margin-bottom:12px">
     <div style="font-size:11px;font-weight:600;color:#FCD34D;margin-bottom:10px">💱 Конвертация валюты</div>
     <div class="grid2">
       <div class="field" style="margin-bottom:10px">
@@ -470,14 +470,14 @@ tr:hover td{background:var(--bg2)}
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
         <div class="field" style="margin:0"><label>Сумма факт</label><input type="number" id="m-actual-amount" placeholder="напр. 150000" oninput="calcFxActual()"></div>
         <div class="field" style="margin:0"><label>Валюта</label>
-          <select id="m-actual-currency" onchange="calcFxActual()" style="background:#252018;border-color:#3A3010;color:#FCD34D">
+          <select id="m-actual-currency" onchange="calcFxActual()" style="background:var(--bg2);border-color:var(--border2);color:var(--text)">
             <option value="">— та же —</option>
             <option value="KZT">KZT ₸</option><option value="USD">USD $</option>
             <option value="EUR">EUR €</option><option value="AED">AED</option>
             <option value="TRY">TRY ₺</option><option value="JPY">JPY ¥</option>
           </select>
         </div>
-        <div class="field" style="margin:0"><label>Курс к ₽</label><input type="number" id="m-actual-rate" placeholder="напр. 0.21" step="0.0001" oninput="calcFxActual()" style="background:#252018;border-color:#3A3010"></div>
+        <div class="field" style="margin:0"><label>Курс к ₽</label><input type="number" id="m-actual-rate" placeholder="напр. 0.21" step="0.0001" oninput="calcFxActual()" style="background:var(--bg2);border-color:var(--border2)"></div>
       </div>
       <div id="calc-actual-box" style="display:none;background:var(--bg3);border-radius:6px;padding:8px;margin-top:8px;font-size:12px;display:none">
         <div style="display:flex;justify-content:space-between;color:var(--text2)">
@@ -1809,6 +1809,13 @@ function calcFxActual(){
     box.style.display='block';
     document.getElementById('calc-actual-formula').textContent=`${amt.toLocaleString('ru-RU')} ${cur} × ${rate} =`;
     document.getElementById('calc-actual-rub').textContent=rub.toLocaleString('ru-RU')+' ₽';
+    // Автоматически считаем валютную комиссию: приход - фактический расход в ₽
+    const income = +document.getElementById('m-amount').value||0;
+    if(income>0 && !commManual){
+      const fxComm = Math.max(0, income - rub);
+      document.getElementById('m-foreign-comm').value = fxComm>0 ? fxComm : '';
+      document.getElementById('m-commission').value = 0;
+    }
   } else {
     box.style.display='none';
   }
@@ -1820,12 +1827,11 @@ async function onCurrencyChange(){
   document.getElementById('currency-convert-block').style.display = isForex ? 'block' : 'none';
   if(isForex){
     document.getElementById('currency-label').textContent = cur;
-    // Подставляем курс из кошелька
+    // Подставляем курс из кошелька по дате заявки
     const entryDate = document.getElementById('m-date').value;
     const rate = await getRateFromWallet(cur, entryDate);
     if(rate > 0){
       document.getElementById('m-fx-rate').value = rate.toFixed(rate<1?4:2);
-      showToast(`Курс ${cur} подставлен из кошелька: ${rate.toFixed(rate<1?4:2)} ₽`);
       calcFx();
     }
   }
@@ -1835,8 +1841,8 @@ async function onCurrencyChange(){
 
 async function getRateFromWallet(currency, date){
   try{
-    // Берём последнее пополнение ПО ИЛИ ДО указанной даты
     const targetDate = date || new Date().toISOString().split('T')[0];
+    // Берём ближайшее пополнение ДО даты заявки
     const {data} = await sb.from('currency_topups')
       .select('amount_rub,amount_currency,date')
       .eq('currency', currency)
@@ -1845,10 +1851,10 @@ async function getRateFromWallet(currency, date){
       .limit(1);
     if(data && data.length > 0){
       const rate = +data[0].amount_rub / +data[0].amount_currency;
-      showToast(`Курс ${currency}: ${rate.toFixed(rate<1?4:2)} ₽ (пополнение ${data[0].date})`);
+      showToast(`💱 Курс ${currency}: ${rate.toFixed(rate<1?4:2)} ₽ (пополнение ${data[0].date})`);
       return rate;
     }
-    // Если до этой даты нет — берём ближайшее ПОСЛЕ
+    // Нет пополнений до этой даты — берём первое после
     const {data:after} = await sb.from('currency_topups')
       .select('amount_rub,amount_currency,date')
       .eq('currency', currency)
@@ -1856,9 +1862,10 @@ async function getRateFromWallet(currency, date){
       .limit(1);
     if(after && after.length > 0){
       const rate = +after[0].amount_rub / +after[0].amount_currency;
-      showToast(`Курс ${currency}: ${rate.toFixed(rate<1?4:2)} ₽ (ближайшее пополнение ${after[0].date})`);
+      showToast(`💱 Курс ${currency}: ${rate.toFixed(rate<1?4:2)} ₽ (ближайшее ${after[0].date})`);
       return rate;
     }
+    showToast(`Нет пополнений ${currency} в кошельке — введите курс вручную`);
   }catch(e){ console.warn('Rate fetch error:', e); }
   return 0;
 }
@@ -1873,10 +1880,10 @@ function calcFx(){
 
   const baseRub = agentAmt * rate;
   const commRub = Math.round(baseRub * commPct / 100);
-  const totalRub = baseRub + commRub;
+  const totalRub = Math.round(baseRub + commRub);
 
   document.getElementById('fx-foreign-amt').textContent = agentAmt.toLocaleString('ru-RU') + ' ' + cur;
-  document.getElementById('fx-base-rub').textContent = fmt(baseRub) + ' ₽';
+  document.getElementById('fx-base-rub').textContent = fmt(Math.round(baseRub)) + ' ₽';
 
   const commRow = document.getElementById('fx-commission-row');
   if(commPct > 0){
@@ -1887,6 +1894,16 @@ function calcFx(){
     commRow.style.display = 'none';
   }
   document.getElementById('fx-total-rub').textContent = fmt(totalRub) + ' ₽';
+
+  // Автоматически считаем валютную комиссию: приход - расход в ₽
+  if(!commManual && agentAmt > 0 && rate > 0){
+    const income = +document.getElementById('m-amount').value||0;
+    if(income > 0){
+      const fxComm = Math.max(0, income - totalRub);
+      document.getElementById('m-foreign-comm').value = fxComm > 0 ? fxComm : '';
+      document.getElementById('m-commission').value = 0;
+    }
+  }
 
   calcModal();
 }
