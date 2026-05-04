@@ -2675,318 +2675,515 @@ function calcStimCoef(c,l){
   return Math.min(100,cp+lp);
 }
 
-function kpiKBRCons(){
-  return KPI_S+`<div class="kpi-grid">
-    <div>
-      <div class="kpi-card"><div class="kpi-title">📋 Основные данные</div>
-        <div class="kpi-row"><span class="kpi-label">Часовая ставка (₽)</span><input class="kpi-input" id="kc-rate" type="number" value="402" oninput="calcKBRCons()"></div>
-        <div class="kpi-row"><span class="kpi-label">Факт. часов</span><input class="kpi-input" id="kc-hours" type="number" value="184" oninput="calcKBRCons()"></div>
-        <div class="kpi-row"><span class="kpi-label">Норма часов</span><input class="kpi-input" id="kc-norm" type="number" value="175" oninput="calcKBRCons()"></div>
-      </div>
-      <div class="kpi-card"><div class="kpi-title">🎯 KPI показатели</div>
-        <div class="kpi-row"><span class="kpi-label">KPI 1: план сделок</span><input class="kpi-input" id="kc-plan" type="number" value="331" oninput="calcKBRCons()"></div>
-        <div class="kpi-row"><span class="kpi-label">KPI 1: факт сделок</span><input class="kpi-input" id="kc-fact" type="number" value="282" oninput="calcKBRCons()"></div>
-        <div class="kpi-row"><div><span class="kpi-label">KPI 2: % бронирования</span><div class="kpi-hint">69↓=0 · 70-84=0.5 · 85-94=0.8 · 95↑=1</div></div><input class="kpi-input" id="kc-rest" type="number" value="0.87" step="0.01" oninput="calcKBRCons()"></div>
-        <div class="kpi-row"><div><span class="kpi-label">KPI 3: CSI</span><div class="kpi-hint">↓4.89=0 · 4.9-4.95=0.6 · 4.96-4.97=1 · ≥4.98=1.5</div></div><input class="kpi-input" id="kc-csi" type="number" value="4.94" step="0.01" oninput="calcKBRCons()"></div>
-      </div>
-      <div class="kpi-card"><div class="kpi-title">⚠️ Штрафы</div>
-        <div class="kpi-row"><span class="kpi-label">Жалоб (шт)</span><input class="kpi-input" id="kc-complaints" type="number" value="0" oninput="calcKBRCons()"></div>
-        <div class="kpi-row"><div><span class="kpi-label">Финансовые потери (₽)</span><div class="kpi-hint">1-10к=-20% · 10-30к=-50% · 30к↑=-100%</div></div><input class="kpi-input" id="kc-losses" type="number" value="0" oninput="calcKBRCons()"></div>
-      </div>
+// Производственный календарь 2026 (норма часов)
+const WORK_HOURS = {
+  '2026-01':120,'2026-02':152,'2026-03':168,'2026-04':175,
+  '2026-05':151,'2026-06':167,'2026-07':184,'2026-08':168,
+  '2026-09':176,'2026-10':176,'2026-11':159,'2026-12':176
+};
+
+function getNorm(monthVal){
+  // monthVal — строка YYYY-MM или число часов напрямую
+  return WORK_HOURS[monthVal] || +monthVal || 175;
+}
+
+function roundDown2(x){ return Math.floor(x*100)/100; }
+
+function getCoef(exec){
+  // Шкала: <0.85=0, 0.85-0.99=0.6, >=1.0 — линейно (макс 2.0)
+  if(exec>=1.0) return Math.min(roundDown2(exec), 2.0);
+  if(exec>=0.85) return 0.6;
+  return 0;
+}
+
+function getCsiCoef(csi){
+  if(csi>=4.98) return 1.0;
+  if(csi>=4.96) return 0.8;  // для проверок и корп
+  if(csi>=4.90) return 0.6;
+  return 0;
+}
+function getCsiCoefKBR(csi){
+  // Для КБР CSI: 4.98=1.5, 4.96-4.97=1.0, 4.9-4.95=0.6
+  if(csi>=4.98) return 1.5;
+  if(csi>=4.96) return 1.0;
+  if(csi>=4.90) return 0.6;
+  return 0;
+}
+
+function calcStimPct(complaints, losses){
+  let cp=0;
+  if(complaints===1)cp=20; else if(complaints===2)cp=50; else if(complaints>=3)cp=100;
+  let lp=0;
+  if(losses>0&&losses<=10000)lp=20; else if(losses>10000&&losses<=30000)lp=50; else if(losses>30000)lp=100;
+  return Math.min(100,cp+lp);
+}
+
+function kpiResult(rows, stimDeduct, stimPct, salary, f){
+  const totalKPI = rows.reduce((s,r)=>s+(r.val||0),0);
+  const totalKPIAfterStim = Math.max(0, totalKPI - stimDeduct);
+  const total = salary + totalKPIAfterStim;
+  return `
+    ${rows.map(r=>`<div class="kpi-rrow"><span style="color:var(--text2)">${r.label}</span><span style="color:var(--green)">+${f(r.val)}</span></div>`).join('')}
+    ${stimDeduct>0?`<div class="kpi-rrow"><span style="color:var(--red)">Штраф −${stimPct}% от KPI 1</span><span style="color:var(--red)">−${f(stimDeduct)}</span></div>`:''}
+    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:500;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px;color:#185FA5">
+      <span>Итог KPI =</span><span>${f(totalKPIAfterStim)}</span>
     </div>
-    <div><div class="kpi-card"><div class="kpi-title">💰 Результат</div><div id="kc-result"></div></div></div>
-  </div>`;
+    <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата</span><span>${f(salary)}</span></div>
+    <div class="kpi-total"><span>Итого к начислению</span><span style="color:#185FA5">${f(total)}</span></div>
+    ${stimDeduct>0?`<div style="background:#FFFBF0;border:0.5px solid #FAC775;border-radius:6px;padding:8px;font-size:11px;color:#854F0B;margin-top:8px">Штраф ${stimPct}%: жалоб ${rows._comp||0} + потери ${(rows._loss||0).toLocaleString('ru-RU')} ₽</div>`:''}
+  `;
+}
+
+const MONTH_OPTS = `
+  <option value="2026-01">Янв 2026 (120ч)</option>
+  <option value="2026-02">Фев 2026 (152ч)</option>
+  <option value="2026-03">Мар 2026 (168ч)</option>
+  <option value="2026-04" selected>Апр 2026 (175ч)</option>
+  <option value="2026-05">Май 2026 (151ч)</option>
+  <option value="2026-06">Июн 2026 (167ч)</option>
+  <option value="2026-07">Июл 2026 (184ч)</option>
+  <option value="2026-08">Авг 2026 (168ч)</option>
+  <option value="2026-09">Сен 2026 (176ч)</option>
+  <option value="2026-10">Окт 2026 (176ч)</option>
+  <option value="2026-11">Ноя 2026 (159ч)</option>
+  <option value="2026-12">Дек 2026 (176ч)</option>
+`;
+
+// ===== 1. КОНСЬЕРЖ КБР =====
+// Веса: KPI1(сделки)=0.5, KPI2(рестораны)=0.2, KPI3(CSI)=0.3, КПИ_total=0.4
+// Выработка КБР = 1.8 сд/час
+function kpiKBRCons(){
+  return `<div class="kpi-grid">
+  <div>
+    <div class="kpi-card"><div class="kpi-title">📋 Основные данные</div>
+      <div class="kpi-row"><span class="kpi-label">Месяц</span><select id="kc-month" oninput="calcKBRCons()" style="font-size:12px;padding:3px 6px">${MONTH_OPTS}</select></div>
+      <div class="kpi-row"><span class="kpi-label">Норма часов</span><span id="kc-norm-show" style="font-size:12px;color:#185FA5">175 ч</span></div>
+      <div class="kpi-row"><span class="kpi-label">Часовая ставка (₽)</span><input class="kpi-input" id="kc-rate" type="number" value="402" oninput="calcKBRCons()"></div>
+      <div class="kpi-row"><span class="kpi-label">Факт. часов</span><input class="kpi-input" id="kc-hours" type="number" value="184" oninput="calcKBRCons()"></div>
+      <div class="kpi-row"><span class="kpi-label">Зарплата (ставка × факт)</span><span id="kc-sal-show" style="font-size:12px">—</span></div>
+      <div class="kpi-row"><span class="kpi-label">База KPI (ставка × норма)</span><span id="kc-base-show" style="font-size:12px;color:#185FA5">—</span></div>
+    </div>
+    <div class="kpi-card"><div class="kpi-title">🎯 KPI показатели</div>
+      <div class="kpi-row"><div><span class="kpi-label">Выработка (сд/час)</span><div class="kpi-hint">Консьерж КБР = 1.8</div></div><input class="kpi-input" id="kc-prod" type="number" value="1.8" step="0.1" oninput="calcKBRCons()"></div>
+      <div class="kpi-row"><span class="kpi-label">План сделок (авто)</span><span id="kc-plan-show" style="font-size:12px;color:#185FA5">—</span></div>
+      <div class="kpi-row"><span class="kpi-label">Факт сделок</span><input class="kpi-input" id="kc-fact" type="number" value="282" oninput="calcKBRCons()"></div>
+      <div class="kpi-row"><div><span class="kpi-label">KPI 2: % бронирования</span><div class="kpi-hint">70-84=0.5 · 85-94=0.8 · ≥95=1.0</div></div><input class="kpi-input" id="kc-rest" type="number" value="0.87" step="0.01" oninput="calcKBRCons()"></div>
+      <div class="kpi-row"><div><span class="kpi-label">KPI 3: CSI</span><div class="kpi-hint">↓4.9=0 · 4.9-4.95=0.6 · 4.96-4.97=1.0 · ≥4.98=1.5</div></div><input class="kpi-input" id="kc-csi" type="number" value="4.94" step="0.01" oninput="calcKBRCons()"></div>
+    </div>
+    <div class="kpi-card"><div class="kpi-title">⚠️ Штрафы</div>
+      <div class="kpi-row"><span class="kpi-label">Жалоб (шт)</span><input class="kpi-input" id="kc-comp" type="number" value="0" oninput="calcKBRCons()"></div>
+      <div class="kpi-row"><div><span class="kpi-label">Потери (₽)</span><div class="kpi-hint">1-10к=-20% · 10-30к=-50% · >30к=-100%</div></div><input class="kpi-input" id="kc-loss" type="number" value="0" oninput="calcKBRCons()"></div>
+    </div>
+  </div>
+  <div><div class="kpi-card"><div class="kpi-title">💰 Результат</div><div id="kc-result"></div></div></div>
+</div>`;
 }
 
 function calcKBRCons(){
-  const rate=+document.getElementById('kc-rate').value||0,hours=+document.getElementById('kc-hours').value||0,norm=+document.getElementById('kc-norm').value||175;
-  const plan=+document.getElementById('kc-plan').value||0,fact=+document.getElementById('kc-fact').value||0;
-  const rest=+document.getElementById('kc-rest').value||0,csi=+document.getElementById('kc-csi').value||0;
-  const complaints=+document.getElementById('kc-complaints').value||0,losses=+document.getElementById('kc-losses').value||0;
-  const salary=Math.round(rate*hours),base=Math.round(rate*norm);
-  const exec1=plan>0?fact/plan:0;
-  let c1=0;if(exec1>=1.2)c1=1.2;else if(exec1>=1.0)c1=exec1;else if(exec1>=0.95)c1=0.8;else if(exec1>=0.9)c1=0.7;else if(exec1>=0.85)c1=0.6;else if(exec1>=0.8)c1=0.5;
-  const kpi1=Math.round(base*c1*0.6);
-  let c2=0;if(rest>=0.95)c2=1;else if(rest>=0.85)c2=0.8;else if(rest>=0.7)c2=0.5;
-  const kpi2=Math.round(base*c2*0.8);
-  let c3=0;if(csi>=4.98)c3=1.5;else if(csi>=4.96)c3=1;else if(csi>=4.9)c3=0.6;
-  const kpi3=Math.round(base*c3*0.6);
-  const stimPct=calcStimCoef(complaints,losses),stimD=Math.round(kpi1*stimPct/100);
-  const total=salary+Math.max(0,kpi1+kpi2+kpi3-stimD);
-  const f=v=>v.toLocaleString('ru-RU')+' ₽';
-  const totalKPI = kpi1+kpi2+kpi3-stimD;
-  document.getElementById('kc-result').innerHTML=`<div class="kpi-result">
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1 — сделки (${Math.round(exec1*100)}%, коэф ${c1.toFixed(2)})</span><span style="color:var(--green)">+${f(kpi1)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 2 — бронирование ресторанов (${Math.round(rest*100)}%)</span><span style="color:var(--green)">+${f(kpi2)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 — CSI (${csi})</span><span style="color:var(--green)">+${f(kpi3)}</span></div>
-    ${stimD>0?`<div class="kpi-rrow"><span style="color:var(--red)">Штраф за жалобы/потери (-${stimPct}%)</span><span style="color:var(--red)">-${f(stimD)}</span></div>`:''}
-    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px">
-      <span style="color:var(--text2)">Итог KPI =</span><span style="color:#185FA5">${f(Math.max(0,totalKPI))}</span>
-    </div>
-    <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата</span><span>${f(salary)}</span></div>
-    <div class="kpi-total"><span>Итого к начислению</span><span>${f(total)}</span></div>
-  </div>`;
+  const norm=getNorm(document.getElementById('kc-month').value);
+  const rate=+document.getElementById('kc-rate').value||0;
+  const hours=+document.getElementById('kc-hours').value||0;
+  const prod=+document.getElementById('kc-prod').value||1.8;
+  const fact=+document.getElementById('kc-fact').value||0;
+  const rest=+document.getElementById('kc-rest').value||0;
+  const csi=+document.getElementById('kc-csi').value||0;
+  const comp=+document.getElementById('kc-comp').value||0;
+  const loss=+document.getElementById('kc-loss').value||0;
+
+  document.getElementById('kc-norm-show').textContent=norm+' ч';
+  const salary=rate*hours;
+  const base=Math.min(rate*norm, rate*hours);  // MIN(план_зп, факт_зп)
+  const plan=Math.round(prod*hours*100)/100;
+  document.getElementById('kc-sal-show').textContent=Math.round(salary).toLocaleString('ru-RU')+' ₽';
+  document.getElementById('kc-base-show').textContent=Math.round(base).toLocaleString('ru-RU')+' ₽';
+  document.getElementById('kc-plan-show').textContent=plan+' сд';
+
+  const exec=plan>0?roundDown2(fact/plan):0;
+  const c1=getCoef(exec);
+  const kpi1=base*0.4*0.5*c1;
+
+  let c2=0;if(rest>=0.95)c2=1;else if(rest>=0.85)c2=0.8;else if(rest>=0.70)c2=0.5;
+  const kpi2=base*0.4*0.2*c2;
+
+  const c3=getCsiCoefKBR(csi);
+  const kpi3=base*0.4*0.3*c3;
+
+  const stimPct=calcStimPct(comp,loss);
+  const stimD=kpi1*stimPct/100;
+  const f=v=>Math.round(v).toLocaleString('ru-RU')+' ₽';
+  const rows=[
+    {label:`KPI 1 — сделки (план ${plan}, факт ${fact}, вып ${(exec*100).toFixed(0)}%, коэф ${c1.toFixed(2)})`, val:kpi1},
+    {label:`KPI 2 — бронирование (${(rest*100).toFixed(0)}%, коэф ${c2})`, val:kpi2},
+    {label:`KPI 3 — CSI (${csi}, коэф ${c3})`, val:kpi3},
+  ];
+  rows._comp=comp; rows._loss=loss;
+  document.getElementById('kc-result').innerHTML=kpiResult(rows,stimD,stimPct,salary,f);
 }
 
+// ===== 2. ВК КБР (ТД) =====
+// Оклад, веса: KPI1=0.5, KPI2(рестораны)=0.2, KPI3(CSI)=0.3, KPI_total=0.4
+// Выработка ВК КБР = 1.8 сд/час
 function kpiKBRVC(){
-  return KPI_S+`<div class="kpi-grid">
-    <div>
-      <div class="kpi-card"><div class="kpi-title">📋 Основные данные</div>
-        <div class="kpi-row"><span class="kpi-label">Оклад (₽)</span><input class="kpi-input" id="vc-salary" type="number" value="77000" oninput="calcKBRVC()"></div>
-        <div class="kpi-row"><span class="kpi-label">Факт. часов</span><input class="kpi-input" id="vc-hours" type="number" value="168" oninput="calcKBRVC()"></div>
-        <div class="kpi-row"><span class="kpi-label">Норма часов</span><input class="kpi-input" id="vc-norm" type="number" value="175" oninput="calcKBRVC()"></div>
-        <div class="kpi-row"><span class="kpi-label">% KPI от оклада</span><input class="kpi-input" id="vc-pct" type="number" value="40" oninput="calcKBRVC()"></div>
-      </div>
-      <div class="kpi-card"><div class="kpi-title">🎯 KPI</div>
-        <div class="kpi-row"><span class="kpi-label">KPI 1: план сделок</span><input class="kpi-input" id="vc-plan" type="number" value="0" oninput="calcKBRVC()"></div>
-        <div class="kpi-row"><span class="kpi-label">KPI 1: факт сделок</span><input class="kpi-input" id="vc-fact" type="number" value="0" oninput="calcKBRVC()"></div>
-        <div class="kpi-row"><div><span class="kpi-label">KPI 2: % бронирования</span><div class="kpi-hint">69↓=0 · 70-84=0.5 · 85-94=0.8 · 95↑=1</div></div><input class="kpi-input" id="vc-rest" type="number" value="0" step="0.01" oninput="calcKBRVC()"></div>
-        <div class="kpi-row"><div><span class="kpi-label">KPI 3: CSI</span><div class="kpi-hint">↓4.89=0 · 4.9-4.94=0.7 · 4.95-4.97=1 · ≥4.98=1.5</div></div><input class="kpi-input" id="vc-csi" type="number" value="0" step="0.01" oninput="calcKBRVC()"></div>
-        <div class="kpi-row"><span class="kpi-label">Жалоб</span><input class="kpi-input" id="vc-complaints" type="number" value="0" oninput="calcKBRVC()"></div>
-        <div class="kpi-row"><span class="kpi-label">Потери (₽)</span><input class="kpi-input" id="vc-losses" type="number" value="0" oninput="calcKBRVC()"></div>
-      </div>
+  return `<div class="kpi-grid">
+  <div>
+    <div class="kpi-card"><div class="kpi-title">📋 Основные данные</div>
+      <div class="kpi-row"><span class="kpi-label">Месяц</span><select id="vc-month" oninput="calcKBRVC()" style="font-size:12px;padding:3px 6px">${MONTH_OPTS}</select></div>
+      <div class="kpi-row"><span class="kpi-label">Норма часов</span><span id="vc-norm-show" style="font-size:12px;color:#185FA5">175 ч</span></div>
+      <div class="kpi-row"><span class="kpi-label">Оклад (₽/мес)</span><input class="kpi-input" id="vc-salary" type="number" value="77000" oninput="calcKBRVC()"></div>
+      <div class="kpi-row"><span class="kpi-label">Факт. часов</span><input class="kpi-input" id="vc-hours" type="number" value="168" oninput="calcKBRVC()"></div>
+      <div class="kpi-row"><span class="kpi-label">% KPI от оклада</span><input class="kpi-input" id="vc-pct" type="number" value="40" oninput="calcKBRVC()"></div>
     </div>
-    <div><div class="kpi-card"><div class="kpi-title">💰 Результат</div><div id="vc-result"></div></div></div>
-  </div>`;
+    <div class="kpi-card"><div class="kpi-title">🎯 KPI показатели</div>
+      <div class="kpi-row"><div><span class="kpi-label">Выработка (сд/час)</span><div class="kpi-hint">ВК КБР = 1.8</div></div><input class="kpi-input" id="vc-prod" type="number" value="1.8" step="0.1" oninput="calcKBRVC()"></div>
+      <div class="kpi-row"><span class="kpi-label">План сделок (авто)</span><span id="vc-plan-show" style="font-size:12px;color:#185FA5">—</span></div>
+      <div class="kpi-row"><span class="kpi-label">Факт сделок</span><input class="kpi-input" id="vc-fact" type="number" value="0" oninput="calcKBRVC()"></div>
+      <div class="kpi-row"><div><span class="kpi-label">KPI 2: % бронирования</span><div class="kpi-hint">70-84=0.5 · 85-94=0.8 · ≥95=1.0</div></div><input class="kpi-input" id="vc-rest" type="number" value="0" step="0.01" oninput="calcKBRVC()"></div>
+      <div class="kpi-row"><div><span class="kpi-label">KPI 3: CSI</span><div class="kpi-hint">↓4.9=0 · 4.9-4.95=0.6 · 4.96-4.97=1.0 · ≥4.98=1.5</div></div><input class="kpi-input" id="vc-csi" type="number" value="0" step="0.01" oninput="calcKBRVC()"></div>
+    </div>
+    <div class="kpi-card"><div class="kpi-title">⚠️ Штрафы</div>
+      <div class="kpi-row"><span class="kpi-label">Жалоб (шт)</span><input class="kpi-input" id="vc-comp" type="number" value="0" oninput="calcKBRVC()"></div>
+      <div class="kpi-row"><span class="kpi-label">Потери (₽)</span><input class="kpi-input" id="vc-loss" type="number" value="0" oninput="calcKBRVC()"></div>
+    </div>
+  </div>
+  <div><div class="kpi-card"><div class="kpi-title">💰 Результат</div><div id="vc-result"></div></div></div>
+</div>`;
 }
 
 function calcKBRVC(){
-  const salary=+document.getElementById('vc-salary').value||0,hours=+document.getElementById('vc-hours').value||0,norm=+document.getElementById('vc-norm').value||175;
+  const norm=getNorm(document.getElementById('vc-month').value);
+  const oklad=+document.getElementById('vc-salary').value||0;
+  const hours=+document.getElementById('vc-hours').value||0;
   const pct=(+document.getElementById('vc-pct').value||40)/100;
-  const plan=+document.getElementById('vc-plan').value||0,fact=+document.getElementById('vc-fact').value||0;
-  const rest=+document.getElementById('vc-rest').value||0,csi=+document.getElementById('vc-csi').value||0;
-  const complaints=+document.getElementById('vc-complaints').value||0,losses=+document.getElementById('vc-losses').value||0;
-  const salAdj=Math.round(salary*hours/norm),pool=Math.round(salary*pct);
-  const e1=plan>0?fact/plan:0;
-  let c1=0;if(e1>=1.25)c1=1.5;else if(e1>=1.2)c1=1.3;else if(e1>=1.1)c1=1.1;else if(e1>=1.0)c1=1;else if(e1>=0.85)c1=0.6;
-  const k1=Math.round(pool*0.5*c1);
-  let c2=0;if(rest>=0.95)c2=1;else if(rest>=0.85)c2=0.8;else if(rest>=0.7)c2=0.5;
-  const k2=Math.round(pool*0.2*c2);
-  let c3=0;if(csi>=4.98)c3=1.5;else if(csi>=4.95)c3=1;else if(csi>=4.9)c3=0.7;
-  const k3=Math.round(pool*0.3*c3);
-  const sp=calcStimCoef(complaints,losses),sd=Math.round(k1*sp/100);
-  const total=salAdj+Math.max(0,k1+k2+k3-sd);
-  const f=v=>v.toLocaleString('ru-RU')+' ₽';
-  const totalKPI=Math.max(0,k1+k2+k3-sd);
-  document.getElementById('vc-result').innerHTML=`<div class="kpi-result">
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1 — сделки (${Math.round(e1*100)}%, коэф ${c1.toFixed(2)})</span><span style="color:var(--green)">+${f(k1)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 2 — бронирование (${Math.round(rest*100)}%)</span><span style="color:var(--green)">+${f(k2)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 — CSI (${csi})</span><span style="color:var(--green)">+${f(k3)}</span></div>
-    ${sd>0?`<div class="kpi-rrow"><span style="color:var(--red)">Штраф -${sp}%</span><span style="color:var(--red)">-${f(sd)}</span></div>`:''}
-    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px"><span style="color:var(--text2)">Итог KPI =</span><span style="color:#185FA5">${f(totalKPI)}</span></div>
-    <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">Оклад (скорр. по часам)</span><span>${f(salAdj)}</span></div>
-    <div class="kpi-total"><span>Итого</span><span>${f(total)}</span></div>
-  </div>`;
+  const prod=+document.getElementById('vc-prod').value||1.8;
+  const fact=+document.getElementById('vc-fact').value||0;
+  const rest=+document.getElementById('vc-rest').value||0;
+  const csi=+document.getElementById('vc-csi').value||0;
+  const comp=+document.getElementById('vc-comp').value||0;
+  const loss=+document.getElementById('vc-loss').value||0;
+
+  document.getElementById('vc-norm-show').textContent=norm+' ч';
+  // Зарплата = оклад × (факт/норма)
+  const salary=Math.round(oklad*hours/norm);
+  // База = MIN(оклад×норма/норма, оклад×факт/норма) = MIN(оклад, salary)
+  const base=Math.min(oklad, salary);
+  // Пул KPI = оклад × pct (от полного оклада)
+  const pool=oklad*pct;
+  const plan=Math.round(prod*hours*100)/100;
+  document.getElementById('vc-plan-show').textContent=plan+' сд';
+
+  const exec=plan>0?roundDown2(fact/plan):0;
+  const c1=getCoef(exec);
+  const kpi1=pool*0.5*c1;
+
+  let c2=0;if(rest>=0.95)c2=1;else if(rest>=0.85)c2=0.8;else if(rest>=0.70)c2=0.5;
+  const kpi2=pool*0.2*c2;
+
+  const c3=getCsiCoefKBR(csi);
+  const kpi3=pool*0.3*c3;
+
+  const stimPct=calcStimPct(comp,loss);
+  const stimD=kpi1*stimPct/100;
+  const f=v=>Math.round(v).toLocaleString('ru-RU')+' ₽';
+  const rows=[
+    {label:`KPI 1 — сделки (план ${plan}, ${(exec*100).toFixed(0)}%, коэф ${c1.toFixed(2)})`, val:kpi1},
+    {label:`KPI 2 — бронирование (${(rest*100).toFixed(0)}%)`, val:kpi2},
+    {label:`KPI 3 — CSI (${csi})`, val:kpi3},
+  ];
+  rows._comp=comp; rows._loss=loss;
+  document.getElementById('vc-result').innerHTML=kpiResult(rows,stimD,stimPct,salary,f);
 }
 
+// ===== 3. ВК НАПРАВЛЕНИЕ ИСПОЛНЕНИЕ =====
+// Выработка = 0.75 сд/час, Веса: KPI1=0.5, KPI3(CSI)=0.5, KPI_total=0.4
+// База = MIN(план_зп, факт_зп)
 function kpiDirExec(){
-  return KPI_S+`<div class="kpi-grid">
-    <div>
-      <div class="kpi-card"><div class="kpi-title">📋 Данные</div>
-        <div class="kpi-row"><span class="kpi-label">Часовая ставка (₽)</span><input class="kpi-input" id="de-rate" type="number" value="468" oninput="calcDirExec()"></div>
-        <div class="kpi-row"><span class="kpi-label">Факт. часов</span><input class="kpi-input" id="de-hours" type="number" value="169" oninput="calcDirExec()"></div>
-        <div class="kpi-row"><span class="kpi-label">Норма часов</span><input class="kpi-input" id="de-norm" type="number" value="175" oninput="calcDirExec()"></div>
-      </div>
-      <div class="kpi-card"><div class="kpi-title">🎯 KPI</div>
-        <div class="kpi-row"><div><span class="kpi-label">KPI 1: план сделок</span><div class="kpi-hint">Коэф = выполнение (макс 2.0)</div></div><input class="kpi-input" id="de-plan" type="number" value="127" oninput="calcDirExec()"></div>
-        <div class="kpi-row"><span class="kpi-label">KPI 1: факт сделок</span><input class="kpi-input" id="de-fact" type="number" value="143" oninput="calcDirExec()"></div>
-        <div class="kpi-row"><div><span class="kpi-label">KPI 3: CSI</span><div class="kpi-hint">↓4.89=0 · 4.9-4.95=0.6 · 4.96-4.97=1 · ≥4.98=1.5</div></div><input class="kpi-input" id="de-csi" type="number" value="0" step="0.01" oninput="calcDirExec()"></div>
-        <div class="kpi-row"><span class="kpi-label">Жалоб</span><input class="kpi-input" id="de-complaints" type="number" value="0" oninput="calcDirExec()"></div>
-        <div class="kpi-row"><span class="kpi-label">Потери (₽)</span><input class="kpi-input" id="de-losses" type="number" value="0" oninput="calcDirExec()"></div>
-      </div>
+  return `<div class="kpi-grid">
+  <div>
+    <div class="kpi-card"><div class="kpi-title">📋 Основные данные</div>
+      <div class="kpi-row"><span class="kpi-label">Месяц</span><select id="de-month" oninput="calcDirExec()" style="font-size:12px;padding:3px 6px">${MONTH_OPTS}</select></div>
+      <div class="kpi-row"><span class="kpi-label">Норма часов</span><span id="de-norm-show" style="font-size:12px;color:#185FA5">175 ч</span></div>
+      <div class="kpi-row"><span class="kpi-label">Часовая ставка (₽)</span><input class="kpi-input" id="de-rate" type="number" value="468" oninput="calcDirExec()"></div>
+      <div class="kpi-row"><span class="kpi-label">Факт. часов</span><input class="kpi-input" id="de-hours" type="number" value="169" oninput="calcDirExec()"></div>
+      <div class="kpi-row"><span class="kpi-label">Зарплата (ставка × факт)</span><span id="de-sal-show" style="font-size:12px">—</span></div>
+      <div class="kpi-row"><span class="kpi-label">База KPI = MIN(план_зп, факт_зп)</span><span id="de-base-show" style="font-size:12px;color:#185FA5">—</span></div>
     </div>
-    <div><div class="kpi-card"><div class="kpi-title">💰 Результат</div><div id="de-result"></div></div></div>
-  </div>`;
+    <div class="kpi-card"><div class="kpi-title">🎯 KPI показатели</div>
+      <div class="kpi-row"><div><span class="kpi-label">Выработка (сд/час)</span><div class="kpi-hint">Travel/Lifestyle/Logistics/ВК = 0.75</div></div><input class="kpi-input" id="de-prod" type="number" value="0.75" step="0.05" oninput="calcDirExec()"></div>
+      <div class="kpi-row"><span class="kpi-label">План сделок (авто)</span><span id="de-plan-show" style="font-size:12px;color:#185FA5">—</span></div>
+      <div class="kpi-row"><span class="kpi-label">Факт сделок</span><input class="kpi-input" id="de-fact" type="number" value="143" oninput="calcDirExec()"></div>
+      <div class="kpi-row"><div><span class="kpi-label">KPI 3: CSI</span><div class="kpi-hint">↓4.9=0 · 4.9-4.95=0.6 · 4.96-4.97=0.8 · ≥4.98=1.0</div></div><input class="kpi-input" id="de-csi" type="number" value="0" step="0.01" oninput="calcDirExec()"></div>
+    </div>
+    <div class="kpi-card"><div class="kpi-title">⚠️ Штрафы</div>
+      <div class="kpi-row"><span class="kpi-label">Жалоб (шт)</span><input class="kpi-input" id="de-comp" type="number" value="0" oninput="calcDirExec()"></div>
+      <div class="kpi-row"><span class="kpi-label">Потери (₽)</span><input class="kpi-input" id="de-loss" type="number" value="0" oninput="calcDirExec()"></div>
+    </div>
+  </div>
+  <div><div class="kpi-card"><div class="kpi-title">💰 Результат</div><div id="de-result"></div></div></div>
+</div>`;
 }
 
 function calcDirExec(){
-  const rate=+document.getElementById('de-rate').value||0,hours=+document.getElementById('de-hours').value||0,norm=+document.getElementById('de-norm').value||175;
-  const plan=+document.getElementById('de-plan').value||0,fact=+document.getElementById('de-fact').value||0;
+  const norm=getNorm(document.getElementById('de-month').value);
+  const rate=+document.getElementById('de-rate').value||0;
+  const hours=+document.getElementById('de-hours').value||0;
+  const prod=+document.getElementById('de-prod').value||0.75;
+  const fact=+document.getElementById('de-fact').value||0;
   const csi=+document.getElementById('de-csi').value||0;
-  const complaints=+document.getElementById('de-complaints').value||0,losses=+document.getElementById('de-losses').value||0;
-  const salary=Math.round(rate*hours),base=Math.round(rate*norm);
-  const e1=plan>0?fact/plan:0,c1=Math.min(2,e1);
-  const k1=Math.round(base*c1);
-  let c3=0;if(csi>=4.98)c3=1.5;else if(csi>=4.96)c3=1;else if(csi>=4.9)c3=0.6;
-  const k3=Math.round(base*c3*0.6);
-  const sp=calcStimCoef(complaints,losses),sd=Math.round(k1*sp/100);
-  const total=salary+Math.max(0,k1+k3-sd);
-  const f=v=>v.toLocaleString('ru-RU')+' ₽';
-  const totalKPI=Math.max(0,k1+k3-sd);
-  document.getElementById('de-result').innerHTML=`<div class="kpi-result">
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1 — сделки (${Math.round(e1*100)}%, коэф ${c1.toFixed(2)})</span><span style="color:var(--green)">+${f(k1)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 — CSI (${csi})</span><span style="color:var(--green)">+${f(k3)}</span></div>
-    ${sd>0?`<div class="kpi-rrow"><span style="color:var(--red)">Штраф -${sp}%</span><span style="color:var(--red)">-${f(sd)}</span></div>`:''}
-    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px"><span style="color:var(--text2)">Итог KPI =</span><span style="color:#185FA5">${f(totalKPI)}</span></div>
-    <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата</span><span>${f(salary)}</span></div>
-    <div class="kpi-total"><span>Итого</span><span>${f(total)}</span></div>
-  </div>`;
+  const comp=+document.getElementById('de-comp').value||0;
+  const loss=+document.getElementById('de-loss').value||0;
+
+  document.getElementById('de-norm-show').textContent=norm+' ч';
+  const salary=rate*hours;
+  const base=Math.min(rate*norm, salary);
+  const plan=Math.round(prod*hours*100)/100;
+  document.getElementById('de-sal-show').textContent=Math.round(salary).toLocaleString('ru-RU')+' ₽';
+  document.getElementById('de-base-show').textContent=Math.round(base).toLocaleString('ru-RU')+' ₽';
+  document.getElementById('de-plan-show').textContent=plan+' сд';
+
+  const exec=plan>0?roundDown2(fact/plan):0;
+  const c1=getCoef(exec);
+  const kpi1=base*0.4*0.5*c1;
+
+  const c3=getCsiCoef(csi);
+  const kpi3=base*0.4*0.5*c3;
+
+  const stimPct=calcStimPct(comp,loss);
+  const stimD=kpi1*stimPct/100;
+  const f=v=>Math.round(v).toLocaleString('ru-RU')+' ₽';
+  const rows=[
+    {label:`KPI 1 — сделки (план ${plan}, ${(exec*100).toFixed(0)}%, коэф ${c1.toFixed(2)})`, val:kpi1},
+    {label:`KPI 3 — CSI (${csi}, коэф ${c3})`, val:kpi3},
+  ];
+  rows._comp=comp; rows._loss=loss;
+  document.getElementById('de-result').innerHTML=kpiResult(rows,stimD,stimPct,salary,f);
 }
 
+// ===== 4. ВК НАПРАВЛЕНИЕ ПРОВЕРКИ =====
+// Веса: KPI1(проверки)=0.5, KPI2(CSI)=0.3, KPI3(исполнение)=0.2, KPI_total=0.4
+// Выработка проверки=2.0, исполнение=0.25
+// Стим.коэф — ВЫЧИТАЕТСЯ из KPI_exec
 function kpiDirCheck(){
-  return KPI_S+`<div class="kpi-grid">
-    <div>
-      <div class="kpi-card"><div class="kpi-title">📋 Данные</div>
-        <div class="kpi-row"><span class="kpi-label">Часовая ставка (₽)</span><input class="kpi-input" id="dc-rate" type="number" value="500" oninput="calcDirCheck()"></div>
-        <div class="kpi-row"><span class="kpi-label">Факт. часов</span><input class="kpi-input" id="dc-hours" type="number" value="174" oninput="calcDirCheck()"></div>
-        <div class="kpi-row"><span class="kpi-label">Норма часов</span><input class="kpi-input" id="dc-norm" type="number" value="175" oninput="calcDirCheck()"></div>
-      </div>
-      <div class="kpi-card"><div class="kpi-title">🎯 KPI Проверки</div>
-        <div class="kpi-row"><span class="kpi-label">Проверок план</span><input class="kpi-input" id="dc-cp" type="number" value="348" oninput="calcDirCheck()"></div>
-        <div class="kpi-row"><span class="kpi-label">Проверок факт</span><input class="kpi-input" id="dc-cf" type="number" value="275" oninput="calcDirCheck()"></div>
-        <div class="kpi-row"><div><span class="kpi-label">CSI</span><div class="kpi-hint">↓4.89=0 · 4.9-4.95=0.6 · 4.96-4.97=1 · ≥4.98=1.5</div></div><input class="kpi-input" id="dc-csi" type="number" value="4.94" step="0.01" oninput="calcDirCheck()"></div>
-      </div>
-      <div class="kpi-card"><div class="kpi-title">🎯 KPI Исполнение</div>
-        <div class="kpi-row"><span class="kpi-label">Исп. сделок план</span><input class="kpi-input" id="dc-ep" type="number" value="43" oninput="calcDirCheck()"></div>
-        <div class="kpi-row"><span class="kpi-label">Исп. сделок факт</span><input class="kpi-input" id="dc-ef" type="number" value="52" oninput="calcDirCheck()"></div>
-        <div class="kpi-row"><div><span class="kpi-label">Стим. коэф. (фин. потери %)</span><div class="kpi-hint">% от 0 до 1 (напр. 0.2 = 20%)</div></div><input class="kpi-input" id="dc-stim" type="number" value="0.2" step="0.1" oninput="calcDirCheck()"></div>
-        <div class="kpi-row"><span class="kpi-label">Жалоб</span><input class="kpi-input" id="dc-complaints" type="number" value="0" oninput="calcDirCheck()"></div>
-        <div class="kpi-row"><span class="kpi-label">Потери (₽)</span><input class="kpi-input" id="dc-losses" type="number" value="0" oninput="calcDirCheck()"></div>
-      </div>
+  return `<div class="kpi-grid">
+  <div>
+    <div class="kpi-card"><div class="kpi-title">📋 Основные данные</div>
+      <div class="kpi-row"><span class="kpi-label">Месяц</span><select id="dc-month" oninput="calcDirCheck()" style="font-size:12px;padding:3px 6px">${MONTH_OPTS}</select></div>
+      <div class="kpi-row"><span class="kpi-label">Норма часов</span><span id="dc-norm-show" style="font-size:12px;color:#185FA5">175 ч</span></div>
+      <div class="kpi-row"><span class="kpi-label">Часовая ставка (₽)</span><input class="kpi-input" id="dc-rate" type="number" value="500" oninput="calcDirCheck()"></div>
+      <div class="kpi-row"><span class="kpi-label">Факт. часов</span><input class="kpi-input" id="dc-hours" type="number" value="174" oninput="calcDirCheck()"></div>
+      <div class="kpi-row"><span class="kpi-label">База KPI = MIN(план_зп, факт_зп)</span><span id="dc-base-show" style="font-size:12px;color:#185FA5">—</span></div>
     </div>
-    <div><div class="kpi-card"><div class="kpi-title">💰 Результат</div><div id="dc-result"></div></div></div>
-  </div>`;
+    <div class="kpi-card"><div class="kpi-title">🎯 KPI — Проверки</div>
+      <div class="kpi-row"><div><span class="kpi-label">Выработка проверок (сд/час)</span><div class="kpi-hint">ВК проверки = 2.0</div></div><input class="kpi-input" id="dc-prod-c" type="number" value="2.0" step="0.1" oninput="calcDirCheck()"></div>
+      <div class="kpi-row"><span class="kpi-label">План проверок (авто)</span><span id="dc-plan-c" style="font-size:12px;color:#185FA5">—</span></div>
+      <div class="kpi-row"><span class="kpi-label">Факт проверок</span><input class="kpi-input" id="dc-fact-c" type="number" value="275" oninput="calcDirCheck()"></div>
+      <div class="kpi-row"><div><span class="kpi-label">CSI направления</span><div class="kpi-hint">↓4.9=0 · 4.9-4.95=0.6 · 4.96-4.97=0.8 · ≥4.98=1.0</div></div><input class="kpi-input" id="dc-csi" type="number" value="4.94" step="0.01" oninput="calcDirCheck()"></div>
+    </div>
+    <div class="kpi-card"><div class="kpi-title">🎯 KPI — Исполнение</div>
+      <div class="kpi-row"><div><span class="kpi-label">Выработка исполнения (сд/час)</span><div class="kpi-hint">ВК исполнение = 0.25</div></div><input class="kpi-input" id="dc-prod-e" type="number" value="0.25" step="0.05" oninput="calcDirCheck()"></div>
+      <div class="kpi-row"><span class="kpi-label">План исполнения (авто)</span><span id="dc-plan-e" style="font-size:12px;color:#185FA5">—</span></div>
+      <div class="kpi-row"><span class="kpi-label">Факт исполнения</span><input class="kpi-input" id="dc-fact-e" type="number" value="52" oninput="calcDirCheck()"></div>
+      <div class="kpi-row"><div><span class="kpi-label">Стим. коэф. (% потерь 0-1)</span><div class="kpi-hint">0=нет потерь · вычитается из KPI исполнения</div></div><input class="kpi-input" id="dc-stim" type="number" value="0.2" step="0.1" oninput="calcDirCheck()"></div>
+    </div>
+    <div class="kpi-card"><div class="kpi-title">⚠️ Штрафы</div>
+      <div class="kpi-row"><span class="kpi-label">Жалоб (шт)</span><input class="kpi-input" id="dc-comp" type="number" value="0" oninput="calcDirCheck()"></div>
+      <div class="kpi-row"><span class="kpi-label">Потери (₽)</span><input class="kpi-input" id="dc-loss" type="number" value="0" oninput="calcDirCheck()"></div>
+    </div>
+  </div>
+  <div><div class="kpi-card"><div class="kpi-title">💰 Результат</div><div id="dc-result"></div></div></div>
+</div>`;
 }
 
 function calcDirCheck(){
-  const rate=+document.getElementById('dc-rate').value||0,hours=+document.getElementById('dc-hours').value||0,norm=+document.getElementById('dc-norm').value||175;
-  const cp=+document.getElementById('dc-cp').value||0,cf=+document.getElementById('dc-cf').value||0;
+  const norm=getNorm(document.getElementById('dc-month').value);
+  const rate=+document.getElementById('dc-rate').value||0;
+  const hours=+document.getElementById('dc-hours').value||0;
+  const prodC=+document.getElementById('dc-prod-c').value||2.0;
+  const factC=+document.getElementById('dc-fact-c').value||0;
   const csi=+document.getElementById('dc-csi').value||0;
-  const ep=+document.getElementById('dc-ep').value||0,ef=+document.getElementById('dc-ef').value||0;
+  const prodE=+document.getElementById('dc-prod-e').value||0.25;
+  const factE=+document.getElementById('dc-fact-e').value||0;
   const stim=+document.getElementById('dc-stim').value||0;
-  const complaints=+document.getElementById('dc-complaints').value||0,losses=+document.getElementById('dc-losses').value||0;
-  const salary=Math.round(rate*hours),base=Math.round(rate*norm);
-  const ec=cp>0?cf/cp:0;
-  // проверки — только при 100%+
-  const k1=ec>=1?Math.round(base*0.6):0;
-  const ee=ep>0?ef/ep:0,ce=Math.min(2,ee);
-  const kExec=Math.round(base*ce*0.6);
-  const kStim=Math.round(base*stim*0.8);
-  let c3=0;if(csi>=4.98)c3=1.5;else if(csi>=4.96)c3=1;else if(csi>=4.9)c3=0.6;
-  const k3=Math.round(base*c3*0.6);
-  const sp=calcStimCoef(complaints,losses),sd=Math.round(kExec*sp/100);
-  const total=salary+Math.max(0,k1+kExec+kStim+k3-sd);
-  const f=v=>v.toLocaleString('ru-RU')+' ₽';
-  const totalKPI=Math.max(0,k1+kExec+kStim+k3-sd);
-  document.getElementById('dc-result').innerHTML=`<div class="kpi-result">
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI проверки (${Math.round(ec*100)}%)</span><span style="color:${ec>=1?'var(--green)':'var(--text3)'}">+${f(k1)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI исполнение (${Math.round(ee*100)}%, коэф ${ce.toFixed(2)})</span><span style="color:var(--green)">+${f(kExec)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">Стим. коэф. исполнение</span><span style="color:var(--green)">+${f(kStim)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">CSI (${csi})</span><span style="color:var(--green)">+${f(k3)}</span></div>
-    ${sd>0?`<div class="kpi-rrow"><span style="color:var(--red)">Штраф -${sp}%</span><span style="color:var(--red)">-${f(sd)}</span></div>`:''}
-    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px"><span style="color:var(--text2)">Итог KPI =</span><span style="color:#185FA5">${f(totalKPI)}</span></div>
-    <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата</span><span>${f(salary)}</span></div>
-    <div class="kpi-total"><span>Итого</span><span>${f(total)}</span></div>
-  </div>`;
+  const comp=+document.getElementById('dc-comp').value||0;
+  const loss=+document.getElementById('dc-loss').value||0;
+
+  document.getElementById('dc-norm-show').textContent=norm+' ч';
+  const salary=rate*hours;
+  const base=Math.min(rate*norm, salary);
+  document.getElementById('dc-base-show').textContent=Math.round(base).toLocaleString('ru-RU')+' ₽';
+
+  // KPI1 проверки: только при выполнении ≥85%
+  const planC=Math.round(prodC*hours*100)/100;
+  document.getElementById('dc-plan-c').textContent=planC+' сд';
+  const execC=planC>0?roundDown2(factC/planC):0;
+  const c1=getCoef(execC);
+  const kpi1=base*0.4*0.5*c1;
+
+  // KPI2 CSI
+  const c2=getCsiCoef(csi);
+  const kpi2=base*0.4*0.3*c2;
+
+  // KPI3 исполнение
+  const planE=Math.round(prodE*hours*100)/100;
+  document.getElementById('dc-plan-e').textContent=planE+' сд';
+  const execE=planE>0?roundDown2(factE/planE):0;
+  const c3=getCoef(execE);
+  const kpiExec=base*0.4*0.2*c3;
+
+  // Стим вычитается из kpiExec
+  const stimD2=kpiExec*stim;
+
+  const stimPct=calcStimPct(comp,loss);
+  const stimD=kpi1*stimPct/100;
+  const f=v=>Math.round(v).toLocaleString('ru-RU')+' ₽';
+
+  const totalKPI=Math.max(0, kpi1+kpi2+kpiExec-stimD2-stimD);
+  const total=salary+totalKPI;
+
+  document.getElementById('dc-result').innerHTML=`
+    <div class="kpi-result">
+      <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1 — проверки (план ${planC}, ${(execC*100).toFixed(0)}%, коэф ${c1.toFixed(2)})</span><span style="color:var(--green)">+${f(kpi1)}</span></div>
+      <div class="kpi-rrow"><span style="color:var(--text2)">KPI 2 — CSI (${csi})</span><span style="color:var(--green)">+${f(kpi2)}</span></div>
+      <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 — исполнение (план ${planE}, ${(execE*100).toFixed(0)}%, коэф ${c3.toFixed(2)})</span><span style="color:var(--green)">+${f(kpiExec)}</span></div>
+      ${stimD2>0?`<div class="kpi-rrow"><span style="color:var(--red)">Стим. штраф (−${(stim*100).toFixed(0)}% от KPI исполн.)</span><span style="color:var(--red)">−${f(stimD2)}</span></div>`:''}
+      ${stimD>0?`<div class="kpi-rrow"><span style="color:var(--red)">Штраф жалобы/потери −${stimPct}%</span><span style="color:var(--red)">−${f(stimD)}</span></div>`:''}
+      <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:500;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px;color:#185FA5">
+        <span>Итог KPI =</span><span>${f(totalKPI)}</span>
+      </div>
+      <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
+      <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата</span><span>${f(salary)}</span></div>
+      <div class="kpi-total"><span>Итого к начислению</span><span style="color:#185FA5">${f(total)}</span></div>
+    </div>`;
 }
 
+// ===== 5. ВК КОРП =====
+// Выработка = 0.75, Веса: KPI1=0.5, KPI3(CSI)=0.5, KPI_total=0.4
 function kpiCorp(){
-  return KPI_S+`<div class="kpi-grid">
-    <div>
-      <div class="kpi-card"><div class="kpi-title">📋 Данные</div>
-        <div class="kpi-row"><span class="kpi-label">Часовая ставка (₽)</span><input class="kpi-input" id="corp-rate" type="number" value="534" oninput="calcCorpKPI()"></div>
-        <div class="kpi-row"><span class="kpi-label">Факт. часов</span><input class="kpi-input" id="corp-hours" type="number" value="150" oninput="calcCorpKPI()"></div>
-        <div class="kpi-row"><span class="kpi-label">Норма часов</span><input class="kpi-input" id="corp-norm" type="number" value="175" oninput="calcCorpKPI()"></div>
-      </div>
-      <div class="kpi-card"><div class="kpi-title">🎯 KPI</div>
-        <div class="kpi-row"><span class="kpi-label">KPI 1: план сделок</span><input class="kpi-input" id="corp-plan" type="number" value="113" oninput="calcCorpKPI()"></div>
-        <div class="kpi-row"><span class="kpi-label">KPI 1: факт</span><input class="kpi-input" id="corp-fact" type="number" value="149" oninput="calcCorpKPI()"></div>
-        <div class="kpi-row"><div><span class="kpi-label">CSI</span><div class="kpi-hint">↓4.89=0 · 4.9-4.95=0.6 · 4.96-4.97=1 · ≥4.98=1.5</div></div><input class="kpi-input" id="corp-csi" type="number" value="4.93" step="0.01" oninput="calcCorpKPI()"></div>
-        <div class="kpi-row"><span class="kpi-label">Жалоб</span><input class="kpi-input" id="corp-complaints" type="number" value="0" oninput="calcCorpKPI()"></div>
-        <div class="kpi-row"><span class="kpi-label">Потери (₽)</span><input class="kpi-input" id="corp-losses" type="number" value="0" oninput="calcCorpKPI()"></div>
-      </div>
+  return `<div class="kpi-grid">
+  <div>
+    <div class="kpi-card"><div class="kpi-title">📋 Основные данные</div>
+      <div class="kpi-row"><span class="kpi-label">Месяц</span><select id="co-month" oninput="calcCorpKPI()" style="font-size:12px;padding:3px 6px">${MONTH_OPTS}</select></div>
+      <div class="kpi-row"><span class="kpi-label">Норма часов</span><span id="co-norm-show" style="font-size:12px;color:#185FA5">175 ч</span></div>
+      <div class="kpi-row"><span class="kpi-label">Часовая ставка (₽)</span><input class="kpi-input" id="co-rate" type="number" value="534" oninput="calcCorpKPI()"></div>
+      <div class="kpi-row"><span class="kpi-label">Факт. часов</span><input class="kpi-input" id="co-hours" type="number" value="150" oninput="calcCorpKPI()"></div>
+      <div class="kpi-row"><span class="kpi-label">База KPI = MIN(план_зп, факт_зп)</span><span id="co-base-show" style="font-size:12px;color:#185FA5">—</span></div>
     </div>
-    <div><div class="kpi-card"><div class="kpi-title">💰 Результат</div><div id="corp-result"></div></div></div>
-  </div>`;
+    <div class="kpi-card"><div class="kpi-title">🎯 KPI показатели</div>
+      <div class="kpi-row"><div><span class="kpi-label">Выработка (сд/час)</span><div class="kpi-hint">ВК корп = 0.75</div></div><input class="kpi-input" id="co-prod" type="number" value="0.75" step="0.05" oninput="calcCorpKPI()"></div>
+      <div class="kpi-row"><span class="kpi-label">План сделок (авто)</span><span id="co-plan-show" style="font-size:12px;color:#185FA5">—</span></div>
+      <div class="kpi-row"><span class="kpi-label">Факт сделок</span><input class="kpi-input" id="co-fact" type="number" value="149" oninput="calcCorpKPI()"></div>
+      <div class="kpi-row"><div><span class="kpi-label">CSI</span><div class="kpi-hint">↓4.9=0 · 4.9-4.95=0.6 · 4.96-4.97=0.8 · ≥4.98=1.0</div></div><input class="kpi-input" id="co-csi" type="number" value="4.93" step="0.01" oninput="calcCorpKPI()"></div>
+    </div>
+    <div class="kpi-card"><div class="kpi-title">⚠️ Штрафы</div>
+      <div class="kpi-row"><span class="kpi-label">Жалоб (шт)</span><input class="kpi-input" id="co-comp" type="number" value="0" oninput="calcCorpKPI()"></div>
+      <div class="kpi-row"><span class="kpi-label">Потери (₽)</span><input class="kpi-input" id="co-loss" type="number" value="0" oninput="calcCorpKPI()"></div>
+    </div>
+  </div>
+  <div><div class="kpi-card"><div class="kpi-title">💰 Результат</div><div id="co-result"></div></div></div>
+</div>`;
 }
 
 function calcCorpKPI(){
-  const rate=+document.getElementById('corp-rate').value||0,hours=+document.getElementById('corp-hours').value||0,norm=+document.getElementById('corp-norm').value||175;
-  const plan=+document.getElementById('corp-plan').value||0,fact=+document.getElementById('corp-fact').value||0;
-  const csi=+document.getElementById('corp-csi').value||0;
-  const complaints=+document.getElementById('corp-complaints').value||0,losses=+document.getElementById('corp-losses').value||0;
-  const salary=Math.round(rate*hours),base=Math.round(rate*norm);
-  const e1=plan>0?fact/plan:0,c1=Math.min(2,e1);
-  const k1=Math.round(base*c1);
-  let c3=0;if(csi>=4.98)c3=1.5;else if(csi>=4.96)c3=1;else if(csi>=4.9)c3=0.6;
-  const k3=Math.round(base*c3);
-  const sp=calcStimCoef(complaints,losses),sd=Math.round(k1*sp/100);
-  const total=salary+Math.max(0,k1+k3-sd);
-  const f=v=>v.toLocaleString('ru-RU')+' ₽';
-  const totalKPI=Math.max(0,k1+k3-sd);
-  document.getElementById('corp-result').innerHTML=`<div class="kpi-result">
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1 — сделки (${Math.round(e1*100)}%, коэф ${c1.toFixed(2)})</span><span style="color:var(--green)">+${f(k1)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 — CSI (${csi})</span><span style="color:var(--green)">+${f(k3)}</span></div>
-    ${sd>0?`<div class="kpi-rrow"><span style="color:var(--red)">Штраф -${sp}%</span><span style="color:var(--red)">-${f(sd)}</span></div>`:''}
-    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px"><span style="color:var(--text2)">Итог KPI =</span><span style="color:#185FA5">${f(totalKPI)}</span></div>
-    <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата</span><span>${f(salary)}</span></div>
-    <div class="kpi-total"><span>Итого</span><span>${f(total)}</span></div>
-  </div>`;
+  const norm=getNorm(document.getElementById('co-month').value);
+  const rate=+document.getElementById('co-rate').value||0;
+  const hours=+document.getElementById('co-hours').value||0;
+  const prod=+document.getElementById('co-prod').value||0.75;
+  const fact=+document.getElementById('co-fact').value||0;
+  const csi=+document.getElementById('co-csi').value||0;
+  const comp=+document.getElementById('co-comp').value||0;
+  const loss=+document.getElementById('co-loss').value||0;
+
+  document.getElementById('co-norm-show').textContent=norm+' ч';
+  const salary=rate*hours;
+  const base=Math.min(rate*norm, salary);
+  const plan=Math.round(prod*hours*100)/100;
+  document.getElementById('co-base-show').textContent=Math.round(base).toLocaleString('ru-RU')+' ₽';
+  document.getElementById('co-plan-show').textContent=plan+' сд';
+
+  const exec=plan>0?roundDown2(fact/plan):0;
+  const c1=getCoef(exec);
+  const kpi1=base*0.4*0.5*c1;
+
+  const c3=getCsiCoef(csi);
+  const kpi3=base*0.4*0.5*c3;
+
+  const stimPct=calcStimPct(comp,loss);
+  const stimD=kpi1*stimPct/100;
+  const f=v=>Math.round(v).toLocaleString('ru-RU')+' ₽';
+  const rows=[
+    {label:`KPI 1 — сделки (план ${plan}, ${(exec*100).toFixed(0)}%, коэф ${c1.toFixed(2)})`, val:kpi1},
+    {label:`KPI 3 — CSI (${csi}, коэф ${c3})`, val:kpi3},
+  ];
+  rows._comp=comp; rows._loss=loss;
+  document.getElementById('co-result').innerHTML=kpiResult(rows,stimD,stimPct,salary,f);
 }
 
+// ===== 6 & 7. ГК (Главный консьерж КБР / Тревел) =====
+// ГК — фиксированный оклад, KPI% от оклада, не зависит от часов
 function kpiGK(type){
   const isKBR=type==='КБР';
-  return KPI_S+`<div class="kpi-grid">
-    <div>
-      <div class="kpi-card"><div class="kpi-title">📋 Данные</div>
-        <div class="kpi-row"><span class="kpi-label">Оклад (₽)</span><input class="kpi-input" id="gk-salary" type="number" value="${isKBR?102500:87500}" oninput="calcGK('${type}')"></div>
-        <div class="kpi-row"><span class="kpi-label">% KPI от оклада</span><input class="kpi-input" id="gk-pct" type="number" value="46" oninput="calcGK('${type}')"></div>
-      </div>
-      <div class="kpi-card"><div class="kpi-title">🎯 KPI (${type})</div>
-        ${isKBR?`
-        <div class="kpi-row"><div><span class="kpi-label">KPI 1 (40%): % бронирования</span><div class="kpi-hint">69↓=0 · 70-84=0.5 · 85-94=0.8 · 95↑=1</div></div><input class="kpi-input" id="gk-kpi1" type="number" value="0.8" step="0.01" oninput="calcGK('${type}')"></div>
-        <div class="kpi-row"><div><span class="kpi-label">KPI 2 (20%): SLA исполнения</span><div class="kpi-hint">69↓=0 · 70-80=0.7 · 81-89=1 · 90-95=1.2 · 96↑=1.5</div></div><input class="kpi-input" id="gk-kpi2" type="number" value="1.0" step="0.01" oninput="calcGK('${type}')"></div>
-        <div class="kpi-row"><div><span class="kpi-label">KPI 3 (40%): CSI</span><div class="kpi-hint">↓4.89=0 · 4.9-4.95=0.6 · 4.96-4.97=1 · ≥4.98=1.5</div></div><input class="kpi-input" id="gk-kpi3" type="number" value="4.94" step="0.01" oninput="calcGK('${type}')"></div>`:`
-        <div class="kpi-row"><div><span class="kpi-label">KPI 1 (40%): выполнение плана</span><div class="kpi-hint">69↓=0 · 70-84=0.5 · 85-94=0.8 · 95↑=1 · ≥120%=1.2</div></div><input class="kpi-input" id="gk-kpi1" type="number" value="1.0" step="0.01" oninput="calcGK('${type}')"></div>
-        <div class="kpi-row"><div><span class="kpi-label">KPI 2 (30%): SLA</span></div><input class="kpi-input" id="gk-kpi2" type="number" value="1.0" step="0.01" oninput="calcGK('${type}')"></div>
-        <div class="kpi-row"><div><span class="kpi-label">KPI 3 (30%): CSI</span><div class="kpi-hint">↓4.89=0 · 4.9-4.95=0.6 · 4.96-4.97=1 · ≥4.98=1.5</div></div><input class="kpi-input" id="gk-kpi3" type="number" value="4.94" step="0.01" oninput="calcGK('${type}')"></div>`}
-      </div>
+  return `<div class="kpi-grid">
+  <div>
+    <div class="kpi-card"><div class="kpi-title">📋 Основные данные</div>
+      <div class="kpi-row"><span class="kpi-label">Оклад (₽/мес)</span><input class="kpi-input" id="gk-salary" type="number" value="${isKBR?102500:87500}" oninput="calcGK('${type}')"></div>
+      <div class="kpi-row"><span class="kpi-label">% KPI от оклада</span><input class="kpi-input" id="gk-pct" type="number" value="46" oninput="calcGK('${type}')"></div>
+      <div class="kpi-row"><span class="kpi-label">Пул KPI (авто)</span><span id="gk-pool-show" style="font-size:12px;color:#185FA5">—</span></div>
     </div>
-    <div><div class="kpi-card"><div class="kpi-title">💰 Результат</div><div id="gk-result"></div></div></div>
-  </div>`;
+    <div class="kpi-card"><div class="kpi-title">🎯 KPI ${type}</div>
+      ${isKBR?`
+      <div class="kpi-row"><div><span class="kpi-label">KPI 1 (40%): % бронирования</span><div class="kpi-hint">70-84=0.5 · 85-94=0.8 · ≥95=1.0</div></div><input class="kpi-input" id="gk-kpi1" type="number" value="0.8" step="0.01" oninput="calcGK('${type}')"></div>
+      <div class="kpi-row"><div><span class="kpi-label">KPI 2 (20%): SLA исполнения</span><div class="kpi-hint">70-80=0.7 · 81-89=1.0 · 90-95=1.2 · ≥96=1.5</div></div><input class="kpi-input" id="gk-kpi2" type="number" value="1.0" step="0.01" oninput="calcGK('${type}')"></div>
+      <div class="kpi-row"><div><span class="kpi-label">KPI 3 (40%): CSI</span><div class="kpi-hint">↓4.9=0 · 4.9-4.95=0.6 · 4.96-4.97=1.0 · ≥4.98=1.5</div></div><input class="kpi-input" id="gk-kpi3" type="number" value="4.94" step="0.01" oninput="calcGK('${type}')"></div>
+      `:`
+      <div class="kpi-row"><div><span class="kpi-label">KPI 1 (40%): % выполнения</span><div class="kpi-hint">70-84=0.5 · 85-94=0.8 · ≥95=1.0 · ≥120%=1.2</div></div><input class="kpi-input" id="gk-kpi1" type="number" value="1.0" step="0.01" oninput="calcGK('${type}')"></div>
+      <div class="kpi-row"><div><span class="kpi-label">KPI 2 (30%): SLA</span><div class="kpi-hint">70-80=0.7 · 81-89=1.0 · 90-95=1.2 · ≥96=1.5</div></div><input class="kpi-input" id="gk-kpi2" type="number" value="1.0" step="0.01" oninput="calcGK('${type}')"></div>
+      <div class="kpi-row"><div><span class="kpi-label">KPI 3 (30%): CSI</span><div class="kpi-hint">↓4.9=0 · 4.9-4.95=0.6 · 4.96-4.97=1.0 · ≥4.98=1.5</div></div><input class="kpi-input" id="gk-kpi3" type="number" value="4.94" step="0.01" oninput="calcGK('${type}')"></div>
+      `}
+    </div>
+  </div>
+  <div><div class="kpi-card"><div class="kpi-title">💰 Результат</div><div id="gk-result"></div></div></div>
+</div>`;
 }
 
 function calcGK(type){
   const salary=+document.getElementById('gk-salary').value||0;
   const pct=(+document.getElementById('gk-pct').value||46)/100;
-  const pool=Math.round(salary*pct);
+  const pool=salary*pct;
   const v1=+document.getElementById('gk-kpi1').value||0;
   const v2=+document.getElementById('gk-kpi2').value||0;
   const v3=+document.getElementById('gk-kpi3').value||0;
   const isKBR=type==='КБР';
-  let k1=0,k2=0,k3=0;
+  document.getElementById('gk-pool-show').textContent=Math.round(pool).toLocaleString('ru-RU')+' ₽';
+
+  let c1=0,c2=0,c3=0,w1,w2,w3;
   if(isKBR){
-    let c1=0;if(v1>=0.95)c1=1;else if(v1>=0.85)c1=0.8;else if(v1>=0.7)c1=0.5;
-    k1=Math.round(pool*0.4*c1);
-    let c2=0;if(v2>=0.96)c2=1.5;else if(v2>=0.90)c2=1.2;else if(v2>=0.81)c2=1;else if(v2>=0.7)c2=0.7;
-    k2=Math.round(pool*0.2*c2);
-    let c3=0;if(v3>=4.98)c3=1.5;else if(v3>=4.96)c3=1;else if(v3>=4.9)c3=0.6;
-    k3=Math.round(pool*0.4*c3);
+    w1=0.4;w2=0.2;w3=0.4;
+    if(v1>=0.95)c1=1;else if(v1>=0.85)c1=0.8;else if(v1>=0.70)c1=0.5;
+    if(v2>=0.96)c2=1.5;else if(v2>=0.90)c2=1.2;else if(v2>=0.81)c2=1;else if(v2>=0.70)c2=0.7;
+    if(v3>=4.98)c3=1.5;else if(v3>=4.96)c3=1;else if(v3>=4.90)c3=0.6;
   } else {
-    let c1=0;if(v1>=1.2)c1=1.2;else if(v1>=0.95)c1=1;else if(v1>=0.85)c1=0.8;else if(v1>=0.7)c1=0.5;
-    k1=Math.round(pool*0.4*c1);
-    let c2=0;if(v2>=0.96)c2=1.5;else if(v2>=0.90)c2=1.2;else if(v2>=0.81)c2=1;else if(v2>=0.7)c2=0.7;
-    k2=Math.round(pool*0.3*c2);
-    let c3=0;if(v3>=4.98)c3=1.5;else if(v3>=4.96)c3=1;else if(v3>=4.9)c3=0.6;
-    k3=Math.round(pool*0.3*c3);
+    w1=0.4;w2=0.3;w3=0.3;
+    if(v1>=1.2)c1=1.2;else if(v1>=0.95)c1=1;else if(v1>=0.85)c1=0.8;else if(v1>=0.70)c1=0.5;
+    if(v2>=0.96)c2=1.5;else if(v2>=0.90)c2=1.2;else if(v2>=0.81)c2=1;else if(v2>=0.70)c2=0.7;
+    if(v3>=4.98)c3=1.5;else if(v3>=4.96)c3=1;else if(v3>=4.90)c3=0.6;
   }
-  const total=salary+k1+k2+k3;
-  const f=v=>v.toLocaleString('ru-RU')+' ₽';
+  const k1=pool*w1*c1;
+  const k2=pool*w2*c2;
+  const k3=pool*w3*c3;
   const totalKPI=k1+k2+k3;
+  const total=salary+totalKPI;
+  const f=v=>Math.round(v).toLocaleString('ru-RU')+' ₽';
   document.getElementById('gk-result').innerHTML=`<div class="kpi-result">
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1</span><span style="color:var(--green)">+${f(k1)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 2 (SLA)</span><span style="color:var(--green)">+${f(k2)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 (CSI)</span><span style="color:var(--green)">+${f(k3)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px"><span style="color:var(--text2)">Итог KPI =</span><span style="color:#185FA5">${f(totalKPI)}</span></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1 (${isKBR?'бронирование':'выполнение'}, коэф ${c1})</span><span style="color:var(--green)">+${f(k1)}</span></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 2 (SLA, коэф ${c2})</span><span style="color:var(--green)">+${f(k2)}</span></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 (CSI ${v3}, коэф ${c3})</span><span style="color:var(--green)">+${f(k3)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:500;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px;color:#185FA5">
+      <span>Итог KPI =</span><span>${f(totalKPI)}</span>
+    </div>
     <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата (оклад)</span><span>${f(salary)}</span></div>
-    <div class="kpi-total"><span>Итого</span><span>${f(total)}</span></div>
-    <div style="font-size:11px;color:var(--text3);margin-top:4px">Пул KPI: ${f(pool)} · Без НДФЛ (×0.87): ${f(Math.round(total*0.87))}</div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">Оклад</span><span>${f(salary)}</span></div>
+    <div class="kpi-total"><span>Итого</span><span style="color:#185FA5">${f(total)}</span></div>
+    <div style="font-size:11px;color:var(--text3);margin-top:4px">Пул KPI: ${f(pool)} · Без НДФЛ: ${f(Math.round(total*0.87))}</div>
   </div>`;
 }
 
