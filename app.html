@@ -522,20 +522,6 @@ tr:hover td{background:var(--bg2)}
     <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:8px 0 3px;border-top:0.5px solid var(--border2);margin-top:6px">
       <span style="color:var(--text)" id="calc-result-label">Комиссия FCS</span><span id="calc-result" style="color:#2ECC71">0 ₽</span>
     </div>
-    <!-- Блок разделения комиссии для валютных операций -->
-    <div id="calc-foreign-block" style="display:none;margin-top:10px;border-top:0.5px solid var(--border2);padding-top:10px">
-      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Куда идёт комиссия:</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div style="background:#0A0A1A;border:0.5px solid #2A2A6A;border-radius:6px;padding:10px">
-          <div style="font-size:10px;color:#818CF8;margin-bottom:4px">💳 Иностр. карта</div>
-          <div style="font-size:16px;font-weight:600;color:#A5B4FC" id="calc-foreign-amt">0 ₽</div>
-        </div>
-        <div style="background:var(--bg3);border:0.5px solid var(--border2);border-radius:6px;padding:10px;opacity:0.5">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:4px" id="calc-dept-name">Отдел</div>
-          <div style="font-size:16px;font-weight:600;color:var(--text3)" id="calc-dept-amt">0 ₽</div>
-        </div>
-      </div>
-    </div>
     <!-- Предупреждение о минусе -->
     <div id="calc-loss-warning" style="display:none;margin-top:10px;background:#2D0A0A;border:1px solid #7F1D1D;border-radius:8px;padding:10px">
       <div style="font-size:12px;font-weight:600;color:#F87171;margin-bottom:4px">⚠️ Компания в минусе!</div>
@@ -1863,39 +1849,41 @@ async function onCurrencyChange(){
 async function getRateFromWallet(currency, date){
   try{
     const targetDate = date || new Date().toISOString().split('T')[0];
-    // Берём ближайшее пополнение ДО даты заявки
-    const {data} = await sb.from('currency_topups')
+    console.log('getRateFromWallet:', currency, targetDate);
+
+    const {data, error} = await sb.from('currency_topups')
       .select('amount_rub,amount_currency,date')
       .eq('currency', currency)
       .lte('date', targetDate)
       .order('date', {ascending:false})
       .limit(1);
+
+    console.log('Wallet data:', data, 'Error:', error);
+
     if(data && data.length > 0){
       const rate = +data[0].amount_rub / +data[0].amount_currency;
       showToast(`💱 Курс ${currency}: ${rate.toFixed(rate<1?4:2)} ₽ (пополнение ${data[0].date})`);
       return rate;
     }
-    // Нет пополнений до этой даты — берём первое после
-    const {data:after} = await sb.from('currency_topups')
+
+    // Нет пополнений до этой даты — берём любое пополнение по этой валюте
+    const {data:any} = await sb.from('currency_topups')
       .select('amount_rub,amount_currency,date')
       .eq('currency', currency)
-      .order('date', {ascending:true})
+      .order('date', {ascending:false})
       .limit(1);
-    if(after && after.length > 0){
-      const rate = +after[0].amount_rub / +after[0].amount_currency;
-      showToast(`💱 Курс ${currency}: ${rate.toFixed(rate<1?4:2)} ₽ (ближайшее ${after[0].date})`);
+
+    if(any && any.length > 0){
+      const rate = +any[0].amount_rub / +any[0].amount_currency;
+      showToast(`💱 Курс ${currency}: ${rate.toFixed(rate<1?4:2)} ₽ (из пополнения ${any[0].date})`);
       return rate;
     }
+
     showToast(`Нет пополнений ${currency} в кошельке — введите курс вручную`);
-    // Подсвечиваем поле курса чтобы было понятно что нужно заполнить
-    const rateField = document.getElementById('m-fx-rate');
-    if(rateField){
-      rateField.style.borderColor = '#F59E0B';
-      rateField.style.background = '#FFFBF0';
-      rateField.placeholder = 'Введите курс вручную!';
-      rateField.focus();
-    }
-  }catch(e){ console.warn('Rate fetch error:', e); }
+  }catch(e){
+    console.error('getRateFromWallet error:', e);
+    showToast('Ошибка загрузки курса: '+e.message);
+  }
   return 0;
 }
 
@@ -2086,17 +2074,6 @@ function calcModal(){
   } else {
     document.getElementById('calc-result').textContent = fmt(Math.max(0,diff))+' ₽';
     document.getElementById('calc-result').style.color = diff < 0 ? '#F87171' : '#2ECC71';
-  }
-
-  // Показываем/скрываем блок "куда идёт комиссия"
-  const foreignBlock = document.getElementById('calc-foreign-block');
-  if(foreignBlock){
-    foreignBlock.style.display = isForex ? 'block' : 'none';
-    if(isForex){
-      document.getElementById('calc-foreign-amt').textContent = fmt(foreignComm)+' ₽';
-      document.getElementById('calc-dept-amt').textContent = '0 ₽';
-      document.getElementById('calc-dept-name').textContent = DEPTS[document.getElementById('m-dept').value]||'Отдел';
-    }
   }
 
   // Потеря при эквайринге
