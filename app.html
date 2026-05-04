@@ -1747,13 +1747,13 @@ function openEdit(id){
   document.getElementById('currency-convert-block').style.display = isForex ? 'block' : 'none';
   if(isForex){
     document.getElementById('currency-label').textContent = e.agent_currency;
-    // Если курс не сохранён — подтягиваем из кошелька
-    if(!e.foreign_rate){
+    if(!e.foreign_rate || +e.foreign_rate === 0){
+      // Курс не сохранён — берём из кошелька
       getRateFromWallet(e.agent_currency, e.date).then(rate=>{
-        if(rate>0){
+        if(rate > 0){
           document.getElementById('m-fx-rate').value = rate.toFixed(rate<1?4:2);
-          calcFx(); calcModal();
         }
+        calcFx(); calcModal();
       });
     } else {
       calcFx(); calcModal();
