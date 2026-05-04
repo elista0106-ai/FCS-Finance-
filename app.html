@@ -2655,6 +2655,16 @@ function renderKPI(){
   else if(activeKpiCalc==='gk_kbr')html=kpiGK('КБР');
   else if(activeKpiCalc==='gk_travel')html=kpiGK('Тревел');
   el.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:12px;border-bottom:0.5px solid var(--border)">${tabs}</div>${html}`;
+  // Автоматически считаем при открытии
+  setTimeout(()=>{
+    if(activeKpiCalc==='kbr_cons') calcKBRCons();
+    else if(activeKpiCalc==='kbr_vc') calcKBRVC();
+    else if(activeKpiCalc==='dir_exec') calcDirExec();
+    else if(activeKpiCalc==='dir_check') calcDirCheck();
+    else if(activeKpiCalc==='corp') calcCorpKPI();
+    else if(activeKpiCalc==='gk_kbr') calcGK('КБР');
+    else if(activeKpiCalc==='gk_travel') calcGK('Тревел');
+  },50);
 }
 
 const KPI_S=`<style>.kpi-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}.kpi-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;padding-bottom:8px;border-bottom:0.5px solid var(--border)}.kpi-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:0.5px solid var(--border)}.kpi-row:last-child{border-bottom:none}.kpi-label{color:var(--text2)}.kpi-input{padding:5px 10px;border:0.5px solid var(--border2);border-radius:6px;background:var(--bg3);color:var(--text);font-size:13px;width:130px;text-align:right}.kpi-input:focus{border-color:#185FA5;outline:none}.kpi-result{background:#F0F7FF;border:0.5px solid #B5D4F4;border-radius:var(--radius);padding:14px 16px;margin-top:4px}.kpi-rrow{display:flex;justify-content:space-between;font-size:13px;padding:4px 0}.kpi-total{display:flex;justify-content:space-between;font-size:16px;font-weight:600;padding:10px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px;color:#185FA5}.kpi-hint{font-size:10px;color:var(--text3);margin-top:2px}.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}</style>`;
@@ -2704,13 +2714,18 @@ function calcKBRCons(){
   const stimPct=calcStimCoef(complaints,losses),stimD=Math.round(kpi1*stimPct/100);
   const total=salary+Math.max(0,kpi1+kpi2+kpi3-stimD);
   const f=v=>v.toLocaleString('ru-RU')+' ₽';
+  const totalKPI = kpi1+kpi2+kpi3-stimD;
   document.getElementById('kc-result').innerHTML=`<div class="kpi-result">
+    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1 — сделки (${Math.round(exec1*100)}%, коэф ${c1.toFixed(2)})</span><span style="color:var(--green)">+${f(kpi1)}</span></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 2 — бронирование ресторанов (${Math.round(rest*100)}%)</span><span style="color:var(--green)">+${f(kpi2)}</span></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 — CSI (${csi})</span><span style="color:var(--green)">+${f(kpi3)}</span></div>
+    ${stimD>0?`<div class="kpi-rrow"><span style="color:var(--red)">Штраф за жалобы/потери (-${stimPct}%)</span><span style="color:var(--red)">-${f(stimD)}</span></div>`:''}
+    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px">
+      <span style="color:var(--text2)">Итог KPI =</span><span style="color:#185FA5">${f(Math.max(0,totalKPI))}</span>
+    </div>
+    <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
     <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата</span><span>${f(salary)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1 (сделки ${Math.round(exec1*100)}%)</span><span style="color:var(--green)">+${f(kpi1)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 2 (бронирование ${Math.round(rest*100)}%)</span><span style="color:var(--green)">+${f(kpi2)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 (CSI ${csi})</span><span style="color:var(--green)">+${f(kpi3)}</span></div>
-    ${stimD>0?`<div class="kpi-rrow"><span style="color:var(--red)">Штраф -${stimPct}%</span><span style="color:var(--red)">-${f(stimD)}</span></div>`:''}
-    <div class="kpi-total"><span>Итого</span><span>${f(total)}</span></div>
+    <div class="kpi-total"><span>Итого к начислению</span><span>${f(total)}</span></div>
   </div>`;
 }
 
@@ -2753,12 +2768,15 @@ function calcKBRVC(){
   const sp=calcStimCoef(complaints,losses),sd=Math.round(k1*sp/100);
   const total=salAdj+Math.max(0,k1+k2+k3-sd);
   const f=v=>v.toLocaleString('ru-RU')+' ₽';
+  const totalKPI=Math.max(0,k1+k2+k3-sd);
   document.getElementById('vc-result').innerHTML=`<div class="kpi-result">
-    <div class="kpi-rrow"><span style="color:var(--text2)">Оклад (скорр.)</span><span>${f(salAdj)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1 (${Math.round(e1*100)}%)</span><span style="color:var(--green)">+${f(k1)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 2 (бронирование)</span><span style="color:var(--green)">+${f(k2)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 (CSI)</span><span style="color:var(--green)">+${f(k3)}</span></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1 — сделки (${Math.round(e1*100)}%, коэф ${c1.toFixed(2)})</span><span style="color:var(--green)">+${f(k1)}</span></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 2 — бронирование (${Math.round(rest*100)}%)</span><span style="color:var(--green)">+${f(k2)}</span></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 — CSI (${csi})</span><span style="color:var(--green)">+${f(k3)}</span></div>
     ${sd>0?`<div class="kpi-rrow"><span style="color:var(--red)">Штраф -${sp}%</span><span style="color:var(--red)">-${f(sd)}</span></div>`:''}
+    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px"><span style="color:var(--text2)">Итог KPI =</span><span style="color:#185FA5">${f(totalKPI)}</span></div>
+    <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">Оклад (скорр. по часам)</span><span>${f(salAdj)}</span></div>
     <div class="kpi-total"><span>Итого</span><span>${f(total)}</span></div>
   </div>`;
 }
@@ -2796,11 +2814,14 @@ function calcDirExec(){
   const sp=calcStimCoef(complaints,losses),sd=Math.round(k1*sp/100);
   const total=salary+Math.max(0,k1+k3-sd);
   const f=v=>v.toLocaleString('ru-RU')+' ₽';
+  const totalKPI=Math.max(0,k1+k3-sd);
   document.getElementById('de-result').innerHTML=`<div class="kpi-result">
-    <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата</span><span>${f(salary)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1 (${Math.round(e1*100)}%, коэф ${c1.toFixed(2)})</span><span style="color:var(--green)">+${f(k1)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 (CSI ${csi})</span><span style="color:var(--green)">+${f(k3)}</span></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1 — сделки (${Math.round(e1*100)}%, коэф ${c1.toFixed(2)})</span><span style="color:var(--green)">+${f(k1)}</span></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 — CSI (${csi})</span><span style="color:var(--green)">+${f(k3)}</span></div>
     ${sd>0?`<div class="kpi-rrow"><span style="color:var(--red)">Штраф -${sp}%</span><span style="color:var(--red)">-${f(sd)}</span></div>`:''}
+    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px"><span style="color:var(--text2)">Итог KPI =</span><span style="color:#185FA5">${f(totalKPI)}</span></div>
+    <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата</span><span>${f(salary)}</span></div>
     <div class="kpi-total"><span>Итого</span><span>${f(total)}</span></div>
   </div>`;
 }
@@ -2849,13 +2870,16 @@ function calcDirCheck(){
   const sp=calcStimCoef(complaints,losses),sd=Math.round(kExec*sp/100);
   const total=salary+Math.max(0,k1+kExec+kStim+k3-sd);
   const f=v=>v.toLocaleString('ru-RU')+' ₽';
+  const totalKPI=Math.max(0,k1+kExec+kStim+k3-sd);
   document.getElementById('dc-result').innerHTML=`<div class="kpi-result">
-    <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата</span><span>${f(salary)}</span></div>
     <div class="kpi-rrow"><span style="color:var(--text2)">KPI проверки (${Math.round(ec*100)}%)</span><span style="color:${ec>=1?'var(--green)':'var(--text3)'}">+${f(k1)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI исполнение (${Math.round(ee*100)}%)</span><span style="color:var(--green)">+${f(kExec)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">Стим. коэф.</span><span style="color:var(--green)">+${f(kStim)}</span></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">KPI исполнение (${Math.round(ee*100)}%, коэф ${ce.toFixed(2)})</span><span style="color:var(--green)">+${f(kExec)}</span></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">Стим. коэф. исполнение</span><span style="color:var(--green)">+${f(kStim)}</span></div>
     <div class="kpi-rrow"><span style="color:var(--text2)">CSI (${csi})</span><span style="color:var(--green)">+${f(k3)}</span></div>
     ${sd>0?`<div class="kpi-rrow"><span style="color:var(--red)">Штраф -${sp}%</span><span style="color:var(--red)">-${f(sd)}</span></div>`:''}
+    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px"><span style="color:var(--text2)">Итог KPI =</span><span style="color:#185FA5">${f(totalKPI)}</span></div>
+    <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата</span><span>${f(salary)}</span></div>
     <div class="kpi-total"><span>Итого</span><span>${f(total)}</span></div>
   </div>`;
 }
@@ -2893,11 +2917,14 @@ function calcCorpKPI(){
   const sp=calcStimCoef(complaints,losses),sd=Math.round(k1*sp/100);
   const total=salary+Math.max(0,k1+k3-sd);
   const f=v=>v.toLocaleString('ru-RU')+' ₽';
+  const totalKPI=Math.max(0,k1+k3-sd);
   document.getElementById('corp-result').innerHTML=`<div class="kpi-result">
-    <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата</span><span>${f(salary)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1 (${Math.round(e1*100)}%, коэф ${c1.toFixed(2)})</span><span style="color:var(--green)">+${f(k1)}</span></div>
-    <div class="kpi-rrow"><span style="color:var(--text2)">CSI (${csi})</span><span style="color:var(--green)">+${f(k3)}</span></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1 — сделки (${Math.round(e1*100)}%, коэф ${c1.toFixed(2)})</span><span style="color:var(--green)">+${f(k1)}</span></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 — CSI (${csi})</span><span style="color:var(--green)">+${f(k3)}</span></div>
     ${sd>0?`<div class="kpi-rrow"><span style="color:var(--red)">Штраф -${sp}%</span><span style="color:var(--red)">-${f(sd)}</span></div>`:''}
+    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px"><span style="color:var(--text2)">Итог KPI =</span><span style="color:#185FA5">${f(totalKPI)}</span></div>
+    <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата</span><span>${f(salary)}</span></div>
     <div class="kpi-total"><span>Итого</span><span>${f(total)}</span></div>
   </div>`;
 }
@@ -2950,13 +2977,16 @@ function calcGK(type){
   }
   const total=salary+k1+k2+k3;
   const f=v=>v.toLocaleString('ru-RU')+' ₽';
+  const totalKPI=k1+k2+k3;
   document.getElementById('gk-result').innerHTML=`<div class="kpi-result">
-    <div class="kpi-rrow"><span style="color:var(--text2)">Оклад</span><span>${f(salary)}</span></div>
     <div class="kpi-rrow"><span style="color:var(--text2)">KPI 1</span><span style="color:var(--green)">+${f(k1)}</span></div>
     <div class="kpi-rrow"><span style="color:var(--text2)">KPI 2 (SLA)</span><span style="color:var(--green)">+${f(k2)}</span></div>
     <div class="kpi-rrow"><span style="color:var(--text2)">KPI 3 (CSI)</span><span style="color:var(--green)">+${f(k3)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:8px 0 4px;border-top:0.5px solid #B5D4F4;margin-top:6px"><span style="color:var(--text2)">Итог KPI =</span><span style="color:#185FA5">${f(totalKPI)}</span></div>
+    <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
+    <div class="kpi-rrow"><span style="color:var(--text2)">Зарплата (оклад)</span><span>${f(salary)}</span></div>
     <div class="kpi-total"><span>Итого</span><span>${f(total)}</span></div>
-    <div style="font-size:11px;color:var(--text3);margin-top:4px">Пул KPI: ${f(pool)} · Без НДФЛ: ${f(Math.round(total*0.87))}</div>
+    <div style="font-size:11px;color:var(--text3);margin-top:4px">Пул KPI: ${f(pool)} · Без НДФЛ (×0.87): ${f(Math.round(total*0.87))}</div>
   </div>`;
 }
 
