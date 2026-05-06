@@ -222,6 +222,45 @@ tr:hover td{background:var(--bg2)}
 .kpi-stab{font-size:12px;padding:6px 14px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text2);cursor:pointer}
 .kpi-stab:hover{background:var(--bg3)}
 .kpi-stab.active{background:var(--accent);color:#fff}
+
+/* ===== HR ===== */
+.hr-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.hr-search{padding:6px 10px;border:0.5px solid var(--border);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);font-size:12px;outline:none;width:200px}
+.hr-search:focus{border-color:var(--accent)}
+.hr-dept-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px}
+.hr-dtab{font-size:12px;padding:5px 12px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text2);cursor:pointer}
+.hr-dtab:hover{background:var(--bg3)}
+.hr-dtab.active{background:var(--text);color:var(--bg2)}
+.hr-table-wrap{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.hr-table{width:100%;border-collapse:collapse;font-size:12px}
+.hr-table th{padding:8px 14px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);background:var(--bg3);border-bottom:0.5px solid var(--border);font-weight:500;white-space:nowrap}
+.hr-table td{padding:9px 14px;border-bottom:0.5px solid var(--border);vertical-align:middle}
+.hr-table tbody tr:last-child td{border-bottom:none}
+.hr-table tbody tr:hover{background:var(--bg3)}
+.hr-inp{font-size:12px;padding:4px 8px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);outline:none;width:100%}
+.hr-inp:focus{border-color:var(--accent)}
+.hr-sel{font-size:12px;padding:4px 8px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);outline:none;width:100%}
+.hr-role{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px}
+.hr-role-exec{background:#EAF3DE;color:#27500A}
+.hr-role-lead{background:#E6F1FB;color:#0C447C}
+.hr-role-chief{background:#FAEEDA;color:#633806}
+.hr-role-corp{background:#EEEDFE;color:#3C3489}
+.hr-av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0}
+.hr-emp-cell{display:flex;align-items:center;gap:8px}
+.hr-edit-btn{background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:2px 5px;border-radius:4px}
+.hr-edit-btn:hover{color:var(--accent);background:var(--bg3)}
+.hr-del-btn{background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:2px 5px;border-radius:4px}
+.hr-del-btn:hover{color:var(--red)}
+.hr-add-row{background:var(--bg3)}
+.hr-add-row td{padding:7px 14px}
+.hr-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:2000;padding:20px;backdrop-filter:blur(4px)}
+.hr-modal{background:var(--bg2);border:0.5px solid var(--border2);border-radius:14px;padding:24px;width:100%;max-width:480px}
+.hr-modal h3{font-size:16px;font-weight:600;margin-bottom:18px}
+.hr-field{margin-bottom:14px}
+.hr-field label{display:block;font-size:11px;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+.hr-field input,.hr-field select{width:100%;padding:8px 12px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none}
+.hr-field input:focus,.hr-field select:focus{border-color:var(--accent)}
+.hr-modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:0.5px solid var(--border)}
 </style>
 </head>
 <body>
@@ -276,6 +315,7 @@ tr:hover td{background:var(--bg2)}
     <div class="tab" id="tab-clients" onclick="switchTab('clients')">👤 Клиенты</div>
     <div class="tab" id="tab-clients" onclick="switchTab('clients')">👥 Клиенты</div>
     <div class="tab" id="tab-kpi" onclick="switchTab('kpi')">🏆 KPI</div>
+    <div class="tab" id="tab-hr" onclick="switchTab('hr')">👥 НР</div>
   </div>
 
   <!-- Bulk action bar -->
@@ -506,7 +546,47 @@ tr:hover td{background:var(--bg2)}
       </div>
     </div>
 
-<!-- Entry Modal -->
+    <!-- HR VIEW -->
+    <div id="view-hr" style="display:none">
+      <div class="content">
+        <div class="hr-toolbar">
+          <input class="hr-search" type="text" id="hr-search" placeholder="🔍 Поиск по имени..." oninput="hrRender()">
+          <button class="btn btn-primary btn-sm" onclick="hrOpenAdd()">+ Добавить сотрудника</button>
+          <button class="btn btn-sm" onclick="hrSave()">💾 Сохранить</button>
+        </div>
+        <div class="hr-dept-tabs" id="hr-dept-tabs"></div>
+        <div id="hr-content"></div>
+      </div>
+    </div>
+
+    <!-- HR MODAL -->
+    <div class="hr-modal-bg" id="hr-modal" style="display:none">
+      <div class="hr-modal">
+        <h3 id="hr-modal-title">Сотрудник</h3>
+        <input type="hidden" id="hr-edit-dept">
+        <input type="hidden" id="hr-edit-idx">
+        <div class="hr-field"><label>Имя</label><input type="text" id="hr-f-name" placeholder="Иванова Мария"></div>
+        <div class="hr-field"><label>Отдел</label>
+          <select id="hr-f-dept">
+            <option>Lifestyle</option><option>Travel</option><option>Логистика</option>
+            <option>КБР</option><option>Корп</option><option>ЦПО</option><option>ЦПО Ночь</option>
+          </select>
+        </div>
+        <div class="hr-field"><label>Ставка ₽/час</label><input type="number" id="hr-f-rate" placeholder="402"></div>
+        <div class="hr-field"><label>Роль</label>
+          <select id="hr-f-role">
+            <option value="Исполнитель">Исполнитель</option>
+            <option value="Ведущий">Ведущий</option>
+            <option value="Главный Консьерж">Главный Консьерж</option>
+            <option value="Корп">Корп</option>
+          </select>
+        </div>
+        <div class="hr-modal-actions">
+          <button class="btn" onclick="hrCloseModal()">Отмена</button>
+          <button class="btn btn-primary" onclick="hrSaveModal()">Сохранить</button>
+        </div>
+      </div>
+    </div>
 <div class="modal-bg" id="modal" style="display:none">
 <div class="modal">
   <h3 id="modal-title">Новая заявка</h3>
@@ -1511,7 +1591,7 @@ function renderTable(){
 function switchTab(t){
   activeTab = t;
   clearSelection();
-  ['main','loss','expense','corp','invoice','treasury','dept','days','clients','kpi'].forEach(tab=>{
+  ['main','loss','expense','corp','invoice','treasury','dept','days','clients','kpi','hr'].forEach(tab=>{
     const v = document.getElementById('view-'+tab);
     const b = document.getElementById('tab-'+tab);
     if(v) v.style.display = tab===t?'block':'none';
@@ -1522,6 +1602,7 @@ function switchTab(t){
   else if(t==='days') renderDays();
   else if(t==='clients') renderClients();
   else if(t==='kpi'){ kpiShowScreen('upload'); }
+  else if(t==='hr'){ hrRender(); }
   else renderTable();
 }
 
@@ -3295,6 +3376,306 @@ function kpiFmt(n){return Math.round(n).toLocaleString('ru-RU');}
 function kpiSetTxt(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
 
 })(); // end KPI module
+
+// ============================================================
+// HR MODULE
+// ============================================================
+(function(){
+
+const HR_DEPTS = ['Все','Lifestyle','Travel','Логистика','КБР','Корп','ЦПО','ЦПО Ночь'];
+const HR_AV_COLORS = [
+  {bg:'#E6F1FB',cl:'#0C447C'},{bg:'#EAF3DE',cl:'#27500A'},
+  {bg:'#FAEEDA',cl:'#633806'},{bg:'#FBEAF0',cl:'#72243E'},
+  {bg:'#EEEDFE',cl:'#3C3489'},{bg:'#E1F5EE',cl:'#085041'},
+  {bg:'#FEF3E2',cl:'#854F0B'},{bg:'#F3E8FF',cl:'#6B21A8'}
+];
+
+// Все сотрудники из документа
+let hrStaff = [
+  // ЦПО
+  {name:'Затямина Александра',dept:'ЦПО',rate:0,role:'Исполнитель'},
+  {name:'Галиахметова Мария',dept:'ЦПО',rate:500,role:'Исполнитель'},
+  {name:'Гвоздева Марина',dept:'ЦПО',rate:500,role:'Исполнитель'},
+  {name:'Ряполова Юлия',dept:'ЦПО',rate:500,role:'Исполнитель'},
+  {name:'Третьякова Кристина',dept:'ЦПО',rate:500,role:'Исполнитель'},
+  {name:'Беспальченко Юлия',dept:'ЦПО',rate:402,role:'Исполнитель'},
+  {name:'Жевлакова Елизавета',dept:'ЦПО',rate:402,role:'Исполнитель'},
+  {name:'Исмаилова Карина',dept:'ЦПО',rate:402,role:'Исполнитель'},
+  {name:'Козлова Анжелика',dept:'ЦПО',rate:402,role:'Исполнитель'},
+  {name:'Наговицына Мария',dept:'ЦПО',rate:402,role:'Исполнитель'},
+  // ЦПО Ночь
+  {name:'Черемных Екатерина',dept:'ЦПО Ночь',rate:500,role:'Исполнитель'},
+  {name:'Таюрская Галина',dept:'ЦПО Ночь',rate:500,role:'Исполнитель'},
+  {name:'Батаева Юлия',dept:'ЦПО Ночь',rate:402,role:'Исполнитель'},
+  {name:'Луговских Евгения',dept:'ЦПО Ночь',rate:402,role:'Исполнитель'},
+  {name:'Витт Анна',dept:'ЦПО Ночь',rate:402,role:'Исполнитель'},
+  // Lifestyle
+  {name:'Соколова Наталия',dept:'Lifestyle',rate:0,role:'Исполнитель'},
+  {name:'Христич Александра',dept:'Lifestyle',rate:0,role:'Исполнитель'},
+  {name:'Долматова Надежда',dept:'Lifestyle',rate:500,role:'Исполнитель'},
+  {name:'Ефимцева Любовь',dept:'Lifestyle',rate:500,role:'Исполнитель'},
+  {name:'Иванова Владлена',dept:'Lifestyle',rate:500,role:'Исполнитель'},
+  {name:'Ложечникова Екатерина',dept:'Lifestyle',rate:500,role:'Исполнитель'},
+  {name:'Мохова Мария',dept:'Lifestyle',rate:500,role:'Исполнитель'},
+  {name:'Хон Ирина',dept:'Lifestyle',rate:500,role:'Исполнитель'},
+  {name:'Виноградов Александр',dept:'Lifestyle',rate:402,role:'Исполнитель'},
+  {name:'Еловская Софья',dept:'Lifestyle',rate:402,role:'Исполнитель'},
+  {name:'Лисова Анна',dept:'Lifestyle',rate:402,role:'Исполнитель'},
+  {name:'Малых Ксения (К)',dept:'Lifestyle',rate:468,role:'Исполнитель'},
+  {name:'Меркулова Екатерина',dept:'Lifestyle',rate:468,role:'Исполнитель'},
+  {name:'Петров Андрей (К)',dept:'Lifestyle',rate:402,role:'Исполнитель'},
+  {name:'Рудченко Юлия',dept:'Lifestyle',rate:468,role:'Исполнитель'},
+  {name:'Тоцкая Алёна',dept:'Lifestyle',rate:468,role:'Исполнитель'},
+  {name:'Хамзин Рушан',dept:'Lifestyle',rate:402,role:'Исполнитель'},
+  {name:'Шевякова Екатерина',dept:'Lifestyle',rate:402,role:'Исполнитель'},
+  {name:'Гулла Анна',dept:'Lifestyle',rate:402,role:'Исполнитель'},
+  {name:'Киселева Анастасия',dept:'Lifestyle',rate:335,role:'Исполнитель'},
+  {name:'Малых Ксения (С)',dept:'Lifestyle',rate:468,role:'Исполнитель'},
+  {name:'Петрова Елизавета',dept:'Lifestyle',rate:402,role:'Исполнитель'},
+  {name:'Петров Андрей (С)',dept:'Lifestyle',rate:402,role:'Исполнитель'},
+  {name:'Скороходова Мария',dept:'Lifestyle',rate:402,role:'Исполнитель'},
+  // Логистика
+  {name:'Хохлова Светлана',dept:'Логистика',rate:0,role:'Исполнитель'},
+  {name:'Макарова Софья',dept:'Логистика',rate:500,role:'Исполнитель'},
+  {name:'Сафарова Анастасия',dept:'Логистика',rate:468,role:'Исполнитель'},
+  {name:'Магомедгаджиева Саида',dept:'Логистика',rate:402,role:'Исполнитель'},
+  {name:'Хороших Антон (К)',dept:'Логистика',rate:402,role:'Исполнитель'},
+  {name:'Шумова Диана',dept:'Логистика',rate:402,role:'Исполнитель'},
+  {name:'Щепетова Элина (К)',dept:'Логистика',rate:402,role:'Исполнитель'},
+  {name:'Жамамбалиева Асель',dept:'Логистика',rate:402,role:'Исполнитель'},
+  {name:'Хороших Антон (С)',dept:'Логистика',rate:402,role:'Исполнитель'},
+  {name:'Щепетова Элина (С)',dept:'Логистика',rate:402,role:'Исполнитель'},
+  // Travel
+  {name:'Глухова Виктория',dept:'Travel',rate:0,role:'Исполнитель'},
+  {name:'Сырцева Дарья',dept:'Travel',rate:500,role:'Исполнитель'},
+  {name:'Зуева Елизавета',dept:'Travel',rate:500,role:'Исполнитель'},
+  {name:'Клименко Дарья',dept:'Travel',rate:500,role:'Исполнитель'},
+  {name:'Коблова Екатерина',dept:'Travel',rate:500,role:'Исполнитель'},
+  {name:'Кузьмичёва Полина',dept:'Travel',rate:500,role:'Исполнитель'},
+  {name:'Кузьмичев Кирилл',dept:'Travel',rate:500,role:'Исполнитель'},
+  {name:'Радзюкевич Анастасия',dept:'Travel',rate:468,role:'Исполнитель'},
+  {name:'Баяндина Полина',dept:'Travel',rate:468,role:'Исполнитель'},
+  {name:'Бельченкова Александра',dept:'Travel',rate:468,role:'Исполнитель'},
+  {name:'Бердиева Алана',dept:'Travel',rate:468,role:'Исполнитель'},
+  {name:'Береснева Анна',dept:'Travel',rate:500,role:'Исполнитель'},
+  {name:'Дмитриева Евгения',dept:'Travel',rate:500,role:'Исполнитель'},
+  {name:'Калинина Марта',dept:'Travel',rate:468,role:'Исполнитель'},
+  {name:'Коротаева Валерия',dept:'Travel',rate:468,role:'Исполнитель'},
+  {name:'Пожарская Дарья',dept:'Travel',rate:402,role:'Исполнитель'},
+  {name:'Сараева Наталья (К)',dept:'Travel',rate:468,role:'Исполнитель'},
+  {name:'Соловьева Анастасия (К)',dept:'Travel',rate:468,role:'Исполнитель'},
+  {name:'Яблочко Лилия',dept:'Travel',rate:468,role:'Исполнитель'},
+  {name:'Елизарова Мария',dept:'Travel',rate:402,role:'Исполнитель'},
+  {name:'Парников Валерий',dept:'Travel',rate:402,role:'Исполнитель'},
+  {name:'Сараева Наталья (С)',dept:'Travel',rate:468,role:'Исполнитель'},
+  {name:'Середин Владислав',dept:'Travel',rate:468,role:'Исполнитель'},
+  {name:'Соловьева Анастасия (С)',dept:'Travel',rate:468,role:'Исполнитель'},
+  {name:'Клинкевичиус Евгения',dept:'Travel',rate:500,role:'Исполнитель'},
+  {name:'Столярова Вероника',dept:'Travel',rate:335,role:'Исполнитель'},
+  // КБР
+  {name:'Гурлева Алина',dept:'КБР',rate:468,role:'Исполнитель'},
+  {name:'Саркисова Дарья',dept:'КБР',rate:0,role:'Исполнитель'},
+  {name:'Долгова Олеся',dept:'КБР',rate:500,role:'Исполнитель'},
+  {name:'Запольских Анастасия',dept:'КБР',rate:500,role:'Исполнитель'},
+  {name:'Илинбаева Наталья',dept:'КБР',rate:500,role:'Исполнитель'},
+  {name:'Карпов Дмитрий',dept:'КБР',rate:500,role:'Исполнитель'},
+  {name:'Ширякова Виктория',dept:'КБР',rate:500,role:'Исполнитель'},
+  {name:'Адилова Адель',dept:'КБР',rate:402,role:'Исполнитель'},
+  {name:'Баринова Дарья',dept:'КБР',rate:402,role:'Исполнитель'},
+  {name:'Давлашян Анна',dept:'КБР',rate:402,role:'Исполнитель'},
+  {name:'Кирикова Ирина',dept:'КБР',rate:402,role:'Исполнитель'},
+  {name:'Ломовицкий Святослав',dept:'КБР',rate:402,role:'Исполнитель'},
+  {name:'Мелюхина Полина',dept:'КБР',rate:402,role:'Исполнитель'},
+  {name:'Никитина Александра',dept:'КБР',rate:402,role:'Исполнитель'},
+  {name:'Рахимова Юлия',dept:'КБР',rate:402,role:'Исполнитель'},
+  {name:'Мирошниченко Мария',dept:'КБР',rate:402,role:'Исполнитель'},
+  // Корп
+  {name:'Суздальцева Марина',dept:'Корп',rate:0,role:'Корп'},
+  {name:'Буц Артур',dept:'Корп',rate:0,role:'Корп'},
+  {name:'Дзевицкая Анастасия',dept:'Корп',rate:0,role:'Корп'},
+  {name:'Максимова София',dept:'Корп',rate:0,role:'Корп'},
+  {name:'Опарина Елена',dept:'Корп',rate:0,role:'Корп'},
+  {name:'Самигуллина Наиля',dept:'Корп',rate:0,role:'Корп'},
+  {name:'Касымова Динара',dept:'Корп',rate:0,role:'Корп'},
+  {name:'Плотникова Екатерина',dept:'Корп',rate:0,role:'Корп'},
+];
+
+let hrCurrDept = 'Все';
+let hrEditingIdx = -1;
+
+// Загружаем сохранённые данные
+function hrLoadFromStorage(){
+  try{
+    const saved = localStorage.getItem('fcs_hr_staff');
+    if(saved){
+      hrStaff = JSON.parse(saved);
+    }
+  }catch(e){}
+}
+
+function hrSaveToStorage(){
+  try{
+    localStorage.setItem('fcs_hr_staff', JSON.stringify(hrStaff));
+    // Синхронизируем с KPI модулем
+    hrSyncToKPI();
+  }catch(e){}
+}
+
+function hrSyncToKPI(){
+  // Обновляем kpiDepts из hrStaff
+  if(typeof kpiDepts === 'undefined') return;
+  const kpiDeptMap = {
+    'Lifestyle':'Lifestyle','Travel':'Travel',
+    'Логистика':'Логистика','КБР':'КБР','Корп':'Корп'
+  };
+  // Очищаем текущие kpiDepts (только структуру, без данных за месяц)
+  Object.keys(kpiDeptMap).forEach(dept=>{
+    if(!kpiDepts[dept]) kpiDepts[dept]=[];
+    // Добавляем новых / обновляем существующих
+    hrStaff.filter(e=>e.dept===dept).forEach(hrEmp=>{
+      const existing = kpiDepts[dept].find(k=>k.name===hrEmp.name);
+      if(existing){
+        existing.rate = hrEmp.rate;
+        existing.role = hrEmp.role;
+      } else {
+        kpiDepts[dept].push({
+          name:hrEmp.name, rate:hrEmp.rate, role:hrEmp.role,
+          hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,sla:0,bron:0,loaded:false
+        });
+      }
+    });
+    // Удаляем из kpi тех кого нет в hr
+    kpiDepts[dept] = kpiDepts[dept].filter(k=>
+      hrStaff.some(h=>h.name===k.name && h.dept===dept)
+    );
+  });
+}
+
+hrLoadFromStorage();
+hrSyncToKPI();
+
+window.hrSave = function(){
+  hrSaveToStorage();
+  showToast('✅ Справочник сотрудников сохранён!');
+};
+
+window.hrRender = function(){
+  const q = (document.getElementById('hr-search')?.value||'').toLowerCase();
+  // Dept tabs
+  const tabsEl = document.getElementById('hr-dept-tabs');
+  if(tabsEl){
+    tabsEl.innerHTML = HR_DEPTS.map(d=>{
+      const cnt = d==='Все' ? hrStaff.length : hrStaff.filter(e=>e.dept===d).length;
+      return `<button class="hr-dtab${d===hrCurrDept?' active':''}" onclick="hrSetDept('${d}')">${d} (${cnt})</button>`;
+    }).join('');
+  }
+
+  // Filter
+  let list = hrCurrDept==='Все' ? hrStaff : hrStaff.filter(e=>e.dept===hrCurrDept);
+  if(q) list = list.filter(e=>e.name.toLowerCase().includes(q));
+
+  const content = document.getElementById('hr-content');
+  if(!content) return;
+
+  if(!list.length){
+    content.innerHTML='<div class="empty">Сотрудники не найдены</div>';
+    return;
+  }
+
+  let html=`<div class="hr-table-wrap"><table class="hr-table">
+    <thead><tr>
+      <th style="width:36px"></th>
+      <th>Имя</th>
+      <th>Отдел</th>
+      <th>Ставка ₽/ч</th>
+      <th>Роль</th>
+      <th style="width:80px"></th>
+    </tr></thead><tbody>`;
+
+  list.forEach((emp)=>{
+    const globalIdx = hrStaff.indexOf(emp);
+    const initials = emp.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const av = HR_AV_COLORS[globalIdx % HR_AV_COLORS.length];
+    const roleCls = emp.role==='Ведущий'?'hr-role-lead':emp.role==='Главный Консьерж'?'hr-role-chief':emp.role==='Корп'?'hr-role-corp':'hr-role-exec';
+    html+=`<tr>
+      <td><div class="hr-av" style="background:${av.bg};color:${av.cl}">${initials}</div></td>
+      <td><span style="font-weight:500">${emp.name}</span></td>
+      <td style="color:var(--text2)">${emp.dept}</td>
+      <td>${emp.rate ? emp.rate+' ₽/ч' : '<span style="color:var(--text3)">—</span>'}</td>
+      <td><span class="hr-role ${roleCls}">${emp.role}</span></td>
+      <td style="text-align:right">
+        <button class="hr-edit-btn" onclick="hrOpenEdit(${globalIdx})" title="Редактировать">✏️</button>
+        <button class="hr-del-btn" onclick="hrDelete(${globalIdx})" title="Удалить">×</button>
+      </td>
+    </tr>`;
+  });
+
+  html+='</tbody></table></div>';
+  content.innerHTML=html;
+};
+
+window.hrSetDept = function(d){
+  hrCurrDept=d;
+  hrRender();
+};
+
+window.hrOpenAdd = function(){
+  hrEditingIdx=-1;
+  document.getElementById('hr-modal-title').textContent='Добавить сотрудника';
+  document.getElementById('hr-f-name').value='';
+  document.getElementById('hr-f-dept').value= hrCurrDept==='Все'?'Lifestyle':hrCurrDept;
+  document.getElementById('hr-f-rate').value='';
+  document.getElementById('hr-f-role').value='Исполнитель';
+  document.getElementById('hr-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('hr-f-name').focus(),50);
+};
+
+window.hrOpenEdit = function(idx){
+  hrEditingIdx=idx;
+  const emp=hrStaff[idx];
+  document.getElementById('hr-modal-title').textContent='Редактировать сотрудника';
+  document.getElementById('hr-f-name').value=emp.name;
+  document.getElementById('hr-f-dept').value=emp.dept;
+  document.getElementById('hr-f-rate').value=emp.rate||'';
+  document.getElementById('hr-f-role').value=emp.role;
+  document.getElementById('hr-modal').style.display='flex';
+};
+
+window.hrCloseModal = function(){
+  document.getElementById('hr-modal').style.display='none';
+};
+
+window.hrSaveModal = function(){
+  const name=(document.getElementById('hr-f-name').value||'').trim();
+  const dept=document.getElementById('hr-f-dept').value;
+  const rate=parseFloat(document.getElementById('hr-f-rate').value)||0;
+  const role=document.getElementById('hr-f-role').value;
+  if(!name){alert('Введите имя');return;}
+  if(hrEditingIdx>=0){
+    hrStaff[hrEditingIdx]={...hrStaff[hrEditingIdx],name,dept,rate,role};
+  } else {
+    hrStaff.push({name,dept,rate,role});
+  }
+  hrSaveToStorage();
+  hrCloseModal();
+  hrRender();
+  showToast(hrEditingIdx>=0?'Сотрудник обновлён':'Сотрудник добавлен');
+};
+
+window.hrDelete = function(idx){
+  if(!confirm('Удалить «'+hrStaff[idx].name+'»?')) return;
+  hrStaff.splice(idx,1);
+  hrSaveToStorage();
+  hrRender();
+  showToast('Удалён');
+};
+
+// Закрыть модал по клику на фон
+document.getElementById('hr-modal')?.addEventListener('click',function(e){
+  if(e.target===this) hrCloseModal();
+});
+
+})(); // end HR module
 </script>
 </body>
 </html>
