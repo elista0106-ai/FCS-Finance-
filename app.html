@@ -2384,34 +2384,76 @@ setTimeout(startAutoRefresh, 5000);
 
 const KPI_MONTHS = [{v:136,l:'Январь (136ч)'},{v:151,l:'Февраль (151ч)'},{v:167,l:'Март (167ч)'},{v:175,l:'Апрель (175ч)'},{v:143,l:'Май (143ч)'},{v:167,l:'Июнь (167ч)'},{v:184,l:'Июль (184ч)'},{v:168,l:'Август (168ч)'},{v:176,l:'Сентябрь (176ч)'},{v:176,l:'Октябрь (176ч)'},{v:159,l:'Ноябрь (159ч)'},{v:176,l:'Декабрь (176ч)'}];
 const KPI_ROLES = ['Исполнитель','Ведущий','Главный Консьерж','Корп'];
-const KPI_DEPTS = ['Lifestyle','Travel','Логистика','КБР','Корп'];
+const KPI_DEPTS = ['Lifestyle','Travel','Логистика','КБР','Корп','ЦПО','ЦПО Ночь'];
 const KPI_AV_COLORS = [
   {bg:'#E6F1FB',cl:'#0C447C'},{bg:'#EAF3DE',cl:'#27500A'},
   {bg:'#FAEEDA',cl:'#633806'},{bg:'#FBEAF0',cl:'#72243E'},
   {bg:'#EEEDFE',cl:'#3C3489'},{bg:'#E1F5EE',cl:'#085041'}
 ];
 
+// kpiDepts теперь строится динамически из hrStaff (HR модуль)
+// Это прокси-объект который всегда актуален
 let kpiDepts = {
-  'Lifestyle':[
-    {name:'Долматова Надежда',rate:500,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
-    {name:'Ефимцева Любовь',rate:500,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
-    {name:'Иванова Владлена',rate:500,role:'Ведущий',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
-    {name:'Ложечникова Екатерина',rate:500,role:'Ведущий',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
-    {name:'Мохова Мария',rate:500,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
-    {name:'Хон Ирина',rate:500,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
-    {name:'Виноградов Александр',rate:402,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
-    {name:'Еловская Софья',rate:402,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
-    {name:'Лисова Анна',rate:402,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
-    {name:'Меркулова Екатерина',rate:468,role:'Главный Консьерж',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,sla:0,loaded:false},
-    {name:'Рудченко Юлия',rate:468,role:'Ведущий',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
-    {name:'Тоцкая Алёна',rate:468,role:'Ведущий',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
-    {name:'Хамзин Руша',rate:402,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
-    {name:'Шевякова Екатерина',rate:402,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
-  ],
+  'Lifestyle':[],
   'Travel':[],
   'Логистика':[],
   'КБР':[],
-  'Корп':[]
+  'Корп':[],
+  'ЦПО':[],
+  'ЦПО Ночь':[]
+};
+
+// Синхронизирует kpiDepts из hrStaff (вызывается после загрузки HR)
+window.kpiSyncFromHR = function(){
+  const hrData = (typeof hrStaff !== 'undefined') ? hrStaff : [];
+  const kpiDeptNames = ['Lifestyle','Travel','Логистика','КБР','Корп','ЦПО','ЦПО Ночь'];
+
+  kpiDeptNames.forEach(dept=>{
+    if(!kpiDepts[dept]) kpiDepts[dept]=[];
+    const hrEmps = hrData.filter(e=>e.dept===dept);
+
+    // Добавляем новых сотрудников из HR
+    hrEmps.forEach(hrEmp=>{
+      const existing = kpiDepts[dept].find(k=>k.name===hrEmp.name);
+      if(existing){
+        // Обновляем ставку и роль из HR
+        existing.rate = hrEmp.rate;
+        existing.role = hrEmp.role;
+      } else {
+        kpiDepts[dept].push({
+          name:hrEmp.name, rate:hrEmp.rate, role:hrEmp.role,
+          hours:0, fd:0, fp:0, csi:4.83, loss:0, comp:0, sla:0, bron:0, loaded:false
+        });
+      }
+    });
+
+    // Убираем из KPI тех кого нет в HR
+    kpiDepts[dept] = kpiDepts[dept].filter(k=>
+      hrEmps.some(h=>h.name===k.name)
+    );
+  });
+
+  // Восстанавливаем данные за текущий месяц
+  const currKey = localStorage.getItem('fcs_kpi_curr_month_key');
+  if(currKey){
+    try{
+      const history = JSON.parse(localStorage.getItem('fcs_kpi_history')||'{}');
+      const monthData = history[currKey];
+      if(monthData){
+        Object.keys(monthData).forEach(dept=>{
+          if(!kpiDepts[dept]) return;
+          monthData[dept].forEach(saved=>{
+            const emp = kpiDepts[dept].find(e=>e.name===saved.name);
+            if(emp){
+              emp.hours=saved.hours||0; emp.fd=saved.fd||0; emp.fp=saved.fp||0;
+              emp.csi=saved.csi||4.83; emp.loss=saved.loss||0; emp.comp=saved.comp||0;
+              emp.sla=saved.sla||0; emp.bron=saved.bron||0; emp.loaded=saved.loaded||false;
+            }
+          });
+        });
+      }
+    }catch(e){}
+  }
 };
 
 let kpiCurrDept = 'Lifestyle';
@@ -2522,16 +2564,7 @@ function kpiMonthKey(normVal){
 
 function kpiSaveToStorage(){
   try{
-    // Сохраняем структуру (список сотрудников со ставками/должностями)
-    const structure = {};
-    Object.keys(kpiDepts).forEach(dept=>{
-      structure[dept] = kpiDepts[dept].map(e=>({
-        name:e.name, rate:e.rate, role:e.role
-      }));
-    });
-    localStorage.setItem('fcs_kpi_structure', JSON.stringify(structure));
-
-    // Сохраняем данные за текущий месяц отдельно
+    // Сохраняем данные за текущий месяц
     const monthKey = kpiGetMonthKey();
     const monthData = {};
     Object.keys(kpiDepts).forEach(dept=>{
@@ -2546,6 +2579,7 @@ function kpiSaveToStorage(){
     localStorage.setItem('fcs_kpi_history', JSON.stringify(history));
     localStorage.setItem('fcs_kpi_curr_month_key', monthKey);
     localStorage.setItem('fcs_kpi_month', kpiCurrMonth);
+    // Структура сотрудников хранится в HR (fcs_hr_staff)
   }catch(e){ console.log('KPI save error:',e); }
 }
 
@@ -2559,49 +2593,10 @@ function kpiGetMonthKey(){
 
 function kpiLoadFromStorage(){
   try{
-    // Загружаем структуру (список сотрудников)
-    const savedStr = localStorage.getItem('fcs_kpi_structure');
-    if(savedStr){
-      const parsed = JSON.parse(savedStr);
-      Object.keys(parsed).forEach(dept=>{
-        if(!kpiDepts[dept]) kpiDepts[dept]=[];
-        parsed[dept].forEach(savedEmp=>{
-          const existing = kpiDepts[dept].find(e=>e.name===savedEmp.name);
-          if(existing){
-            existing.role = savedEmp.role || existing.role;
-            existing.rate = savedEmp.rate || existing.rate;
-          } else {
-            kpiDepts[dept].push({
-              name:savedEmp.name, rate:savedEmp.rate||0, role:savedEmp.role||'Исполнитель',
-              hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,sla:0,bron:0,loaded:false
-            });
-          }
-        });
-      });
-    }
-
-    // Загружаем данные за текущий месяц
     const savedMonth = localStorage.getItem('fcs_kpi_month');
     if(savedMonth) kpiCurrMonth = parseInt(savedMonth);
-
-    const currKey = localStorage.getItem('fcs_kpi_curr_month_key');
-    if(currKey){
-      const history = JSON.parse(localStorage.getItem('fcs_kpi_history')||'{}');
-      const monthData = history[currKey];
-      if(monthData){
-        Object.keys(monthData).forEach(dept=>{
-          if(!kpiDepts[dept]) kpiDepts[dept]=[];
-          monthData[dept].forEach(saved=>{
-            const emp = kpiDepts[dept].find(e=>e.name===saved.name);
-            if(emp){
-              emp.hours=saved.hours||0; emp.fd=saved.fd||0; emp.fp=saved.fp||0;
-              emp.csi=saved.csi||4.83; emp.loss=saved.loss||0; emp.comp=saved.comp||0;
-              emp.sla=saved.sla||0; emp.bron=saved.bron||0; emp.loaded=saved.loaded||false;
-            }
-          });
-        });
-      }
-    }
+    // Данные сотрудников берём из HR через kpiSyncFromHR()
+    // Вызывается после инициализации HR модуля
   }catch(e){ console.log('KPI load error:', e); }
 }
 
@@ -2646,37 +2641,25 @@ kpiLoadFromStorage();
 // ---- СОХРАНЕНИЕ / ЭКСПОРТ / ИМПОРТ НАСТРОЕК ----
 window.kpiSaveSettings = function(){
   try{
-    // Сохраняем структуру (список + ставки + должности)
-    const structure = {};
-    Object.keys(kpiDepts).forEach(dept=>{
-      structure[dept] = kpiDepts[dept].map(e=>({
-        name:e.name, rate:e.rate, role:e.role
-      }));
-    });
-    localStorage.setItem('fcs_kpi_structure', JSON.stringify(structure));
-    // Также сохраняем текущие данные за месяц
     kpiSaveToStorage();
+    // HR сохраняется отдельно через hrSave()
     const status = document.getElementById('kpi-save-status');
+    const total = Object.values(kpiDepts).flat().length;
     if(status){
       status.style.display='block';
-      status.textContent = '✅ Сохранено ' + new Date().toLocaleString('ru-RU') + ' — ' + Object.values(kpiDepts).flat().length + ' сотрудников';
+      status.textContent = '✅ Данные сохранены ' + new Date().toLocaleString('ru-RU') + ' — ' + total + ' сотрудников';
     }
-    showToast('✅ Настройки сохранены!');
+    showToast('✅ Данные KPI сохранены!');
   }catch(e){ alert('Ошибка сохранения: '+e.message); }
 };
 
 window.kpiExportSettings = function(){
   const backup = {
-    version: 2,
+    version: 3,
     savedAt: new Date().toISOString(),
-    structure: {},
+    hrStaff: (typeof hrStaff !== 'undefined') ? hrStaff : [],
     history: kpiGetHistory()
   };
-  Object.keys(kpiDepts).forEach(dept=>{
-    backup.structure[dept] = kpiDepts[dept].map(e=>({
-      name:e.name, rate:e.rate, role:e.role
-    }));
-  });
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2692,47 +2675,33 @@ window.kpiImportSettings = function(input){
   reader.onload = e => {
     try{
       const backup = JSON.parse(e.target.result);
-      if(!backup.structure) throw new Error('Неверный формат файла');
-
-      // Восстанавливаем структуру
-      Object.keys(backup.structure).forEach(dept=>{
-        if(!kpiDepts[dept]) kpiDepts[dept]=[];
-        backup.structure[dept].forEach(savedEmp=>{
-          const existing = kpiDepts[dept].find(e=>e.name===savedEmp.name);
-          if(existing){
-            existing.role = savedEmp.role || existing.role;
-            existing.rate = savedEmp.rate || existing.rate;
-          } else {
-            kpiDepts[dept].push({
-              name:savedEmp.name, rate:savedEmp.rate||0, role:savedEmp.role||'Исполнитель',
-              hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,sla:0,bron:0,loaded:false
-            });
-          }
+      if(backup.hrStaff && typeof hrStaff !== "undefined"){
+        hrStaff.length = 0;
+        backup.hrStaff.forEach(emp=>hrStaff.push(emp));
+        localStorage.setItem("fcs_hr_staff", JSON.stringify(hrStaff));
+      } else if(backup.structure && typeof hrStaff !== "undefined"){
+        Object.keys(backup.structure).forEach(dept=>{
+          backup.structure[dept].forEach(e=>{
+            if(!hrStaff.some(h=>h.name===e.name && h.dept===dept))
+              hrStaff.push({name:e.name,dept,rate:e.rate||0,role:e.role||"Исполнитель"});
+          });
         });
-      });
-
-      // Восстанавливаем историю если есть
-      if(backup.history){
-        localStorage.setItem('fcs_kpi_history', JSON.stringify(backup.history));
+        localStorage.setItem("fcs_hr_staff", JSON.stringify(hrStaff));
       }
-
-      // Сохраняем и обновляем
-      kpiSaveSettings();
-      kpiLoadFromStorage();
-
-      const status = document.getElementById('kpi-save-status');
+      if(backup.history) localStorage.setItem("fcs_kpi_history", JSON.stringify(backup.history));
+      if(typeof kpiSyncFromHR === "function") kpiSyncFromHR();
+      const status = document.getElementById("kpi-save-status");
       if(status){
-        status.style.display='block';
-        status.textContent = '✅ Резерв восстановлен: ' + Object.values(kpiDepts).flat().length + ' сотрудников, сохранён ' + (backup.savedAt ? new Date(backup.savedAt).toLocaleString('ru-RU') : '—');
+        status.style.display="block";
+        status.textContent = "✅ Резерв восстановлен: " + (typeof hrStaff!=="undefined"?hrStaff.length:0) + " сотрудников";
       }
-      showToast('✅ Резервная копия восстановлена!');
+      showToast("✅ Резервная копия восстановлена!");
+      if(typeof hrRender==="function") hrRender();
       kpiRenderDept();
-    }catch(err){
-      alert('Ошибка загрузки файла: '+err.message);
-    }
+    }catch(err){ alert("Ошибка загрузки: "+err.message); }
   };
   reader.readAsText(file);
-  input.value='';
+  input.value="";
 };
 
 // ---- ЭКСПОРТ В EXCEL ----
@@ -3522,37 +3491,13 @@ function hrSaveToStorage(){
 }
 
 function hrSyncToKPI(){
-  // Обновляем kpiDepts из hrStaff
-  if(typeof kpiDepts === 'undefined') return;
-  const kpiDeptMap = {
-    'Lifestyle':'Lifestyle','Travel':'Travel',
-    'Логистика':'Логистика','КБР':'КБР','Корп':'Корп'
-  };
-  // Очищаем текущие kpiDepts (только структуру, без данных за месяц)
-  Object.keys(kpiDeptMap).forEach(dept=>{
-    if(!kpiDepts[dept]) kpiDepts[dept]=[];
-    // Добавляем новых / обновляем существующих
-    hrStaff.filter(e=>e.dept===dept).forEach(hrEmp=>{
-      const existing = kpiDepts[dept].find(k=>k.name===hrEmp.name);
-      if(existing){
-        existing.rate = hrEmp.rate;
-        existing.role = hrEmp.role;
-      } else {
-        kpiDepts[dept].push({
-          name:hrEmp.name, rate:hrEmp.rate, role:hrEmp.role,
-          hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,sla:0,bron:0,loaded:false
-        });
-      }
-    });
-    // Удаляем из kpi тех кого нет в hr
-    kpiDepts[dept] = kpiDepts[dept].filter(k=>
-      hrStaff.some(h=>h.name===k.name && h.dept===dept)
-    );
-  });
+  // Делегируем синхронизацию в KPI модуль
+  if(typeof kpiSyncFromHR === 'function') kpiSyncFromHR();
 }
 
 hrLoadFromStorage();
-hrSyncToKPI();
+// После загрузки HR — синхронизируем KPI
+if(typeof kpiSyncFromHR === 'function') kpiSyncFromHR();
 
 window.hrSave = function(){
   hrSaveToStorage();
