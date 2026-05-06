@@ -411,17 +411,24 @@ tr:hover td{background:var(--bg2)}
             </label>
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
               <label style="font-size:12px;color:var(--text2)">Расчётный месяц:</label>
-              <select id="kpi-upload-month" style="font-size:13px;padding:5px 8px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text)">
-                <option value="136">Январь (136ч)</option><option value="151">Февраль (151ч)</option>
-                <option value="167">Март (167ч)</option><option value="175">Апрель (175ч)</option>
-                <option value="143" selected>Май (143ч)</option><option value="167">Июнь (167ч)</option>
-                <option value="184">Июль (184ч)</option><option value="168">Август (168ч)</option>
-                <option value="176">Сентябрь (176ч)</option><option value="176">Октябрь (176ч)</option>
-                <option value="159">Ноябрь (159ч)</option><option value="176">Декабрь (176ч)</option>
+              <select id="kpi-upload-month" style="font-size:13px;padding:5px 8px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text)" onchange="kpiCurrMonth=+this.value">
+                <option value="136" data-key="2026-01">Январь 2026 (136ч)</option>
+                <option value="151" data-key="2026-02">Февраль 2026 (151ч)</option>
+                <option value="167" data-key="2026-03">Март 2026 (167ч)</option>
+                <option value="175" data-key="2026-04">Апрель 2026 (175ч)</option>
+                <option value="143" data-key="2026-05" selected>Май 2026 (143ч)</option>
+                <option value="167" data-key="2026-06">Июнь 2026 (167ч)</option>
+                <option value="184" data-key="2026-07">Июль 2026 (184ч)</option>
+                <option value="168" data-key="2026-08">Август 2026 (168ч)</option>
+                <option value="176" data-key="2026-09">Сентябрь 2026 (176ч)</option>
+                <option value="176" data-key="2026-10">Октябрь 2026 (176ч)</option>
+                <option value="159" data-key="2026-11">Ноябрь 2026 (159ч)</option>
+                <option value="176" data-key="2026-12">Декабрь 2026 (176ч)</option>
               </select>
               <button class="btn btn-primary btn-sm" onclick="kpiApplyUpload()">Загрузить и рассчитать</button>
-              <button class="btn btn-sm" onclick="kpiDownloadSample()">⬇ Скачать образец</button>
-              <button class="btn btn-sm" onclick="kpiResetData()" style="color:var(--red);border-color:var(--red)" title="Очистить все данные KPI">🗑 Сбросить</button>
+              <button class="btn btn-sm" onclick="kpiExportExcel()">⬇ Выгрузить Excel</button>
+              <button class="btn btn-sm" onclick="kpiDownloadSample()">📋 Образец файла</button>
+              <button class="btn btn-sm" onclick="kpiResetData()" style="color:var(--red);border-color:var(--red)" title="Очистить данные за месяц">🗑 Сбросить</button>
             </div>
           </div>
           <div class="kpi-card" style="padding:16px">
@@ -468,6 +475,7 @@ tr:hover td{background:var(--bg2)}
             <button class="kpi-stab" onclick="kpiShowCalc(2)">ГК (не КБР)</button>
             <button class="kpi-stab" onclick="kpiShowCalc(3)">КБР Исп/Вед</button>
             <button class="kpi-stab" onclick="kpiShowCalc(4)">ГК КБР</button>
+            <button class="kpi-stab" onclick="kpiShowCalc(5)">Корп</button>
           </div>
           <div id="kpi-manual-content"></div>
         </div>
@@ -2271,7 +2279,7 @@ setTimeout(startAutoRefresh, 5000);
 (function(){
 
 const KPI_MONTHS = [{v:136,l:'Январь (136ч)'},{v:151,l:'Февраль (151ч)'},{v:167,l:'Март (167ч)'},{v:175,l:'Апрель (175ч)'},{v:143,l:'Май (143ч)'},{v:167,l:'Июнь (167ч)'},{v:184,l:'Июль (184ч)'},{v:168,l:'Август (168ч)'},{v:176,l:'Сентябрь (176ч)'},{v:176,l:'Октябрь (176ч)'},{v:159,l:'Ноябрь (159ч)'},{v:176,l:'Декабрь (176ч)'}];
-const KPI_ROLES = ['Исполнитель','Ведущий','Главный Консьерж'];
+const KPI_ROLES = ['Исполнитель','Ведущий','Главный Консьерж','Корп'];
 const KPI_DEPTS = ['Lifestyle','Travel','Логистика','КБР','Корп'];
 const KPI_AV_COLORS = [
   {bg:'#E6F1FB',cl:'#0C447C'},{bg:'#EAF3DE',cl:'#27500A'},
@@ -2394,48 +2402,181 @@ window.kpiApplyUpload = function(){
 };
 
 // ---- LOCALSTORAGE ----
+// ---- ХРАНИЛИЩЕ ПО МЕСЯЦАМ ----
+// kpiHistory: { "2026-05": { dept: [emp,...], ... }, "2026-04": {...} }
+// kpiDepts хранит ТЕКУЩИЙ список сотрудников (структура/ставки/должности) — без данных за месяц
+
+function kpiMonthKey(normVal){
+  // Превращаем норму обратно в ГГГГ-ММ через текущий выбранный год+месяц из селекта
+  const sel = document.getElementById('kpi-upload-month');
+  if(sel){
+    const opt = sel.options[sel.selectedIndex];
+    return opt ? opt.dataset.key : 'unknown';
+  }
+  return 'unknown';
+}
+
 function kpiSaveToStorage(){
   try{
-    localStorage.setItem('fcs_kpi_depts', JSON.stringify(kpiDepts));
+    // Сохраняем структуру (список сотрудников со ставками/должностями)
+    const structure = {};
+    Object.keys(kpiDepts).forEach(dept=>{
+      structure[dept] = kpiDepts[dept].map(e=>({
+        name:e.name, rate:e.rate, role:e.role
+      }));
+    });
+    localStorage.setItem('fcs_kpi_structure', JSON.stringify(structure));
+
+    // Сохраняем данные за текущий месяц отдельно
+    const monthKey = kpiGetMonthKey();
+    const monthData = {};
+    Object.keys(kpiDepts).forEach(dept=>{
+      monthData[dept] = kpiDepts[dept].map(e=>({
+        name:e.name, hours:e.hours, fd:e.fd, fp:e.fp,
+        csi:e.csi, loss:e.loss, comp:e.comp, sla:e.sla||0,
+        bron:e.bron||0, loaded:e.loaded||false
+      }));
+    });
+    const history = JSON.parse(localStorage.getItem('fcs_kpi_history')||'{}');
+    history[monthKey] = monthData;
+    localStorage.setItem('fcs_kpi_history', JSON.stringify(history));
+    localStorage.setItem('fcs_kpi_curr_month_key', monthKey);
     localStorage.setItem('fcs_kpi_month', kpiCurrMonth);
-  }catch(e){}
+  }catch(e){ console.log('KPI save error:',e); }
+}
+
+function kpiGetMonthKey(){
+  const sel = document.getElementById('kpi-upload-month');
+  if(sel && sel.options[sel.selectedIndex]){
+    return sel.options[sel.selectedIndex].dataset.key || '2026-05';
+  }
+  return '2026-05';
 }
 
 function kpiLoadFromStorage(){
   try{
-    const saved = localStorage.getItem('fcs_kpi_depts');
-    if(saved){
-      const parsed = JSON.parse(saved);
+    // Загружаем структуру (список сотрудников)
+    const savedStr = localStorage.getItem('fcs_kpi_structure');
+    if(savedStr){
+      const parsed = JSON.parse(savedStr);
       Object.keys(parsed).forEach(dept=>{
         if(!kpiDepts[dept]) kpiDepts[dept]=[];
         parsed[dept].forEach(savedEmp=>{
           const existing = kpiDepts[dept].find(e=>e.name===savedEmp.name);
           if(existing){
-            // Полностью перезаписываем все поля из сохранённого
             existing.role = savedEmp.role || existing.role;
             existing.rate = savedEmp.rate || existing.rate;
-            existing.hours = savedEmp.hours || 0;
-            existing.fd = savedEmp.fd || 0;
-            existing.fp = savedEmp.fp || 0;
-            existing.csi = savedEmp.csi || 4.83;
-            existing.loss = savedEmp.loss || 0;
-            existing.comp = savedEmp.comp || 0;
-            existing.sla = savedEmp.sla || 0;
-            existing.bron = savedEmp.bron || 0;
-            existing.loaded = savedEmp.loaded || false;
           } else {
-            kpiDepts[dept].push(savedEmp);
+            kpiDepts[dept].push({
+              name:savedEmp.name, rate:savedEmp.rate||0, role:savedEmp.role||'Исполнитель',
+              hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,sla:0,bron:0,loaded:false
+            });
           }
         });
       });
     }
+
+    // Загружаем данные за текущий месяц
     const savedMonth = localStorage.getItem('fcs_kpi_month');
     if(savedMonth) kpiCurrMonth = parseInt(savedMonth);
+
+    const currKey = localStorage.getItem('fcs_kpi_curr_month_key');
+    if(currKey){
+      const history = JSON.parse(localStorage.getItem('fcs_kpi_history')||'{}');
+      const monthData = history[currKey];
+      if(monthData){
+        Object.keys(monthData).forEach(dept=>{
+          if(!kpiDepts[dept]) kpiDepts[dept]=[];
+          monthData[dept].forEach(saved=>{
+            const emp = kpiDepts[dept].find(e=>e.name===saved.name);
+            if(emp){
+              emp.hours=saved.hours||0; emp.fd=saved.fd||0; emp.fp=saved.fp||0;
+              emp.csi=saved.csi||4.83; emp.loss=saved.loss||0; emp.comp=saved.comp||0;
+              emp.sla=saved.sla||0; emp.bron=saved.bron||0; emp.loaded=saved.loaded||false;
+            }
+          });
+        });
+      }
+    }
   }catch(e){ console.log('KPI load error:', e); }
 }
 
-// Загружаем сохранённые данные при старте
+function kpiLoadMonthData(monthKey){
+  // Сбрасываем текущие данные
+  Object.keys(kpiDepts).forEach(dept=>{
+    kpiDepts[dept].forEach(e=>{
+      e.hours=0;e.fd=0;e.fp=0;e.csi=4.83;e.loss=0;e.comp=0;e.sla=0;e.bron=0;e.loaded=false;
+    });
+  });
+  // Загружаем данные за выбранный месяц
+  try{
+    const history = JSON.parse(localStorage.getItem('fcs_kpi_history')||'{}');
+    const monthData = history[monthKey];
+    if(monthData){
+      Object.keys(monthData).forEach(dept=>{
+        if(!kpiDepts[dept]) return;
+        monthData[dept].forEach(saved=>{
+          const emp=kpiDepts[dept].find(e=>e.name===saved.name);
+          if(emp){
+            emp.hours=saved.hours||0;emp.fd=saved.fd||0;emp.fp=saved.fp||0;
+            emp.csi=saved.csi||4.83;emp.loss=saved.loss||0;emp.comp=saved.comp||0;
+            emp.sla=saved.sla||0;emp.bron=saved.bron||0;emp.loaded=saved.loaded||false;
+          }
+        });
+      });
+      localStorage.setItem('fcs_kpi_curr_month_key', monthKey);
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+function kpiGetHistory(){
+  try{ return JSON.parse(localStorage.getItem('fcs_kpi_history')||'{}'); }
+  catch(e){ return {}; }
+}
+
+// Загружаем при старте
 kpiLoadFromStorage();
+
+// ---- ЭКСПОРТ В EXCEL ----
+window.kpiExportExcel = function(){
+  if(typeof XLSX==='undefined'){ alert('Библиотека XLSX не загружена'); return; }
+  const monthKey = kpiGetMonthKey();
+  const monthName = document.getElementById('kpi-upload-month')?.options[document.getElementById('kpi-upload-month').selectedIndex]?.text || monthKey;
+  const wb = XLSX.utils.book_new();
+
+  // Лист 1 — Сводная по всем отделам
+  const summaryRows = [['Отдел','Сотрудник','Должность','Ставка','Факт ч','База KPI','KPI надбавка','Зарплата','Итого']];
+  Object.keys(kpiDepts).forEach(dept=>{
+    kpiDepts[dept].forEach(e=>{
+      const c = kpiCalcEmp(e, kpiCurrMonth);
+      const sal = e.rate*e.hours;
+      const base = e.rate*kpiCurrMonth;
+      summaryRows.push([dept,e.name,e.role,e.rate,e.hours,base,c.bonus,sal,sal+c.bonus]);
+    });
+  });
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Сводная');
+
+  // Листы по отделам
+  Object.keys(kpiDepts).forEach(dept=>{
+    if(!kpiDepts[dept].length) return;
+    const rows = [['Сотрудник','Должность','Ставка ₽/ч','Норма ч','Факт ч','База KPI','Макс KPI 40%','Факт сделок','Факт проверок','CSI','Потери ₽','Жалобы','KPI надбавка','Зарплата','Итого']];
+    kpiDepts[dept].forEach(e=>{
+      const c = kpiCalcEmp(e, kpiCurrMonth);
+      const sal = e.rate*e.hours;
+      const base = e.rate*kpiCurrMonth;
+      rows.push([e.name,e.role,e.rate,kpiCurrMonth,e.hours,base,Math.round(base*0.4),e.fd,e.fp,e.csi,e.loss,e.comp,c.bonus,sal,sal+c.bonus]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch:22},{wch:16},{wch:10},{wch:9},{wch:9},{wch:12},{wch:12},{wch:12},{wch:13},{wch:8},{wch:10},{wch:9},{wch:13},{wch:12},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, ws, dept.substring(0,31));
+  });
+
+  XLSX.writeFile(wb, `KPI_${monthName.replace(/[()]/g,'').trim()}.xlsx`);
+  showToast('Excel выгружен!');
+};
 
 window.kpiDownloadSample = function(){
   if(typeof XLSX==='undefined'){ alert('Библиотека XLSX не загружена'); return; }
@@ -2451,17 +2592,24 @@ window.kpiDownloadSample = function(){
 };
 
 window.kpiResetData = function(){
-  if(!confirm('Сбросить все данные KPI? Ставки и должности сохранятся, данные за месяц удалятся.')) return;
+  if(!confirm('Сбросить данные за этот месяц? Ставки и должности сохранятся.')) return;
+  const monthKey = kpiGetMonthKey();
   Object.keys(kpiDepts).forEach(dept=>{
     kpiDepts[dept].forEach(e=>{
       e.hours=0;e.fd=0;e.fp=0;e.csi=4.83;e.loss=0;e.comp=0;e.loaded=false;
     });
   });
+  // Удаляем из истории
+  try{
+    const history = kpiGetHistory();
+    delete history[monthKey];
+    localStorage.setItem('fcs_kpi_history', JSON.stringify(history));
+  }catch(e){}
   kpiUploadData=null;
   kpiSaveToStorage();
   const titleEl=document.getElementById('kpi-uz-title');
   if(titleEl) titleEl.textContent='Загрузить данные за месяц';
-  showToast('Данные сброшены');
+  showToast('Данные за месяц сброшены');
   kpiRenderDept();
 };
 
@@ -2575,7 +2723,7 @@ function kpiRenderEmpCalc(){
   const initials=e.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   const av=KPI_AV_COLORS[kpiCurrEmp%KPI_AV_COLORS.length];
   const rp=e.role==='Исполнитель'?'kpi-rp-exec':e.role==='Ведущий'?'kpi-rp-lead':'kpi-rp-chief';
-  const isExec=e.role==='Исполнитель';
+  const isExec=e.role==="Исполнитель"||e.role==="Корп";
   const isLead=e.role==='Ведущий';
   const isChief=e.role==='Главный Консьерж';
   const isKBR=kpiCurrDept==='КБР';
@@ -2702,7 +2850,7 @@ function kpiUpdateEmpCalc(){
   const e=kpiDepts[kpiCurrDept][kpiCurrEmp];
   const norm=kpiCurrMonth;
   const base=e.rate*norm, maxkpi=base*0.4, sal=e.rate*e.hours;
-  const isExec=e.role==='Исполнитель';
+  const isExec=e.role==="Исполнитель"||e.role==="Корп";
   const isLead=e.role==='Ведущий';
   const isChief=e.role==='Главный Консьерж';
   const isKBR=kpiCurrDept==='КБР';
@@ -2786,7 +2934,7 @@ function kpiRenderManual(){
   const i=kpiCalcTab;
   const mSel=id=>`<select id="${id}" onchange="kpiManCalc()" style="font-size:13px;padding:6px 8px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg3);color:var(--text)">${KPI_MONTHS.map(m=>`<option value="${m.v}"${m.v===kpiCurrMonth?' selected':''}>${m.l}</option>`).join('')}</select>`;
 
-  const titles=['Исполнитель — Lifestyle / Travel / Логистика','Ведущий — Lifestyle / Travel / Логистика','Главный Консьерж (не КБР)','КБР — Исполнитель / Ведущий','Главный Консьерж КБР'];
+  const titles=['Исполнитель — Lifestyle / Travel / Логистика','Ведущий — Lifestyle / Travel / Логистика','Главный Консьерж (не КБР)','КБР — Исполнитель / Ведущий','Главный Консьерж КБР','Корп — ВК корп'];
   let html=`<div class="kpi-card" style="padding:16px">
     <div style="font-size:14px;font-weight:600;margin-bottom:12px">${titles[i]}</div>`;
 
@@ -2870,6 +3018,30 @@ function kpiRenderManual(){
     </div>`;
   }
 
+  // Корп — та же формула что у Исполнителя (выработка 0.75/ч)
+  if(i===5){
+    html+=`<div class="kpi-fg">
+      <div class="kpi-field"><label>Расчётный месяц</label>${mSel('km_month')}</div>
+      <div class="kpi-field"><label>Ставка ₽/час</label><input type="number" id="km_rate" placeholder="468" oninput="kpiManCalc()"></div>
+      <div class="kpi-field"><label>Факт часов</label><input type="number" id="km_hours" placeholder="175" oninput="kpiManCalc()"></div>
+      <div class="kpi-field"><label>База KPI (авто)</label><div class="kpi-auto hi" id="km_base">—</div></div>
+      <div class="kpi-field"><label>Макс KPI 40% (авто)</label><div class="kpi-auto hi" id="km_maxkpi">—</div></div>
+    </div>
+    <div class="kpi-hint"><b>Сделки (KPI1 · 50%):</b> выработка 0.75/ч · &lt;85%→0 · 85–99%→60% · 100–180%→факт/план · 181–190%→+2%/шаг · &gt;190%→200%<br><b>CSI (KPI2 · 50%):</b> &lt;4.90→0% · 4.90–4.95→60% · 4.96–4.97→80% · 4.98–5.0→100%</div>
+    <div class="kpi-fg">
+      <div class="kpi-field"><label>План сделок (авто)</label><div class="kpi-auto" id="km_plan">—</div></div>
+      <div class="kpi-field"><label>Факт сделок</label><input type="number" id="km_fd" placeholder="89" oninput="kpiManCalc()"></div>
+      <div class="kpi-field"><label>CSI</label><input type="number" id="km_csi" placeholder="4.95" step="0.01" oninput="kpiManCalc()"></div>
+    </div>
+    <div class="kpi-sec">Штрафы</div>
+    <div class="kpi-hint"><b>Жалобы:</b> 1→−20% · 2→−50% · 3+→−100% · <b>Потери:</b> 1–10к→−20% · 10–30к→−50% · &gt;30к→−100%</div>
+    <div class="kpi-fg">
+      <div class="kpi-field"><label>Жалоб</label><input type="number" id="km_comp" placeholder="0" oninput="kpiManCalc()"></div>
+      <div class="kpi-field"><label>Потери ₽</label><input type="number" id="km_loss" placeholder="0" oninput="kpiManCalc()"></div>
+      <div class="kpi-field"><label>Штраф (авто)</label><div class="kpi-auto warn" id="km_pen">0%</div></div>
+    </div>`;
+  }
+
   html+=`<div class="kpi-res-box" id="km_res"></div></div>`;
   document.getElementById('kpi-manual-content').innerHTML=html;
   kpiManCalc();
@@ -2939,6 +3111,21 @@ window.kpiManCalc=function(){
       {l:'KPI3 Бронирования '+bron+'% → '+(c3*100).toFixed(0)+'%',v:'+'+kpiFmt(kpi3)+' ₽',cls:'pos'},
       {l:'Штраф → −'+(pen*100).toFixed(0)+'%',v:pen>0?'−'+kpiFmt(penAmt)+' ₽':'0 ₽',cls:pen>0?'neg':'zero'},
     ];
+  } else if(i===5){
+    // Корп — то же что Исполнитель (выработка 0.75/ч, KPI1 50%, KPI2 CSI 50%)
+    const fd=gv('km_fd'),csi=gv('km_csi'),comp=gv('km_comp'),loss=gv('km_loss');
+    const plan=Math.round(0.75*hours*10)/10;
+    st('km_plan',plan||'—');
+    const c1=kpiDeal(fd,plan),c2=kpiCSI(csi),pen=kpiPen(comp,loss);
+    const kpi1=0.5*c1*maxkpi,kpi2=0.5*c2*maxkpi,raw=kpi1+kpi2,penAmt=raw*pen;
+    bonus=Math.round(raw-penAmt);
+    st('km_pen',pen>0?'−'+(pen*100).toFixed(0)+'%':'0%');
+    const pEx=plan>0&&fd>0?(fd/plan*100).toFixed(0)+'%':'—';
+    rows=[
+      {l:'KPI1 Сделки '+fd+'/'+plan+' ('+pEx+') → коэф '+(c1*100).toFixed(0)+'%',v:'+'+kpiFmt(kpi1)+' ₽',cls:'pos'},
+      {l:'KPI2 CSI '+csi+' → коэф '+(c2*100).toFixed(0)+'%',v:'+'+kpiFmt(kpi2)+' ₽',cls:'pos'},
+      {l:'Штраф → −'+(pen*100).toFixed(0)+'%',v:pen>0?'−'+kpiFmt(penAmt)+' ₽':'0 ₽',cls:pen>0?'neg':'zero'},
+    ];
   } else {
     const bron=gv('km_bron'),sla=gv('km_sla'),csi=gv('km_csi');
     const bK=kpiBron(bron),sK=kpiSLA(sla),cK=kpiCSIGK(csi);
@@ -2967,7 +3154,7 @@ function kpiCalcEmp(e,norm){
   if(!e.rate||!e.hours) return {bonus:0,pctMain:0};
   const maxkpi=e.rate*norm*0.4;
   let bonus=0,pctMain=0;
-  if(e.role==='Исполнитель'){
+  if(e.role==='Исполнитель'||e.role==='Корп'){
     const plan=0.75*e.hours;pctMain=plan?e.fd/plan:0;
     const raw=0.5*kpiDeal(e.fd,plan)*maxkpi+0.5*kpiCSI(e.csi)*maxkpi;
     bonus=Math.round(raw*(1-kpiPen(e.comp,e.loss)));
