@@ -2406,13 +2406,23 @@ function kpiLoadFromStorage(){
     const saved = localStorage.getItem('fcs_kpi_depts');
     if(saved){
       const parsed = JSON.parse(saved);
-      // Мержим сохранённые данные с дефолтными (чтобы не потерять базовый список)
       Object.keys(parsed).forEach(dept=>{
         if(!kpiDepts[dept]) kpiDepts[dept]=[];
         parsed[dept].forEach(savedEmp=>{
           const existing = kpiDepts[dept].find(e=>e.name===savedEmp.name);
           if(existing){
-            Object.assign(existing, savedEmp);
+            // Полностью перезаписываем все поля из сохранённого
+            existing.role = savedEmp.role || existing.role;
+            existing.rate = savedEmp.rate || existing.rate;
+            existing.hours = savedEmp.hours || 0;
+            existing.fd = savedEmp.fd || 0;
+            existing.fp = savedEmp.fp || 0;
+            existing.csi = savedEmp.csi || 4.83;
+            existing.loss = savedEmp.loss || 0;
+            existing.comp = savedEmp.comp || 0;
+            existing.sla = savedEmp.sla || 0;
+            existing.bron = savedEmp.bron || 0;
+            existing.loaded = savedEmp.loaded || false;
           } else {
             kpiDepts[dept].push(savedEmp);
           }
@@ -2421,7 +2431,7 @@ function kpiLoadFromStorage(){
     }
     const savedMonth = localStorage.getItem('fcs_kpi_month');
     if(savedMonth) kpiCurrMonth = parseInt(savedMonth);
-  }catch(e){}
+  }catch(e){ console.log('KPI load error:', e); }
 }
 
 // Загружаем сохранённые данные при старте
@@ -2509,7 +2519,10 @@ function kpiRenderDeptTable(){
       <td>${e.csi||'—'}</td>
       <td class="${c.bonus>0?'kpi-val-ok':'kpi-val-warn'}">${c.bonus>0?'+'+kpiFmt(c.bonus)+' ₽':'0 ₽'}</td>
       <td style="font-weight:500">${sal>0?kpiFmt(sal+c.bonus)+' ₽':'—'}</td>
-      <td class="kpi-chev">›</td>
+      <td style="text-align:center">
+        <button onclick="event.stopPropagation();kpiDeleteEmp(${i})" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;padding:2px 6px;border-radius:4px" title="Удалить" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">×</button>
+        <span class="kpi-chev">›</span>
+      </td>
     </tr>`;
   });
 
@@ -2536,6 +2549,14 @@ window.kpiAddEmp=function(){
   const role=document.getElementById('kpi-new-role').value;
   if(!name){alert('Введите имя');return;}
   kpiDepts[kpiCurrDept].push({name,rate,role,hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,sla:0,bron:0,loaded:false});
+  kpiSaveToStorage();
+  kpiRenderDeptTable();
+};
+
+window.kpiDeleteEmp=function(i){
+  const emp = kpiDepts[kpiCurrDept][i];
+  if(!confirm('Удалить сотрудника «'+emp.name+'»?')) return;
+  kpiDepts[kpiCurrDept].splice(i,1);
   kpiSaveToStorage();
   kpiRenderDeptTable();
 };
@@ -2669,7 +2690,12 @@ function kpiRenderEmpCalc(){
 window.kpiUpdEmp=function(field,val){
   kpiDepts[kpiCurrDept][kpiCurrEmp][field]=val;
   kpiSaveToStorage();
-  kpiUpdateEmpCalc();
+  if(field==='role'){
+    // При смене должности перерисовываем всю карточку (меняется структура KPI)
+    kpiRenderEmpCalc();
+  } else {
+    kpiUpdateEmpCalc();
+  }
 };
 
 function kpiUpdateEmpCalc(){
