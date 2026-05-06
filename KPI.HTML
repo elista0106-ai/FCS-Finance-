@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KPI Калькулятор — FCS</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #f5f4f1;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --border: rgba(0,0,0,0.10);
+    --border2: rgba(0,0,0,0.18);
+    --text: #1a1917;
+    --text2: #6b6a65;
+    --text3: #a09f9a;
+    --green: #1a7a50;
+    --green-bg: #eaf5ee;
+    --red: #c0392b;
+    --red-bg: #fdf0ee;
+    --accent: #2c4a8c;
+    --accent-bg: #eef1f9;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Golos Text', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .page-header h1 {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.3px;
+  }
+  .page-header p {
+    font-size: 13px;
+    color: var(--text2);
+    margin-top: 4px;
+  }
+
+  .container {
+    max-width: 820px;
+    margin: 0 auto;
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 6px;
+  }
+  .tab {
+    flex: 1;
+    min-width: 120px;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    font-family: 'Golos Text', sans-serif;
+  }
+  .tab:hover { background: var(--surface2); color: var(--text); }
+  .tab.active { background: var(--accent); color: #fff; }
+
+  /* CARD */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .calc { display: none; }
+  .calc.active { display: block; }
+
+  .calc-title { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .calc-sub { font-size: 12px; color: var(--text2); margin-bottom: 20px; line-height: 1.5; }
+
+  /* MONTH BAR */
+  .month-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--accent-bg);
+    border: 1px solid rgba(44,74,140,0.15);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .month-bar label { font-size: 12px; color: var(--accent); font-weight: 500; white-space: nowrap; }
+  .month-bar select {
+    font-size: 13px;
+    padding: 5px 8px;
+    border: 1px solid rgba(44,74,140,0.2);
+    border-radius: 7px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'Golos Text', sans-serif;
+    cursor: pointer;
+  }
+  .month-bar .norm-info { font-size: 13px; color: var(--accent); font-weight: 600; margin-left: auto; }
+
+  /* HINT */
+  .hint {
+    font-size: 11px;
+    color: var(--text2);
+    background: var(--surface2);
+    border-left: 3px solid var(--border2);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    line-height: 1.7;
+  }
+  .hint b { color: var(--text); }
+
+  /* SECTION LABEL */
+  .section-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin: 18px 0 10px;
+  }
+
+  /* GRID */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .grid4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+
+  @media (max-width: 600px) {
+    .grid2, .grid3, .grid4 { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* FIELD */
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11px; color: var(--text2); font-weight: 500; }
+
+  .field input, .field select {
+    font-size: 14px;
+    padding: 8px 11px;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'Golos Text', sans-serif;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(44,74,140,0.08); }
+
+  .auto-val {
+    font-size: 14px;
+    padding: 8px 11px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface2);
+    color: var(--text3);
+    min-height: 38px;
+  }
+  .auto-val.hi { color: var(--accent); font-weight: 600; background: var(--accent-bg); border-color: rgba(44,74,140,0.15); }
+  .auto-val.warn { color: var(--red); font-weight: 600; background: var(--red-bg); border-color: rgba(192,57,43,0.15); }
+
+  /* RESULTS */
+  .results {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+    margin-top: 20px;
+  }
+  .res-title { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px; }
+  .res-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    gap: 8px;
+  }
+  .res-row:last-child { border-bottom: none; }
+  .res-label { color: var(--text2); flex: 1; }
+  .res-val { font-weight: 600; white-space: nowrap; color: var(--text); }
+  .res-val.pos { color: var(--green); }
+  .res-val.neg { color: var(--red); }
+  .res-val.zero { color: var(--text3); }
+
+  .kpi-subtotal {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 8px 12px;
+    margin: 6px 0;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .kpi-subtotal .res-label { color: var(--text); }
+
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    margin-top: 10px;
+    background: var(--accent);
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .total-row span:last-child { font-size: 18px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="page-header">
+    <h1>KPI Калькулятор</h1>
+    <p>First Concierge Service — расчёт вознаграждения</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab(0)">Исполнитель</button>
+    <button class="tab" onclick="showTab(1)">Ведущий</button>
+    <button class="tab" onclick="showTab(2)">ГК (не КБР)</button>
+    <button class="tab" onclick="showTab(3)">КБР Исп/Вед</button>
+    <button class="tab" onclick="showTab(4)">ГК КБР</button>
+  </div>
+
+  <!-- 1. Исполнитель -->
+  <div class="calc active card" id="c0">
+    <div class="calc-title">Исполнитель — Lifestyle / Travel / Логистика</div>
+    <div class="calc-sub">KPI1 Сделки 50% · KPI2 CSI 50% · макс надбавка 40% · база = ставка × норма месяца</div>
+
+    <div class="month-bar">
+      <label>Расчётный месяц:</label>
+      <select id="c0_month" onchange="calc0()">
+        <option value="136">Январь (136ч)</option>
+        <option value="151">Февраль (151ч)</option>
+        <option value="167">Март (167ч)</option>
+        <option value="175">Апрель (175ч)</option>
+        <option value="143" selected>Май (143ч)</option>
+        <option value="167">Июнь (167ч)</option>
+        <option value="184">Июль (184ч)</option>
+        <option value="168">Август (168ч)</option>
+        <option value="176">Сентябрь (176ч)</option>
+        <option value="176">Октябрь (176ч)</option>
+        <option value="159">Ноябрь (159ч)</option>
+        <option value="176">Декабрь (176ч)</option>
+      </select>
+      <span class="norm-info">Норма: <span id="c0_norm_lbl">143</span> ч</span>
+    </div>
+
+    <div class="hint">
+      <b>Сделки:</b> &lt;85%→0 · 85–99%→60% · 100–180%→факт/план · 181–190%→+2%/шаг · &gt;190%→200%<br>
+      <b>CSI:</b> &lt;4.90→0% · 4.90–4.95→60% · 4.96–4.97→80% · 4.98–5.0→100%
+    </div>
+
+    <div class="grid4">
+      <div class="field"><label>Ставка ₽/час</label><input type="number" id="c0_rate" placeholder="468" oninput="calc0()"></div>
+      <div class="field"><label>Факт часов</label><input type="number" id="c0_hours" placeholder="211" oninput="calc0()"></div>
+      <div class="field"><label>База KPI (авто)</label><div class="auto-val hi" id="c0_base">—</div></div>
+      <div class="field"><label>Макс KPI 40% (авто)</label><div class="auto-val hi" id="c0_maxkpi">—</div></div>
+    </div>
+
+    <div class="grid3">
+      <div class="field"><label>План сделок (авто)</label><div class="auto-val" id="c0_plan">—</div></div>
+      <div class="field"><label>Факт сделок</label><input type="number" id="c0_fd" placeholder="157" oninput="calc0()"></div>
+      <div class="field"><label>CSI</label><input type="number" id="c0_csi" placeholder="4.95" step="0.01" oninput="calc0()"></div>
+    </div>
+
+    <div class="section-label">Штрафы</div>
+    <div class="hint"><b>Жалобы:</b> 1→−20% · 2→−50% · 3+→−100% &nbsp;|&nbsp; <b>Потери:</b> 1–10к→−20% · 10–30к→−50% · &gt;30к→−100% · суммируются, макс −100%</div>
+    <div class="grid3">
+      <div class="field"><label>Кол-во жалоб / низких оценок</label><input type="number" id="c0_comp" placeholder="0" min="0" oninput="calc0()"></div>
+      <div class="field"><label>Сумма финансовых потерь ₽</label><input type="number" id="c0_loss" placeholder="0" oninput="calc0()"></div>
+      <div class="field"><label>Штраф (авто)</label><div class="auto-val warn" id="c0_pen">0%</div></div>
+    </div>
+    <div id="c0_res"></div>
+  </div>
+
+  <!-- 2. Ведущий -->
+  <div class="calc card" id="c1">
+    <div class="calc-title">Ведущий — Lifestyle / Travel / Логистика</div>
+    <div class="calc-sub">KPI1 Проверки 50% · KPI2 CSI 30% · KPI3 Исполнение 20% · макс 40% · база = ставка × норма</div>
+
+    <div class="month-bar">
+      <label>Расчётный месяц:</label>
+      <select id="c1_month" onchange="calc1()">
+        <option value="136">Январь (136ч)</option>
+        <option value="151">Февраль (151ч)</option>
+        <option value="167">Март (167ч)</option>
+        <option value="175">Апрель (175ч)</option>
+        <option value="143" selected>Май (143ч)</option>
+        <option value="167">Июнь (167ч)</option>
+        <option value="184">Июль (184ч)</option>
+        <option value="168">Август (168ч)</option>
+        <option value="176">Сентябрь (176ч)</option>
+        <option value="176">Октябрь (176ч)</option>
+        <option value="159">Ноябрь (159ч)</option>
+        <option value="176">Декабрь (176ч)</option>
+      </select>
+      <span class="norm-info">Норма: <span id="c1_norm_lbl">143</span> ч</span>
+    </div>
+
+    <div class="hint"><b>Проверки и сделки — та же шкала · CSI:</b> &lt;4.90→0% · 4.90–4.95→60% · 4.96–4.97→80% · 4.98–5.0→100%</div>
+
+    <div class="grid4">
+      <div class="field"><label>Ставка ₽/час</label><input type="number" id="c1_rate" placeholder="500" oninput="calc1()"></div>
+      <div class="field"><label>Факт часов</label><input type="number" id="c1_hours" placeholder="180" oninput="calc1()"></div>
+      <div class="field"><label>База KPI (авто)</label><div class="auto-val hi" id="c1_base">—</div></div>
+      <div class="field"><label>Макс KPI 40% (авто)</label><div class="auto-val hi" id="c1_maxkpi">—</div></div>
+    </div>
+
+    <div class="section-label">Проверки (KPI1 · вес 50%)</div>
+    <div class="grid3">
+      <div class="field"><label>План проверок (авто)</label><div class="auto-val" id="c1_planp">—</div></div>
+      <div class="field"><label>Факт проверок</label><input type="number" id="c1_fp" placeholder="233" oninput="calc1()"></div>
+      <div class="field"></div>
+    </div>
+
+    <div class="section-label">Исполнение (KPI3 · 20%) + CSI (KPI2 · 30%)</div>
+    <div class="grid3">
+      <div class="field"><label>План сделок (авто)</label><div class="auto-val" id="c1_pland">—</div></div>
+      <div class="field"><label>Факт сделок</label><input type="number" id="c1_fd" placeholder="89" oninput="calc1()"></div>
+      <div class="field"><label>CSI</label><input type="number" id="c1_csi" placeholder="4.95" step="0.01" oninput="calc1()"></div>
+    </div>
+
+    <div class="section-label">Штрафы</div>
+    <div class="hint"><b>Жалобы:</b> 1→−20% · 2→−50% · 3+→−100% &nbsp;|&nbsp; <b>Потери:</b> 1–10к→−20% · 10–30к→−50% · &gt;30к→−100% · суммируются, макс −100%</div>
+    <div class="grid3">
+      <div class="field"><label>Кол-во жалоб / низких оценок</label><input type="number" id="c1_comp" placeholder="0" min="0" oninput="calc1()"></div>
+      <div class="field"><label>Сумма финансовых потерь ₽</label><input type="number" id="c1_loss" placeholder="0" oninput="calc1()"></div>
+      <div class="field"><label>Штраф (авто)</label><div class="auto-val warn" id="c1_pen">0%</div></div>
+    </div>
+    <div id="c1_res"></div>
+  </div>
+
+  <!-- 3. ГК не КБР -->
+  <div class="calc card" id="c2">
+    <div class="calc-title">Главный Консьерж — Travel / Lifestyle / Логистика</div>
+    <div class="calc-sub">KPI1 Потери 30% · KPI2 SLA 30% · KPI3 CSI 40% · макс KPI = 40% от базы</div>
+
+    <div class="month-bar">
+      <label>Расчётный месяц:</label>
+      <select id="c2_month" onchange="calc2()">
+        <option value="136">Январь (136ч)</option>
+        <option value="151">Февраль (151ч)</option>
+        <option value="167">Март (167ч)</option>
+        <option value="175">Апрель (175ч)</option>
+        <option value="143" selected>Май (143ч)</option>
+        <option value="167">Июнь (167ч)</option>
+        <option value="184">Июль (184ч)</option>
+        <option value="168">Август (168ч)</option>
+        <option value="176">Сентябрь (176ч)</option>
+        <option value="176">Октябрь (176ч)</option>
+        <option value="159">Ноябрь (159ч)</option>
+        <option value="176">Декабрь (176ч)</option>
+      </select>
+      <span class="norm-info">Норма: <span id="c2_norm_lbl">143</span> ч</span>
+    </div>
+
+    <div class="grid4">
+      <div class="field"><label>Ставка ₽/час</label><input type="number" id="c2_rate" placeholder="587" oninput="calc2()"></div>
+      <div class="field"><label>Факт часов</label><input type="number" id="c2_hours" placeholder="175" oninput="calc2()"></div>
+      <div class="field"><label>База KPI (авто)</label><div class="auto-val hi" id="c2_base">—</div></div>
+      <div class="field"><label>Макс KPI 40% (авто)</label><div class="auto-val hi" id="c2_maxkpi">—</div></div>
+    </div>
+
+    <div class="section-label">KPI1 · вес 30% — Финансовые потери</div>
+    <div class="hint"><b>Потери:</b> &gt;100 000→коэф 0 · 50 001–100 000→коэф 0.5 · 1–50 000→коэф 0.7 · 0→коэф 1.0</div>
+    <div class="grid3">
+      <div class="field"><label>Сумма потерь ₽</label><input type="number" id="c2_loss" placeholder="0" oninput="calc2()"></div>
+      <div class="field"><label>Коэф (авто)</label><div class="auto-val hi" id="c2_loss_k">—</div></div>
+      <div class="field"></div>
+    </div>
+
+    <div class="section-label">KPI2 · вес 30% — SLA исполнения</div>
+    <div class="hint"><b>SLA:</b> &lt;70%→0 · 70–80%→0.7 · 81–89%→1.0 · 90–95%→1.2 · 96–100%→1.5</div>
+    <div class="grid3">
+      <div class="field"><label>SLA %</label><input type="number" id="c2_sla" placeholder="85" oninput="calc2()"></div>
+      <div class="field"><label>Коэф (авто)</label><div class="auto-val hi" id="c2_sla_k">—</div></div>
+      <div class="field"></div>
+    </div>
+
+    <div class="section-label">KPI3 · вес 40% — CSI направления</div>
+    <div class="hint"><b>CSI:</b> &lt;4.89→0 · 4.90–4.95→0.6 · 4.96–4.97→1.0 · 4.98–5.0→1.5</div>
+    <div class="grid3">
+      <div class="field"><label>CSI</label><input type="number" id="c2_csi" placeholder="4.95" step="0.01" oninput="calc2()"></div>
+      <div class="field"><label>Коэф (авто)</label><div class="auto-val hi" id="c2_csi_k">—</div></div>
+      <div class="field"></div>
+    </div>
+    <div id="c2_res"></div>
+  </div>
+
+  <!-- 4. КБР -->
+  <div class="calc card" id="c3">
+    <div class="calc-title">КБР — Исполнитель / Ведущий</div>
+    <div class="calc-sub">KPI1 Сделки 50% · KPI2 CSI 30% · KPI3 Бронирования 20% · макс 40% · база = ставка × норма</div>
+
+    <div class="month-bar">
+      <label>Расчётный месяц:</label>
+      <select id="c3_month" onchange="calc3()">
+        <option value="136">Январь (136ч)</option>
+        <option value="151">Февраль (151ч)</option>
+        <option value="167">Март (167ч)</option>
+        <option value="175">Апрель (175ч)</option>
+        <option value="143" selected>Май (143ч)</option>
+        <option value="167">Июнь (167ч)</option>
+        <option value="184">Июль (184ч)</option>
+        <option value="168">Август (168ч)</option>
+        <option value="176">Сентябрь (176ч)</option>
+        <option value="176">Октябрь (176ч)</option>
+        <option value="159">Ноябрь (159ч)</option>
+        <option value="176">Декабрь (176ч)</option>
+      </select>
+      <span class="norm-info">Норма: <span id="c3_norm_lbl">143</span> ч</span>
+    </div>
+
+    <div class="hint">
+      <b>Сделки КБР:</b> &lt;85%→0 · 85–99%→60% · 100–110%→факт/план · 111–125%→+2%/шаг · ≥125%→150%<br>
+      <b>Бронирования:</b> &lt;70%→0 · 70–84%→50% · 85–94%→80% · 95–100%→100% &nbsp;|&nbsp;
+      <b>CSI:</b> &lt;4.90→0% · 4.90–4.95→60% · 4.96–4.97→80% · 4.98–5.0→100%
+    </div>
+
+    <div class="grid4">
+      <div class="field"><label>Ставка ₽/час</label><input type="number" id="c3_rate" placeholder="500" oninput="calc3()"></div>
+      <div class="field"><label>Факт часов</label><input type="number" id="c3_hours" placeholder="183" oninput="calc3()"></div>
+      <div class="field"><label>База KPI (авто)</label><div class="auto-val hi" id="c3_base">—</div></div>
+      <div class="field"><label>Макс KPI 40% (авто)</label><div class="auto-val hi" id="c3_maxkpi">—</div></div>
+    </div>
+
+    <div class="grid3">
+      <div class="field"><label>План сделок (авто)</label><div class="auto-val" id="c3_plan">—</div></div>
+      <div class="field"><label>Факт сделок</label><input type="number" id="c3_fd" placeholder="102" oninput="calc3()"></div>
+      <div class="field"><label>CSI</label><input type="number" id="c3_csi" placeholder="4.95" step="0.01" oninput="calc3()"></div>
+    </div>
+
+    <div class="grid3">
+      <div class="field"><label>% бронирований</label><input type="number" id="c3_bron" placeholder="90" oninput="calc3()"></div>
+      <div class="field"></div><div class="field"></div>
+    </div>
+
+    <div class="section-label">Штрафы</div>
+    <div class="hint"><b>Жалобы:</b> 1→−20% · 2→−50% · 3+→−100% &nbsp;|&nbsp; <b>Потери:</b> 1–10к→−20% · 10–30к→−50% · &gt;30к→−100% · суммируются, макс −100%</div>
+    <div class="grid3">
+      <div class="field"><label>Кол-во жалоб / низких оценок</label><input type="number" id="c3_comp" placeholder="0" min="0" oninput="calc3()"></div>
+      <div class="field"><label>Сумма финансовых потерь ₽</label><input type="number" id="c3_loss" placeholder="0" oninput="calc3()"></div>
+      <div class="field"><label>Штраф (авто)</label><div class="auto-val warn" id="c3_pen">0%</div></div>
+    </div>
+    <div id="c3_res"></div>
+  </div>
+
+  <!-- 5. ГК КБР -->
+  <div class="calc card" id="c4">
+    <div class="calc-title">Главный Консьерж КБР</div>
+    <div class="calc-sub">KPI1 Бронирования 40% · KPI2 SLA 20% · KPI3 CSI 40% · макс KPI = 40% от базы</div>
+
+    <div class="month-bar">
+      <label>Расчётный месяц:</label>
+      <select id="c4_month" onchange="calc4()">
+        <option value="136">Январь (136ч)</option>
+        <option value="151">Февраль (151ч)</option>
+        <option value="167">Март (167ч)</option>
+        <option value="175">Апрель (175ч)</option>
+        <option value="143" selected>Май (143ч)</option>
+        <option value="167">Июнь (167ч)</option>
+        <option value="184">Июль (184ч)</option>
+        <option value="168">Август (168ч)</option>
+        <option value="176">Сентябрь (176ч)</option>
+        <option value="176">Октябрь (176ч)</option>
+        <option value="159">Ноябрь (159ч)</option>
+        <option value="176">Декабрь (176ч)</option>
+      </select>
+      <span class="norm-info">Норма: <span id="c4_norm_lbl">143</span> ч</span>
+    </div>
+
+    <div class="hint">
+      <b>Бронирования:</b> &lt;70%→0 · 70–84%→0.5 · 85–94%→0.8 · 95–100%→1.0 &nbsp;|&nbsp;
+      <b>SLA:</b> &lt;70%→0 · 70–80%→0.7 · 81–89%→1.0 · 90–95%→1.2 · 96–100%→1.5 &nbsp;|&nbsp;
+      <b>CSI:</b> &lt;4.89→0 · 4.90–4.95→0.6 · 4.96–4.97→1.0 · 4.98–5.0→1.5
+    </div>
+
+    <div class="grid4">
+      <div class="field"><label>Ставка ₽/час</label><input type="number" id="c4_rate" placeholder="587" oninput="calc4()"></div>
+      <div class="field"><label>Факт часов</label><input type="number" id="c4_hours" placeholder="175" oninput="calc4()"></div>
+      <div class="field"><label>База KPI (авто)</label><div class="auto-val hi" id="c4_base">—</div></div>
+      <div class="field"><label>Макс KPI 40% (авто)</label><div class="auto-val hi" id="c4_maxkpi">—</div></div>
+    </div>
+
+    <div class="grid3">
+      <div class="field"><label>% бронирований</label><input type="number" id="c4_bron" placeholder="80" oninput="calc4()"></div>
+      <div class="field"><label>SLA %</label><input type="number" id="c4_sla" placeholder="85" oninput="calc4()"></div>
+      <div class="field"><label>CSI</label><input type="number" id="c4_csi" placeholder="4.95" step="0.01" oninput="calc4()"></div>
+    </div>
+    <div id="c4_res"></div>
+  </div>
+
+</div>
+
+<script>
+function showTab(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('active',i===j));
+  document.querySelectorAll('.calc').forEach((c,j)=>c.classList.toggle('active',i===j));
+}
+function v(id){return parseFloat(document.getElementById(id)?.value)||0;}
+function fmt(n){return Math.round(n).toLocaleString('ru-RU');}
+
+function dealCoef(fact,plan){
+  if(!plan||!fact) return 0;
+  const p=fact/plan;
+  if(p<0.85) return 0;
+  if(p<1.0) return 0.6;
+  if(p<=1.80) return p;
+  if(p<=1.90) return Math.min(1.80+(p-1.80)*2,2.0);
+  return 2.0;
+}
+function dealCoefKBR(fact,plan){
+  if(!plan||!fact) return 0;
+  const p=fact/plan;
+  if(p<0.85) return 0;
+  if(p<1.0) return 0.6;
+  if(p<=1.10) return p;
+  if(p<=1.25) return Math.min(1.10+(p-1.10)*2,1.50);
+  return 1.50;
+}
+function csiCoef(csi){
+  if(!csi||csi<4.90) return 0;
+  if(csi<=4.95) return 0.6;
+  if(csi<=4.97) return 0.8;
+  return 1.0;
+}
+function csiCoefGK(csi){
+  if(!csi||csi<4.90) return 0;
+  if(csi<=4.95) return 0.6;
+  if(csi<=4.97) return 1.0;
+  return 1.5;
+}
+function bronCoef(pct){
+  if(!pct||pct<70) return 0;
+  if(pct<85) return 0.5;
+  if(pct<95) return 0.8;
+  return 1.0;
+}
+function slaCoef(pct){
+  if(!pct||pct<70) return 0;
+  if(pct<=80) return 0.7;
+  if(pct<=89) return 1.0;
+  if(pct<=95) return 1.2;
+  return 1.5;
+}
+function lossCoefGK(loss){
+  if(!loss||loss<=0) return 1.0;
+  if(loss<=50000) return 0.7;
+  if(loss<=100000) return 0.5;
+  return 0;
+}
+function penaltyPct(comp,loss){
+  let p=0;
+  if(comp>=3) p+=1.0;
+  else if(comp===2) p+=0.5;
+  else if(comp===1) p+=0.2;
+  if(loss>30000) p+=1.0;
+  else if(loss>10000) p+=0.5;
+  else if(loss>0) p+=0.2;
+  return Math.min(p,1.0);
+}
+
+function renderRes(id, rows, kpiBonus, sal, total){
+  const el=document.getElementById(id);
+  if(!el) return;
+  let html='<div class="results"><div class="res-title">Детализация расчёта</div>';
+  rows.forEach(r=>{
+    const cls=r.neg?'neg':r.val>0?'pos':'zero';
+    html+=`<div class="res-row"><span class="res-label">${r.label}</span><span class="res-val ${cls}">${r.display}</span></div>`;
+  });
+  const kc=kpiBonus>0?'pos':kpiBonus<0?'neg':'zero';
+  html+=`<div class="kpi-subtotal"><span class="res-label">Итого надбавка KPI</span><span class="res-val ${kc}">${kpiBonus>=0?'+':''}${fmt(kpiBonus)} ₽</span></div>`;
+  html+=`<div class="total-row"><span>Зарплата ${fmt(sal)} ₽ + KPI ${fmt(kpiBonus)} ₽</span><span>${total>0?fmt(total)+' ₽':'—'}</span></div>`;
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+function calc0(){
+  const rate=v('c0_rate'),hours=v('c0_hours'),norm=v('c0_month'),fd=v('c0_fd'),csi=v('c0_csi'),comp=v('c0_comp'),loss=v('c0_loss');
+  document.getElementById('c0_norm_lbl').textContent=norm;
+  const base=rate*norm,maxkpi=base*0.4;
+  document.getElementById('c0_base').textContent=rate?fmt(base)+' ₽':'—';
+  document.getElementById('c0_maxkpi').textContent=rate?fmt(maxkpi)+' ₽':'—';
+  const plan=hours?Math.round(0.75*hours*10)/10:0;
+  document.getElementById('c0_plan').textContent=plan||'—';
+  const pen=penaltyPct(comp,loss);
+  document.getElementById('c0_pen').textContent=pen>0?'−'+(pen*100).toFixed(0)+'%':'0%';
+  if(!rate||!hours){document.getElementById('c0_res').innerHTML='';return;}
+  const sal=rate*hours,c1=dealCoef(fd,plan),c2=csiCoef(csi);
+  const kpi1=0.5*c1*maxkpi,kpi2=0.5*c2*maxkpi,raw=kpi1+kpi2,penAmt=raw*pen,bonus=raw-penAmt;
+  const pEx=plan>0&&fd>0?(fd/plan*100).toFixed(0)+'%':'—';
+  renderRes('c0_res',[
+    {label:'KPI1 Сделки — '+fd+' / '+plan+' ('+pEx+') → коэф '+(c1*100).toFixed(0)+'%',val:kpi1,display:'+'+fmt(kpi1)+' ₽'},
+    {label:'KPI2 CSI — '+csi+' → коэф '+(c2*100).toFixed(0)+'%',val:kpi2,display:'+'+fmt(kpi2)+' ₽'},
+    {label:'Штраф: жалоб '+comp+', потери '+fmt(loss)+' ₽ → −'+(pen*100).toFixed(0)+'%',val:0,neg:pen>0,display:pen>0?'−'+fmt(penAmt)+' ₽':'0 ₽'},
+  ],Math.round(bonus),sal,sal+Math.round(bonus));
+}
+
+function calc1(){
+  const rate=v('c1_rate'),hours=v('c1_hours'),norm=v('c1_month'),fp=v('c1_fp'),fd=v('c1_fd'),csi=v('c1_csi'),comp=v('c1_comp'),loss=v('c1_loss');
+  document.getElementById('c1_norm_lbl').textContent=norm;
+  const base=rate*norm,maxkpi=base*0.4;
+  document.getElementById('c1_base').textContent=rate?fmt(base)+' ₽':'—';
+  document.getElementById('c1_maxkpi').textContent=rate?fmt(maxkpi)+' ₽':'—';
+  const planP=hours?Math.round(2.0*hours*10)/10:0,planD=hours?Math.round(0.25*hours*10)/10:0;
+  document.getElementById('c1_planp').textContent=planP||'—';
+  document.getElementById('c1_pland').textContent=planD||'—';
+  const pen=penaltyPct(comp,loss);
+  document.getElementById('c1_pen').textContent=pen>0?'−'+(pen*100).toFixed(0)+'%':'0%';
+  if(!rate||!hours){document.getElementById('c1_res').innerHTML='';return;}
+  const sal=rate*hours,c1=dealCoef(fp,planP),c2=csiCoef(csi),c3=dealCoef(fd,planD);
+  const kpi1=0.5*c1*maxkpi,kpi2=0.3*c2*maxkpi,kpi3=0.2*c3*maxkpi;
+  const raw=kpi1+kpi2+kpi3,penAmt=raw*pen,bonus=raw-penAmt;
+  const pP=planP>0&&fp>0?(fp/planP*100).toFixed(0)+'%':'—',pD=planD>0&&fd>0?(fd/planD*100).toFixed(0)+'%':'—';
+  renderRes('c1_res',[
+    {label:'KPI1 Проверки — '+fp+' / '+planP+' ('+pP+') → коэф '+(c1*100).toFixed(0)+'%',val:kpi1,display:'+'+fmt(kpi1)+' ₽'},
+    {label:'KPI2 CSI — '+csi+' → коэф '+(c2*100).toFixed(0)+'%',val:kpi2,display:'+'+fmt(kpi2)+' ₽'},
+    {label:'KPI3 Исполнение — '+fd+' / '+planD+' ('+pD+') → коэф '+(c3*100).toFixed(0)+'%',val:kpi3,display:'+'+fmt(kpi3)+' ₽'},
+    {label:'Штраф: жалоб '+comp+', потери '+fmt(loss)+' ₽ → −'+(pen*100).toFixed(0)+'%',val:0,neg:pen>0,display:pen>0?'−'+fmt(penAmt)+' ₽':'0 ₽'},
+  ],Math.round(bonus),sal,sal+Math.round(bonus));
+}
+
+function calc2(){
+  const rate=v('c2_rate'),hours=v('c2_hours'),norm=v('c2_month'),loss=v('c2_loss'),sla=v('c2_sla'),csi=v('c2_csi');
+  document.getElementById('c2_norm_lbl').textContent=norm;
+  const base=rate*norm,maxkpi=base*0.4;
+  document.getElementById('c2_base').textContent=rate?fmt(base)+' ₽':'—';
+  document.getElementById('c2_maxkpi').textContent=rate?fmt(maxkpi)+' ₽':'—';
+  const lK=lossCoefGK(loss),sK=slaCoef(sla),cK=csiCoefGK(csi);
+  document.getElementById('c2_loss_k').textContent=rate?(lK*100).toFixed(0)+'%':'—';
+  document.getElementById('c2_sla_k').textContent=rate?(sK*100).toFixed(0)+'%':'—';
+  document.getElementById('c2_csi_k').textContent=rate?(cK*100).toFixed(0)+'%':'—';
+  if(!rate||!hours){document.getElementById('c2_res').innerHTML='';return;}
+  const sal=rate*hours,kpi1=0.30*maxkpi*lK,kpi2=0.30*maxkpi*sK,kpi3=0.40*maxkpi*cK,bonus=kpi1+kpi2+kpi3;
+  renderRes('c2_res',[
+    {label:'KPI1 Потери '+fmt(loss)+' ₽ → коэф '+(lK*100).toFixed(0)+'%',val:kpi1,display:'+'+fmt(kpi1)+' ₽'},
+    {label:'KPI2 SLA '+sla+'% → коэф '+(sK*100).toFixed(0)+'%',val:kpi2,display:'+'+fmt(kpi2)+' ₽'},
+    {label:'KPI3 CSI '+csi+' → коэф '+(cK*100).toFixed(0)+'%',val:kpi3,display:'+'+fmt(kpi3)+' ₽'},
+  ],Math.round(bonus),sal,sal+Math.round(bonus));
+}
+
+function calc3(){
+  const rate=v('c3_rate'),hours=v('c3_hours'),norm=v('c3_month'),fd=v('c3_fd'),csi=v('c3_csi'),bron=v('c3_bron'),comp=v('c3_comp'),loss=v('c3_loss');
+  document.getElementById('c3_norm_lbl').textContent=norm;
+  const base=rate*norm,maxkpi=base*0.4;
+  document.getElementById('c3_base').textContent=rate?fmt(base)+' ₽':'—';
+  document.getElementById('c3_maxkpi').textContent=rate?fmt(maxkpi)+' ₽':'—';
+  const plan=hours?Math.round(1.80*hours*10)/10:0;
+  document.getElementById('c3_plan').textContent=plan||'—';
+  const pen=penaltyPct(comp,loss);
+  document.getElementById('c3_pen').textContent=pen>0?'−'+(pen*100).toFixed(0)+'%':'0%';
+  if(!rate||!hours){document.getElementById('c3_res').innerHTML='';return;}
+  const sal=rate*hours,c1=dealCoefKBR(fd,plan),c2=csiCoef(csi),c3=bronCoef(bron);
+  const kpi1=0.5*c1*maxkpi,kpi2=0.3*c2*maxkpi,kpi3=0.2*c3*maxkpi;
+  const raw=kpi1+kpi2+kpi3,penAmt=raw*pen,bonus=raw-penAmt;
+  const pEx=plan>0&&fd>0?(fd/plan*100).toFixed(0)+'%':'—';
+  renderRes('c3_res',[
+    {label:'KPI1 Сделки — '+fd+' / '+plan+' ('+pEx+') → коэф '+(c1*100).toFixed(0)+'%',val:kpi1,display:'+'+fmt(kpi1)+' ₽'},
+    {label:'KPI2 CSI — '+csi+' → коэф '+(c2*100).toFixed(0)+'%',val:kpi2,display:'+'+fmt(kpi2)+' ₽'},
+    {label:'KPI3 Бронирования — '+bron+'% → коэф '+(c3*100).toFixed(0)+'%',val:kpi3,display:'+'+fmt(kpi3)+' ₽'},
+    {label:'Штраф: жалоб '+comp+', потери '+fmt(loss)+' ₽ → −'+(pen*100).toFixed(0)+'%',val:0,neg:pen>0,display:pen>0?'−'+fmt(penAmt)+' ₽':'0 ₽'},
+  ],Math.round(bonus),sal,sal+Math.round(bonus));
+}
+
+function calc4(){
+  const rate=v('c4_rate'),hours=v('c4_hours'),norm=v('c4_month'),bron=v('c4_bron'),sla=v('c4_sla'),csi=v('c4_csi');
+  document.getElementById('c4_norm_lbl').textContent=norm;
+  const base=rate*norm,maxkpi=base*0.4;
+  document.getElementById('c4_base').textContent=rate?fmt(base)+' ₽':'—';
+  document.getElementById('c4_maxkpi').textContent=rate?fmt(maxkpi)+' ₽':'—';
+  if(!rate||!hours){document.getElementById('c4_res').innerHTML='';return;}
+  const sal=rate*hours,bK=bronCoef(bron),sK=slaCoef(sla),cK=csiCoefGK(csi);
+  const kpi1=0.40*maxkpi*bK,kpi2=0.20*maxkpi*sK,kpi3=0.40*maxkpi*cK,bonus=kpi1+kpi2+kpi3;
+  renderRes('c4_res',[
+    {label:'KPI1 Бронирования '+bron+'% → коэф '+(bK*100).toFixed(0)+'%',val:kpi1,display:'+'+fmt(kpi1)+' ₽'},
+    {label:'KPI2 SLA '+sla+'% → коэф '+(sK*100).toFixed(0)+'%',val:kpi2,display:'+'+fmt(kpi2)+' ₽'},
+    {label:'KPI3 CSI '+csi+' → коэф '+(cK*100).toFixed(0)+'%',val:kpi3,display:'+'+fmt(kpi3)+' ₽'},
+  ],Math.round(bonus),sal,sal+Math.round(bonus));
+}
+</script>
+</body>
+</html>
