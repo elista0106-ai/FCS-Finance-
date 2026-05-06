@@ -245,6 +245,7 @@ tr:hover td{background:var(--bg2)}
 .hr-role-lead{background:#E6F1FB;color:#0C447C}
 .hr-role-chief{background:#FAEEDA;color:#633806}
 .hr-role-corp{background:#EEEDFE;color:#3C3489}
+.hr-role-intern{background:#F3E8FF;color:#6B21A8}
 .hr-av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0}
 .hr-emp-cell{display:flex;align-items:center;gap:8px}
 .hr-edit-btn{background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:2px 5px;border-radius:4px}
@@ -579,6 +580,7 @@ tr:hover td{background:var(--bg2)}
             <option value="Ведущий">Ведущий</option>
             <option value="Главный Консьерж">Главный Консьерж</option>
             <option value="Корп">Корп</option>
+            <option value="Стажёр">Стажёр</option>
           </select>
         </div>
         <div class="hr-modal-actions">
@@ -1601,7 +1603,7 @@ function switchTab(t){
   else if(t==='dept') renderDeptView();
   else if(t==='days') renderDays();
   else if(t==='clients') renderClients();
-  else if(t==='kpi'){ kpiShowScreen('upload'); }
+  else if(t==='kpi'){ if(typeof kpiSyncFromHR==='function') kpiSyncFromHR(); kpiShowScreen('upload'); }
   else if(t==='hr'){ hrRender(); }
   else renderTable();
 }
@@ -2383,7 +2385,7 @@ setTimeout(startAutoRefresh, 5000);
 (function(){
 
 const KPI_MONTHS = [{v:136,l:'Январь (136ч)'},{v:151,l:'Февраль (151ч)'},{v:167,l:'Март (167ч)'},{v:175,l:'Апрель (175ч)'},{v:143,l:'Май (143ч)'},{v:167,l:'Июнь (167ч)'},{v:184,l:'Июль (184ч)'},{v:168,l:'Август (168ч)'},{v:176,l:'Сентябрь (176ч)'},{v:176,l:'Октябрь (176ч)'},{v:159,l:'Ноябрь (159ч)'},{v:176,l:'Декабрь (176ч)'}];
-const KPI_ROLES = ['Исполнитель','Ведущий','Главный Консьерж','Корп'];
+const KPI_ROLES = ['Исполнитель','Ведущий','Главный Консьерж','Корп','Стажёр'];
 const KPI_DEPTS = ['Lifestyle','Travel','Логистика','КБР','Корп','ЦПО','ЦПО Ночь'];
 const KPI_AV_COLORS = [
   {bg:'#E6F1FB',cl:'#0C447C'},{bg:'#EAF3DE',cl:'#27500A'},
@@ -2888,7 +2890,7 @@ function kpiRenderEmpCalc(){
   const initials=e.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   const av=KPI_AV_COLORS[kpiCurrEmp%KPI_AV_COLORS.length];
   const rp=e.role==='Исполнитель'?'kpi-rp-exec':e.role==='Ведущий'?'kpi-rp-lead':'kpi-rp-chief';
-  const isExec=e.role==="Исполнитель"||e.role==="Корп";
+  const isExec=e.role==="Исполнитель"||e.role==="Корп"||e.role==="Стажёр";
   const isLead=e.role==='Ведущий';
   const isChief=e.role==='Главный Консьерж';
   const isKBR=kpiCurrDept==='КБР';
@@ -3015,7 +3017,7 @@ function kpiUpdateEmpCalc(){
   const e=kpiDepts[kpiCurrDept][kpiCurrEmp];
   const norm=kpiCurrMonth;
   const base=e.rate*norm, maxkpi=base*0.4, sal=e.rate*e.hours;
-  const isExec=e.role==="Исполнитель"||e.role==="Корп";
+  const isExec=e.role==="Исполнитель"||e.role==="Корп"||e.role==="Стажёр";
   const isLead=e.role==='Ведущий';
   const isChief=e.role==='Главный Консьерж';
   const isKBR=kpiCurrDept==='КБР';
@@ -3319,7 +3321,7 @@ function kpiCalcEmp(e,norm){
   if(!e.rate||!e.hours) return {bonus:0,pctMain:0};
   const maxkpi=e.rate*norm*0.4;
   let bonus=0,pctMain=0;
-  if(e.role==='Исполнитель'||e.role==='Корп'){
+  if(e.role==='Исполнитель'||e.role==='Корп'||e.role==='Стажёр'){
     const plan=0.75*e.hours;pctMain=plan?e.fd/plan:0;
     const raw=0.5*kpiDeal(e.fd,plan)*maxkpi+0.5*kpiCSI(e.csi)*maxkpi;
     bonus=Math.round(raw*(1-kpiPen(e.comp,e.loss)));
@@ -3477,9 +3479,12 @@ function hrLoadFromStorage(){
   try{
     const saved = localStorage.getItem('fcs_hr_staff');
     if(saved){
-      hrStaff = JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      // Мутируем массив вместо переприсваивания — чтобы ссылки не потерялись
+      hrStaff.length = 0;
+      parsed.forEach(e => hrStaff.push(e));
     }
-  }catch(e){}
+  }catch(e){ console.log('HR load error:', e); }
 }
 
 function hrSaveToStorage(){
@@ -3541,7 +3546,7 @@ window.hrRender = function(){
     const globalIdx = hrStaff.indexOf(emp);
     const initials = emp.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const av = HR_AV_COLORS[globalIdx % HR_AV_COLORS.length];
-    const roleCls = emp.role==='Ведущий'?'hr-role-lead':emp.role==='Главный Консьерж'?'hr-role-chief':emp.role==='Корп'?'hr-role-corp':'hr-role-exec';
+    const roleCls = emp.role==='Ведущий'?'hr-role-lead':emp.role==='Главный Консьерж'?'hr-role-chief':emp.role==='Корп'?'hr-role-corp':emp.role==='Стажёр'?'hr-role-intern':'hr-role-exec';
     html+=`<tr>
       <td><div class="hr-av" style="background:${av.bg};color:${av.cl}">${initials}</div></td>
       <td><span style="font-weight:500">${emp.name}</span></td>
