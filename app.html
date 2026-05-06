@@ -2393,7 +2393,7 @@ const KPI_AV_COLORS = [
   {bg:'#EEEDFE',cl:'#3C3489'},{bg:'#E1F5EE',cl:'#085041'}
 ];
 
-// kpiDepts теперь строится динамически из hrStaff (HR модуль)
+// kpiDepts теперь строится динамически из window.hrStaff (HR модуль)
 // Это прокси-объект который всегда актуален
 let kpiDepts = {
   'Lifestyle':[],
@@ -2405,9 +2405,9 @@ let kpiDepts = {
   'ЦПО Ночь':[]
 };
 
-// Синхронизирует kpiDepts из hrStaff (вызывается после загрузки HR)
+// Синхронизирует kpiDepts из window.hrStaff (вызывается после загрузки HR)
 window.kpiSyncFromHR = function(){
-  const hrData = (typeof hrStaff !== 'undefined') ? hrStaff : [];
+  const hrData = window.hrStaff || [];
   const kpiDeptNames = ['Lifestyle','Travel','Логистика','КБР','Корп','ЦПО','ЦПО Ночь'];
 
   kpiDeptNames.forEach(dept=>{
@@ -2659,7 +2659,7 @@ window.kpiExportSettings = function(){
   const backup = {
     version: 3,
     savedAt: new Date().toISOString(),
-    hrStaff: (typeof hrStaff !== 'undefined') ? hrStaff : [],
+    hrStaff: window.hrStaff || [],
     history: kpiGetHistory()
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
@@ -2677,25 +2677,25 @@ window.kpiImportSettings = function(input){
   reader.onload = e => {
     try{
       const backup = JSON.parse(e.target.result);
-      if(backup.hrStaff && typeof hrStaff !== "undefined"){
-        hrStaff.length = 0;
-        backup.hrStaff.forEach(emp=>hrStaff.push(emp));
-        localStorage.setItem("fcs_hr_staff", JSON.stringify(hrStaff));
-      } else if(backup.structure && typeof hrStaff !== "undefined"){
+      if(backup.hrStaff && typeof window.hrStaff !== "undefined"){
+        window.hrStaff.length = 0;
+        backup.hrStaff.forEach(emp=>window.hrStaff.push(emp));
+        localStorage.setItem("fcs_hr_staff", JSON.stringify(window.hrStaff));
+      } else if(backup.structure && typeof window.hrStaff !== "undefined"){
         Object.keys(backup.structure).forEach(dept=>{
           backup.structure[dept].forEach(e=>{
-            if(!hrStaff.some(h=>h.name===e.name && h.dept===dept))
-              hrStaff.push({name:e.name,dept,rate:e.rate||0,role:e.role||"Исполнитель"});
+            if(!window.hrStaff.some(h=>h.name===e.name && h.dept===dept))
+              window.hrStaff.push({name:e.name,dept,rate:e.rate||0,role:e.role||"Исполнитель"});
           });
         });
-        localStorage.setItem("fcs_hr_staff", JSON.stringify(hrStaff));
+        localStorage.setItem("fcs_hr_staff", JSON.stringify(window.hrStaff));
       }
       if(backup.history) localStorage.setItem("fcs_kpi_history", JSON.stringify(backup.history));
       if(typeof kpiSyncFromHR === "function") kpiSyncFromHR();
       const status = document.getElementById("kpi-save-status");
       if(status){
         status.style.display="block";
-        status.textContent = "✅ Резерв восстановлен: " + (typeof hrStaff!=="undefined"?hrStaff.length:0) + " сотрудников";
+        status.textContent = "✅ Резерв восстановлен: " + window.hrStaff.length + " сотрудников";
       }
       showToast("✅ Резервная копия восстановлена!");
       if(typeof hrRender==="function") hrRender();
@@ -3361,8 +3361,8 @@ const HR_AV_COLORS = [
   {bg:'#FEF3E2',cl:'#854F0B'},{bg:'#F3E8FF',cl:'#6B21A8'}
 ];
 
-// Все сотрудники из документа
-let hrStaff = [
+// Все сотрудники из документа — глобальная переменная
+window.hrStaff = [
   // ЦПО
   {name:'Затямина Александра',dept:'ЦПО',rate:0,role:'Исполнитель'},
   {name:'Галиахметова Мария',dept:'ЦПО',rate:500,role:'Исполнитель'},
@@ -3481,15 +3481,15 @@ function hrLoadFromStorage(){
     if(saved){
       const parsed = JSON.parse(saved);
       // Мутируем массив вместо переприсваивания — чтобы ссылки не потерялись
-      hrStaff.length = 0;
-      parsed.forEach(e => hrStaff.push(e));
+      window.hrStaff.length = 0;
+      parsed.forEach(e => window.hrStaff.push(e));
     }
   }catch(e){ console.log('HR load error:', e); }
 }
 
 function hrSaveToStorage(){
   try{
-    localStorage.setItem('fcs_hr_staff', JSON.stringify(hrStaff));
+    localStorage.setItem('fcs_hr_staff', JSON.stringify(window.hrStaff));
     // Синхронизируем с KPI модулем
     hrSyncToKPI();
   }catch(e){}
@@ -3515,13 +3515,13 @@ window.hrRender = function(){
   const tabsEl = document.getElementById('hr-dept-tabs');
   if(tabsEl){
     tabsEl.innerHTML = HR_DEPTS.map(d=>{
-      const cnt = d==='Все' ? hrStaff.length : hrStaff.filter(e=>e.dept===d).length;
+      const cnt = d==='Все' ? window.hrStaff.length : window.hrStaff.filter(e=>e.dept===d).length;
       return `<button class="hr-dtab${d===hrCurrDept?' active':''}" onclick="hrSetDept('${d}')">${d} (${cnt})</button>`;
     }).join('');
   }
 
   // Filter
-  let list = hrCurrDept==='Все' ? hrStaff : hrStaff.filter(e=>e.dept===hrCurrDept);
+  let list = hrCurrDept==='Все' ? window.hrStaff : window.hrStaff.filter(e=>e.dept===hrCurrDept);
   if(q) list = list.filter(e=>e.name.toLowerCase().includes(q));
 
   const content = document.getElementById('hr-content');
@@ -3543,7 +3543,7 @@ window.hrRender = function(){
     </tr></thead><tbody>`;
 
   list.forEach((emp)=>{
-    const globalIdx = hrStaff.indexOf(emp);
+    const globalIdx = window.hrStaff.indexOf(emp);
     const initials = emp.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const av = HR_AV_COLORS[globalIdx % HR_AV_COLORS.length];
     const roleCls = emp.role==='Ведущий'?'hr-role-lead':emp.role==='Главный Консьерж'?'hr-role-chief':emp.role==='Корп'?'hr-role-corp':emp.role==='Стажёр'?'hr-role-intern':'hr-role-exec';
@@ -3582,7 +3582,7 @@ window.hrOpenAdd = function(){
 
 window.hrOpenEdit = function(idx){
   hrEditingIdx=idx;
-  const emp=hrStaff[idx];
+  const emp=window.hrStaff[idx];
   document.getElementById('hr-modal-title').textContent='Редактировать сотрудника';
   document.getElementById('hr-f-name').value=emp.name;
   document.getElementById('hr-f-dept').value=emp.dept;
@@ -3602,9 +3602,9 @@ window.hrSaveModal = function(){
   const role=document.getElementById('hr-f-role').value;
   if(!name){alert('Введите имя');return;}
   if(hrEditingIdx>=0){
-    hrStaff[hrEditingIdx]={...hrStaff[hrEditingIdx],name,dept,rate,role};
+    window.hrStaff[hrEditingIdx]={...window.hrStaff[hrEditingIdx],name,dept,rate,role};
   } else {
-    hrStaff.push({name,dept,rate,role});
+    window.hrStaff.push({name,dept,rate,role});
   }
   hrSaveToStorage();
   hrCloseModal();
@@ -3613,8 +3613,8 @@ window.hrSaveModal = function(){
 };
 
 window.hrDelete = function(idx){
-  if(!confirm('Удалить «'+hrStaff[idx].name+'»?')) return;
-  hrStaff.splice(idx,1);
+  if(!confirm('Удалить «'+window.hrStaff[idx].name+'»?')) return;
+  window.hrStaff.splice(idx,1);
   hrSaveToStorage();
   hrRender();
   showToast('Удалён');
