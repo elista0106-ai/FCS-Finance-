@@ -421,6 +421,7 @@ tr:hover td{background:var(--bg2)}
               </select>
               <button class="btn btn-primary btn-sm" onclick="kpiApplyUpload()">Загрузить и рассчитать</button>
               <button class="btn btn-sm" onclick="kpiDownloadSample()">⬇ Скачать образец</button>
+              <button class="btn btn-sm" onclick="kpiResetData()" style="color:var(--red);border-color:var(--red)" title="Очистить все данные KPI">🗑 Сбросить</button>
             </div>
           </div>
           <div class="kpi-card" style="padding:16px">
@@ -2310,11 +2311,14 @@ let kpiCalcTab = 0;
 // ---- NAVIGATION ----
 window.kpiShowScreen = function(id){
   document.querySelectorAll('.kpi-screen').forEach(s=>s.classList.remove('active'));
-  document.querySelectorAll('.kpi-stab').forEach((t,i)=>{
-    if(t.closest('#kpi-sc-manual')) return;
-    t.classList.toggle('active', ['upload','dept','manual'][i]===id);
-  });
-  document.getElementById('kpi-sc-'+id).classList.add('active');
+  // Обновляем только верхние sub-tabs (не те что внутри manual)
+  const topTabs = document.querySelectorAll('#view-kpi .content > .kpi-sub-tabs .kpi-stab');
+  topTabs.forEach((t,i)=>t.classList.toggle('active',['upload','dept','manual'][i]===id));
+  const sc = document.getElementById('kpi-sc-'+id);
+  if(sc) sc.classList.add('active');
+  // Синхронизируем месяц
+  const mSel = document.getElementById('kpi-upload-month');
+  if(mSel) mSel.value = kpiCurrMonth;
   if(id==='dept') kpiRenderDept();
   if(id==='manual') kpiRenderManual();
 };
@@ -2334,41 +2338,94 @@ if(kpiDz){
 
 window.kpiHandleFile = function(file){
   if(!file) return;
-  document.getElementById('kpi-uz-title').textContent = '✓ ' + file.name;
+  const titleEl = document.getElementById('kpi-uz-title');
+  if(titleEl) titleEl.textContent = '⏳ Читаем ' + file.name + '...';
   const reader = new FileReader();
   reader.onload = e => {
     try{
       if(typeof XLSX === 'undefined'){ alert('Библиотека XLSX не загружена'); return; }
       const wb = XLSX.read(e.target.result,{type:'array'});
       const ws = wb.Sheets[wb.SheetNames[0]];
-      kpiUploadData = XLSX.utils.sheet_to_json(ws,{defval:''});
-    }catch(err){ alert('Ошибка: '+err.message); }
+      kpiUploadData = XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+      if(titleEl) titleEl.textContent = '✅ Файл загружен: ' + file.name + ' (' + kpiUploadData.length + ' строк)';
+      showToast('Файл прочитан: ' + kpiUploadData.length + ' строк. Нажмите «Загрузить и рассчитать»');
+    }catch(err){
+      if(titleEl) titleEl.textContent = '❌ Ошибка: ' + err.message;
+      alert('Ошибка чтения файла: '+err.message);
+    }
   };
   reader.readAsArrayBuffer(file);
 };
 
 window.kpiApplyUpload = function(){
   kpiCurrMonth = parseInt(document.getElementById('kpi-upload-month').value);
-  if(kpiUploadData){
-    kpiUploadData.forEach(row=>{
-      const name=(row['Сотрудник']||'').toString().trim();
-      const dept=(row['Отдел']||'').toString().trim();
-      if(!kpiDepts[dept]) return;
-      const emp=kpiDepts[dept].find(e=>e.name===name);
-      if(emp){
-        emp.hours=parseFloat(row['Факт часов'])||0;
-        emp.fd=parseFloat(row['Факт сделок'])||0;
-        emp.fp=parseFloat(row['Факт проверок'])||0;
-        emp.csi=parseFloat(row['CSI'])||4.83;
-        emp.loss=parseFloat(row['Потери ₽'])||0;
-        emp.comp=parseFloat(row['Жалобы'])||0;
-        emp.loaded=true;
-      }
-    });
-    showToast('Данные загружены!');
+  if(!kpiUploadData || kpiUploadData.length === 0){
+    alert('Сначала выберите файл!');
+    return;
   }
+  let updated = 0, created = 0;
+  kpiUploadData.forEach(row=>{
+    const name=(row['Сотрудник']||row['сотрудник']||'').toString().trim();
+    const dept=(row['Отдел']||row['отдел']||'').toString().trim();
+    if(!name || !dept) return;
+    // Создаём отдел если нет
+    if(!kpiDepts[dept]) kpiDepts[dept]=[];
+    // Ищем сотрудника
+    let emp=kpiDepts[dept].find(e=>e.name===name);
+    // Если не нашли — создаём автоматически
+    if(!emp){
+      emp={name,rate:0,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,sla:0,bron:0,loaded:false};
+      kpiDepts[dept].push(emp);
+      created++;
+    }
+    emp.hours=parseFloat(row['Факт часов']||row['факт часов'])||0;
+    emp.fd=parseFloat(row['Факт сделок']||row['факт сделок'])||0;
+    emp.fp=parseFloat(row['Факт проверок']||row['факт проверок'])||0;
+    emp.csi=parseFloat(row['CSI']||row['csi'])||4.83;
+    emp.loss=parseFloat(row['Потери ₽']||row['потери']||row['Потери'])||0;
+    emp.comp=parseFloat(row['Жалобы']||row['жалобы'])||0;
+    emp.loaded=true;
+    updated++;
+  });
+  // Сохраняем в localStorage
+  kpiSaveToStorage();
+  showToast(`✅ Загружено: ${updated} сотрудников, создано новых: ${created}`);
   kpiShowScreen('dept');
 };
+
+// ---- LOCALSTORAGE ----
+function kpiSaveToStorage(){
+  try{
+    localStorage.setItem('fcs_kpi_depts', JSON.stringify(kpiDepts));
+    localStorage.setItem('fcs_kpi_month', kpiCurrMonth);
+  }catch(e){}
+}
+
+function kpiLoadFromStorage(){
+  try{
+    const saved = localStorage.getItem('fcs_kpi_depts');
+    if(saved){
+      const parsed = JSON.parse(saved);
+      // Мержим сохранённые данные с дефолтными (чтобы не потерять базовый список)
+      Object.keys(parsed).forEach(dept=>{
+        if(!kpiDepts[dept]) kpiDepts[dept]=[];
+        parsed[dept].forEach(savedEmp=>{
+          const existing = kpiDepts[dept].find(e=>e.name===savedEmp.name);
+          if(existing){
+            Object.assign(existing, savedEmp);
+          } else {
+            kpiDepts[dept].push(savedEmp);
+          }
+        });
+      });
+    }
+    const savedMonth = localStorage.getItem('fcs_kpi_month');
+    if(savedMonth) kpiCurrMonth = parseInt(savedMonth);
+  }catch(e){}
+}
+
+// Загружаем сохранённые данные при старте
+kpiLoadFromStorage();
 
 window.kpiDownloadSample = function(){
   if(typeof XLSX==='undefined'){ alert('Библиотека XLSX не загружена'); return; }
@@ -2381,6 +2438,21 @@ window.kpiDownloadSample = function(){
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'KPI данные');
   XLSX.writeFile(wb,'kpi_sample.xlsx');
+};
+
+window.kpiResetData = function(){
+  if(!confirm('Сбросить все данные KPI? Ставки и должности сохранятся, данные за месяц удалятся.')) return;
+  Object.keys(kpiDepts).forEach(dept=>{
+    kpiDepts[dept].forEach(e=>{
+      e.hours=0;e.fd=0;e.fp=0;e.csi=4.83;e.loss=0;e.comp=0;e.loaded=false;
+    });
+  });
+  kpiUploadData=null;
+  kpiSaveToStorage();
+  const titleEl=document.getElementById('kpi-uz-title');
+  if(titleEl) titleEl.textContent='Загрузить данные за месяц';
+  showToast('Данные сброшены');
+  kpiRenderDept();
 };
 
 // ---- DEPT TABLE ----
@@ -2464,6 +2536,7 @@ window.kpiAddEmp=function(){
   const role=document.getElementById('kpi-new-role').value;
   if(!name){alert('Введите имя');return;}
   kpiDepts[kpiCurrDept].push({name,rate,role,hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,sla:0,bron:0,loaded:false});
+  kpiSaveToStorage();
   kpiRenderDeptTable();
 };
 
@@ -2595,6 +2668,7 @@ function kpiRenderEmpCalc(){
 
 window.kpiUpdEmp=function(field,val){
   kpiDepts[kpiCurrDept][kpiCurrEmp][field]=val;
+  kpiSaveToStorage();
   kpiUpdateEmpCalc();
 };
 
