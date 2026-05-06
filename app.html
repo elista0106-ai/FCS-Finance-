@@ -2423,17 +2423,17 @@ window.kpiSyncFromHR = function(){
   const hrData = window.hrStaff || [];
   const kpiDeptNames = ['Lifestyle','Travel','Логистика','КБР','Корп','ЦПО','ЦПО Ночь'];
 
+  // ШАГ 1: Строим структуру из HR (без сброса данных за месяц)
   kpiDeptNames.forEach(dept=>{
     if(!kpiDepts[dept]) kpiDepts[dept]=[];
     const hrEmps = hrData.filter(e=>e.dept===dept);
 
-    // Добавляем новых сотрудников из HR
     hrEmps.forEach(hrEmp=>{
       const existing = kpiDepts[dept].find(k=>k.name===hrEmp.name);
       if(existing){
-        // Обновляем ставку и роль из HR
         existing.rate = hrEmp.rate;
         existing.role = hrEmp.role;
+        // НЕ сбрасываем hours/fd/fp/csi/loss/comp — они могут быть загружены
       } else {
         kpiDepts[dept].push({
           name:hrEmp.name, rate:hrEmp.rate, role:hrEmp.role,
@@ -2448,7 +2448,7 @@ window.kpiSyncFromHR = function(){
     );
   });
 
-  // Восстанавливаем данные за текущий месяц
+  // ШАГ 2: Накладываем данные за текущий месяц из истории
   const currKey = localStorage.getItem('fcs_kpi_curr_month_key');
   if(currKey){
     try{
@@ -2467,7 +2467,7 @@ window.kpiSyncFromHR = function(){
           });
         });
       }
-    }catch(e){}
+    }catch(e){ console.log('KPI restore month error:', e); }
   }
 };
 
