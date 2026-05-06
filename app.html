@@ -2819,7 +2819,7 @@ window.kpiExportExcel = function(){
   const summaryRows = [['Отдел','Сотрудник','Должность','Ставка','Факт ч','База KPI','KPI надбавка','Зарплата','Итого']];
   Object.keys(kpiDepts).forEach(dept=>{
     kpiDepts[dept].forEach(e=>{
-      const c = kpiCalcEmp(e, kpiCurrMonth);
+      const c = kpiCalcEmp(e, kpiCurrMonth, dept);
       const sal = e.rate*e.hours;
       const base = e.rate*kpiCurrMonth;
       summaryRows.push([dept,e.name,e.role,e.rate,e.hours,base,c.bonus,sal,sal+c.bonus]);
@@ -2833,7 +2833,7 @@ window.kpiExportExcel = function(){
     if(!kpiDepts[dept].length) return;
     const rows = [['Сотрудник','Должность','Ставка ₽/ч','Норма ч','Факт ч','База KPI','Макс KPI 40%','Факт сделок','Факт проверок','CSI','Потери ₽','Жалобы','KPI надбавка','Зарплата','Итого']];
     kpiDepts[dept].forEach(e=>{
-      const c = kpiCalcEmp(e, kpiCurrMonth);
+      const c = kpiCalcEmp(e, kpiCurrMonth, dept);
       const sal = e.rate*e.hours;
       const base = e.rate*kpiCurrMonth;
       rows.push([e.name,e.role,e.rate,kpiCurrMonth,e.hours,base,Math.round(base*0.4),e.fd,e.fp,e.csi,e.loss,e.comp,c.bonus,sal,sal+c.bonus]);
@@ -2918,7 +2918,7 @@ function kpiRenderDeptTable(){
       <tbody id="kpi-emp-tbody">`;
 
   emps.forEach((e,i)=>{
-    const c=kpiCalcEmp(e,kpiCurrMonth);
+    const c=kpiCalcEmp(e,kpiCurrMonth,kpiCurrDept);
     const initials=e.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const av=KPI_AV_COLORS[i%KPI_AV_COLORS.length];
     const rp=e.role==='Исполнитель'?'kpi-rp-exec':e.role==='Ведущий'?'kpi-rp-lead':'kpi-rp-chief';
@@ -3062,20 +3062,37 @@ function kpiRenderEmpCalc(){
   }
 
   if(isChief){
-    html+=`<div class="kpi-card" style="padding:16px">
-      <div class="kpi-sec">KPI1 · Финансовые потери (30%)</div>
-      <div class="kpi-hint"><b>Потери:</b> &gt;100к→0 · 50–100к→0.5 · 1–50к→0.7 · 0→1.0</div>
-      <div class="kpi-fg">
-        <div class="kpi-field"><label>Сумма потерь ₽</label><input type="number" value="${e.loss}" onchange="kpiUpdEmp('loss',+this.value)"></div>
-        <div class="kpi-field"><label>Коэф (авто)</label><div class="kpi-auto" id="kec-lk">—</div></div>
-      </div>
-      <div class="kpi-sec" style="margin-top:10px">KPI2 · SLA (30%)</div>
-      <div class="kpi-hint"><b>SLA:</b> &lt;70%→0 · 70–80%→0.7 · 81–89%→1.0 · 90–95%→1.2 · 96–100%→1.5</div>
-      <div class="kpi-fg">
-        <div class="kpi-field"><label>SLA %</label><input type="number" value="${e.sla||0}" onchange="kpiUpdEmp('sla',+this.value)"></div>
-        <div class="kpi-field"><label>Коэф (авто)</label><div class="kpi-auto" id="kec-sk">—</div></div>
-      </div>
-    </div>`;
+    if(isKBR){
+      html+=`<div class="kpi-card" style="padding:16px">
+        <div class="kpi-sec">KPI1 · % бронирований (40%)</div>
+        <div class="kpi-hint"><b>Бронирования:</b> &lt;70%→0 · 70–84%→0.5 · 85–94%→0.8 · 95–100%→1.0</div>
+        <div class="kpi-fg">
+          <div class="kpi-field"><label>% бронирований</label><input type="number" value="${e.bron||0}" onchange="kpiUpdEmp('bron',+this.value)"></div>
+          <div class="kpi-field"><label>Коэф (авто)</label><div class="kpi-auto" id="kec-bk">—</div></div>
+        </div>
+        <div class="kpi-sec" style="margin-top:10px">KPI2 · SLA (20%)</div>
+        <div class="kpi-hint"><b>SLA:</b> &lt;70%→0 · 70–80%→0.7 · 81–89%→1.0 · 90–95%→1.2 · 96–100%→1.5</div>
+        <div class="kpi-fg">
+          <div class="kpi-field"><label>SLA %</label><input type="number" value="${e.sla||0}" onchange="kpiUpdEmp('sla',+this.value)"></div>
+          <div class="kpi-field"><label>Коэф (авто)</label><div class="kpi-auto" id="kec-sk">—</div></div>
+        </div>
+      </div>`;
+    } else {
+      html+=`<div class="kpi-card" style="padding:16px">
+        <div class="kpi-sec">KPI1 · Финансовые потери (30%)</div>
+        <div class="kpi-hint"><b>Потери:</b> &gt;100к→0 · 50–100к→0.5 · 1–50к→0.7 · 0→1.0</div>
+        <div class="kpi-fg">
+          <div class="kpi-field"><label>Сумма потерь ₽</label><input type="number" value="${e.loss}" onchange="kpiUpdEmp('loss',+this.value)"></div>
+          <div class="kpi-field"><label>Коэф (авто)</label><div class="kpi-auto" id="kec-lk">—</div></div>
+        </div>
+        <div class="kpi-sec" style="margin-top:10px">KPI2 · SLA (30%)</div>
+        <div class="kpi-hint"><b>SLA:</b> &lt;70%→0 · 70–80%→0.7 · 81–89%→1.0 · 90–95%→1.2 · 96–100%→1.5</div>
+        <div class="kpi-fg">
+          <div class="kpi-field"><label>SLA %</label><input type="number" value="${e.sla||0}" onchange="kpiUpdEmp('sla',+this.value)"></div>
+          <div class="kpi-field"><label>Коэф (авто)</label><div class="kpi-auto" id="kec-sk">—</div></div>
+        </div>
+      </div>`;
+    }
   }
 
   html+=`<div class="kpi-card" style="padding:16px">
@@ -3168,17 +3185,33 @@ function kpiUpdateEmpCalc(){
     ];
   }
   if(isChief){
-    const lK=kpiLossGK(e.loss),sK=kpiSLA(e.sla||0),cK=kpiCSIGK(e.csi);
-    const kpi1=0.30*maxkpi*lK,kpi2=0.30*maxkpi*sK,kpi3=0.40*maxkpi*cK;
-    bonus=Math.round(kpi1+kpi2+kpi3);
-    kpiSetTxt('kec-lk',(lK*100).toFixed(0)+'%');
-    kpiSetTxt('kec-sk',(sK*100).toFixed(0)+'%');
-    kpiSetTxt('kec-c2',(cK*100).toFixed(0)+'%');
-    rows=[
-      {l:'KPI1 Потери '+kpiFmt(e.loss)+'₽ → '+(lK*100).toFixed(0)+'%',v:'+'+kpiFmt(kpi1)+' ₽',cls:'pos'},
-      {l:'KPI2 SLA '+(e.sla||0)+'% → '+(sK*100).toFixed(0)+'%',v:'+'+kpiFmt(kpi2)+' ₽',cls:'pos'},
-      {l:'KPI3 CSI '+e.csi+' → '+(cK*100).toFixed(0)+'%',v:'+'+kpiFmt(kpi3)+' ₽',cls:'pos'},
-    ];
+    if(isKBR){
+      // ГК КБР: бронирования 40%, SLA 20%, CSI 40%
+      const bK=kpiBron(e.bron||0),sK=kpiSLA(e.sla||0),cK=kpiCSIGK(e.csi);
+      const kpi1=0.40*maxkpi*bK,kpi2=0.20*maxkpi*sK,kpi3=0.40*maxkpi*cK;
+      bonus=Math.round(kpi1+kpi2+kpi3);
+      kpiSetTxt('kec-bk',(bK*100).toFixed(0)+'%');
+      kpiSetTxt('kec-sk',(sK*100).toFixed(0)+'%');
+      kpiSetTxt('kec-c2',(cK*100).toFixed(0)+'%');
+      rows=[
+        {l:'KPI1 Бронирования '+(e.bron||0)+'% → '+(bK*100).toFixed(0)+'%',v:'+'+kpiFmt(kpi1)+' ₽',cls:'pos'},
+        {l:'KPI2 SLA '+(e.sla||0)+'% → '+(sK*100).toFixed(0)+'%',v:'+'+kpiFmt(kpi2)+' ₽',cls:'pos'},
+        {l:'KPI3 CSI '+e.csi+' → '+(cK*100).toFixed(0)+'%',v:'+'+kpiFmt(kpi3)+' ₽',cls:'pos'},
+      ];
+    } else {
+      // ГК не КБР: потери 30%, SLA 30%, CSI 40%
+      const lK=kpiLossGK(e.loss),sK=kpiSLA(e.sla||0),cK=kpiCSIGK(e.csi);
+      const kpi1=0.30*maxkpi*lK,kpi2=0.30*maxkpi*sK,kpi3=0.40*maxkpi*cK;
+      bonus=Math.round(kpi1+kpi2+kpi3);
+      kpiSetTxt('kec-lk',(lK*100).toFixed(0)+'%');
+      kpiSetTxt('kec-sk',(sK*100).toFixed(0)+'%');
+      kpiSetTxt('kec-c2',(cK*100).toFixed(0)+'%');
+      rows=[
+        {l:'KPI1 Потери '+kpiFmt(e.loss)+'₽ → '+(lK*100).toFixed(0)+'%',v:'+'+kpiFmt(kpi1)+' ₽',cls:'pos'},
+        {l:'KPI2 SLA '+(e.sla||0)+'% → '+(sK*100).toFixed(0)+'%',v:'+'+kpiFmt(kpi2)+' ₽',cls:'pos'},
+        {l:'KPI3 CSI '+e.csi+' → '+(cK*100).toFixed(0)+'%',v:'+'+kpiFmt(kpi3)+' ₽',cls:'pos'},
+      ];
+    }
   }
 
   const total=sal+bonus;
@@ -3419,7 +3452,7 @@ window.kpiManCalc=function(){
 };
 
 // ---- CALC HELPERS ----
-function kpiCalcEmp(e,norm){
+function kpiCalcEmp(e,norm,dept){
   if(!e.rate||!e.hours) return {bonus:0,pctMain:0};
   const maxkpi=e.rate*norm*0.4;
   let bonus=0,pctMain=0;
@@ -3431,9 +3464,15 @@ function kpiCalcEmp(e,norm){
     const planP=2.0*e.hours;pctMain=planP?e.fp/planP:0;
     const raw=0.5*kpiDeal(e.fp,planP)*maxkpi+0.3*kpiCSI(e.csi)*maxkpi+0.2*kpiDeal(e.fd,0.25*e.hours)*maxkpi;
     bonus=Math.round(raw*(1-kpiPen(e.comp,e.loss)));
-  } else {
+  } else if(e.role==='Главный Консьерж'){
     pctMain=1;
-    bonus=Math.round(0.30*maxkpi*kpiLossGK(e.loss)+0.30*maxkpi*kpiSLA(e.sla||0)+0.40*maxkpi*kpiCSIGK(e.csi));
+    if(dept==='КБР'){
+      // ГК КБР: бронирования 40%, SLA 20%, CSI 40%
+      bonus=Math.round(0.40*maxkpi*kpiBron(e.bron||0)+0.20*maxkpi*kpiSLA(e.sla||0)+0.40*maxkpi*kpiCSIGK(e.csi));
+    } else {
+      // ГК не КБР: потери 30%, SLA 30%, CSI 40%
+      bonus=Math.round(0.30*maxkpi*kpiLossGK(e.loss)+0.30*maxkpi*kpiSLA(e.sla||0)+0.40*maxkpi*kpiCSIGK(e.csi));
+    }
   }
   return {bonus,pctMain};
 }
