@@ -401,15 +401,37 @@ tr:hover td{background:var(--bg2)}
 
         <!-- UPLOAD SCREEN -->
         <div class="kpi-screen active" id="kpi-sc-upload">
+
+          <!-- БЛОК: Сохранение настроек -->
+          <div class="kpi-card" style="padding:16px;margin-bottom:12px;background:#EAF3DE;border-color:#B5D49A">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+              <div>
+                <div style="font-size:13px;font-weight:600;color:var(--green2);margin-bottom:3px">💾 Настройки сотрудников</div>
+                <div style="font-size:11px;color:var(--text2)">Сохраните список сотрудников, ставки и должности — они не потеряются при обновлении программы</div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-sm" onclick="kpiSaveSettings()" style="background:var(--green2);color:#fff;border-color:var(--green2);font-weight:600">💾 Сохранить настройки</button>
+                <button class="btn btn-sm" onclick="kpiExportSettings()">⬇ Скачать резерв (.json)</button>
+                <label class="btn btn-sm" style="cursor:pointer" title="Восстановить из файла .json">
+                  📂 Загрузить резерв
+                  <input type="file" accept=".json" style="display:none" onchange="kpiImportSettings(this)">
+                </label>
+              </div>
+            </div>
+            <div id="kpi-save-status" style="font-size:11px;color:var(--green2);margin-top:8px;display:none"></div>
+          </div>
+
+          <!-- БЛОК: Загрузка данных за месяц -->
           <div class="kpi-card" style="padding:20px">
+            <div style="font-size:13px;font-weight:600;margin-bottom:12px">📥 Загрузка данных за месяц</div>
             <label class="kpi-upload-zone" id="kpi-dropzone" for="kpiFileInput">
               <input type="file" id="kpiFileInput" accept=".xlsx,.xls,.csv" onchange="kpiHandleFile(this.files[0])">
               <div style="font-size:32px;margin-bottom:10px">📂</div>
-              <div id="kpi-uz-title" style="font-size:14px;font-weight:600;margin-bottom:4px">Загрузить данные за месяц</div>
-              <div style="font-size:12px;color:var(--text2)">Excel (.xlsx) или CSV — Сотрудник, Отдел, Факт часов, Факт сделок, Факт проверок, CSI, Потери ₽, Жалобы</div>
+              <div id="kpi-uz-title" style="font-size:14px;font-weight:600;margin-bottom:4px">Выбрать Excel / CSV файл</div>
+              <div style="font-size:12px;color:var(--text2)">Сотрудник, Отдел, Факт часов, Факт сделок, Факт проверок, CSI, Потери ₽, Жалобы</div>
               <div style="display:inline-block;margin-top:12px;padding:6px 16px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);font-size:12px;color:var(--text2)">Выбрать файл</div>
             </label>
-            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <label style="font-size:12px;color:var(--text2)">Расчётный месяц:</label>
               <select id="kpi-upload-month" style="font-size:13px;padding:5px 8px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text)" onchange="kpiCurrMonth=+this.value">
                 <option value="136" data-key="2026-01">Январь 2026 (136ч)</option>
@@ -428,9 +450,10 @@ tr:hover td{background:var(--bg2)}
               <button class="btn btn-primary btn-sm" onclick="kpiApplyUpload()">Загрузить и рассчитать</button>
               <button class="btn btn-sm" onclick="kpiExportExcel()">⬇ Выгрузить Excel</button>
               <button class="btn btn-sm" onclick="kpiDownloadSample()">📋 Образец файла</button>
-              <button class="btn btn-sm" onclick="kpiResetData()" style="color:var(--red);border-color:var(--red)" title="Очистить данные за месяц">🗑 Сбросить</button>
+              <button class="btn btn-sm" onclick="kpiResetData()" style="color:var(--red);border-color:var(--red)">🗑 Сбросить месяц</button>
             </div>
           </div>
+
           <div class="kpi-card" style="padding:16px">
             <div style="font-size:13px;font-weight:600;margin-bottom:10px">Образец файла</div>
             <div style="overflow-x:auto">
@@ -451,7 +474,7 @@ tr:hover td{background:var(--bg2)}
                 </tbody>
               </table>
             </div>
-            <div style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.7">Имена сотрудников должны совпадать с именами в списке отдела. «Факт проверок» — только для Ведущих.</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.7">Имена должны совпадать с именами в списке отдела. «Факт проверок» — только для Ведущих.</div>
           </div>
         </div>
 
@@ -2538,6 +2561,98 @@ function kpiGetHistory(){
 
 // Загружаем при старте
 kpiLoadFromStorage();
+
+// ---- СОХРАНЕНИЕ / ЭКСПОРТ / ИМПОРТ НАСТРОЕК ----
+window.kpiSaveSettings = function(){
+  try{
+    // Сохраняем структуру (список + ставки + должности)
+    const structure = {};
+    Object.keys(kpiDepts).forEach(dept=>{
+      structure[dept] = kpiDepts[dept].map(e=>({
+        name:e.name, rate:e.rate, role:e.role
+      }));
+    });
+    localStorage.setItem('fcs_kpi_structure', JSON.stringify(structure));
+    // Также сохраняем текущие данные за месяц
+    kpiSaveToStorage();
+    const status = document.getElementById('kpi-save-status');
+    if(status){
+      status.style.display='block';
+      status.textContent = '✅ Сохранено ' + new Date().toLocaleString('ru-RU') + ' — ' + Object.values(kpiDepts).flat().length + ' сотрудников';
+    }
+    showToast('✅ Настройки сохранены!');
+  }catch(e){ alert('Ошибка сохранения: '+e.message); }
+};
+
+window.kpiExportSettings = function(){
+  const backup = {
+    version: 2,
+    savedAt: new Date().toISOString(),
+    structure: {},
+    history: kpiGetHistory()
+  };
+  Object.keys(kpiDepts).forEach(dept=>{
+    backup.structure[dept] = kpiDepts[dept].map(e=>({
+      name:e.name, rate:e.rate, role:e.role
+    }));
+  });
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'kpi_backup_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  showToast('Резервная копия скачана!');
+};
+
+window.kpiImportSettings = function(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const backup = JSON.parse(e.target.result);
+      if(!backup.structure) throw new Error('Неверный формат файла');
+
+      // Восстанавливаем структуру
+      Object.keys(backup.structure).forEach(dept=>{
+        if(!kpiDepts[dept]) kpiDepts[dept]=[];
+        backup.structure[dept].forEach(savedEmp=>{
+          const existing = kpiDepts[dept].find(e=>e.name===savedEmp.name);
+          if(existing){
+            existing.role = savedEmp.role || existing.role;
+            existing.rate = savedEmp.rate || existing.rate;
+          } else {
+            kpiDepts[dept].push({
+              name:savedEmp.name, rate:savedEmp.rate||0, role:savedEmp.role||'Исполнитель',
+              hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,sla:0,bron:0,loaded:false
+            });
+          }
+        });
+      });
+
+      // Восстанавливаем историю если есть
+      if(backup.history){
+        localStorage.setItem('fcs_kpi_history', JSON.stringify(backup.history));
+      }
+
+      // Сохраняем и обновляем
+      kpiSaveSettings();
+      kpiLoadFromStorage();
+
+      const status = document.getElementById('kpi-save-status');
+      if(status){
+        status.style.display='block';
+        status.textContent = '✅ Резерв восстановлен: ' + Object.values(kpiDepts).flat().length + ' сотрудников, сохранён ' + (backup.savedAt ? new Date(backup.savedAt).toLocaleString('ru-RU') : '—');
+      }
+      showToast('✅ Резервная копия восстановлена!');
+      kpiRenderDept();
+    }catch(err){
+      alert('Ошибка загрузки файла: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value='';
+};
 
 // ---- ЭКСПОРТ В EXCEL ----
 window.kpiExportExcel = function(){
