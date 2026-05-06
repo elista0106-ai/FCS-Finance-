@@ -2597,22 +2597,36 @@ window.kpiApplyUpload = function(){
   kpiUploadData.forEach(row=>{
     const name=(row['Сотрудник']||row['сотрудник']||'').toString().trim();
     const dept=(row['Отдел']||row['отдел']||'').toString().trim();
-    if(!name || !dept) return;
-    // Создаём отдел если нет
-    if(!kpiDepts[dept]) kpiDepts[dept]=[];
-    // Ищем сотрудника
-    let emp=kpiDepts[dept].find(e=>e.name===name);
-    // Если не нашли — создаём автоматически
+    if(!name) return;
+
+    // Ищем сотрудника — сначала в указанном отделе, потом во всех
+    let emp = null;
+    let targetDept = dept;
+
+    if(dept && kpiDepts[dept]){
+      emp = kpiDepts[dept].find(e=>e.name===name);
+    }
+    // Если не нашли по отделу — ищем по всем отделам (вдруг отдел написан иначе)
     if(!emp){
+      for(const d of Object.keys(kpiDepts)){
+        const found = kpiDepts[d].find(e=>e.name===name);
+        if(found){ emp=found; targetDept=d; break; }
+      }
+    }
+    // Совсем не нашли — создаём в указанном отделе
+    if(!emp){
+      if(!targetDept) return;
+      if(!kpiDepts[targetDept]) kpiDepts[targetDept]=[];
       emp={name,rate:0,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,sla:0,bron:0,loaded:false};
-      kpiDepts[dept].push(emp);
+      kpiDepts[targetDept].push(emp);
       created++;
     }
+
     emp.hours=parseFloat(row['Факт часов']||row['факт часов'])||0;
     emp.fd=parseFloat(row['Факт сделок']||row['факт сделок'])||0;
     emp.fp=parseFloat(row['Факт проверок']||row['факт проверок'])||0;
-    emp.csi=parseFloat(row['CSI']||row['csi'])||4.83;
-    emp.loss=parseFloat(row['Потери ₽']||row['потери']||row['Потери'])||0;
+    emp.csi=parseFloat(row['CSI']||row['csi']||row['Csi'])||4.83;
+    emp.loss=parseFloat(row['Потери ₽']||row['Потери']||row['потери'])||0;
     emp.comp=parseFloat(row['Жалобы']||row['жалобы'])||0;
     emp.loaded=true;
     updated++;
@@ -2641,24 +2655,26 @@ function kpiMonthKey(normVal){
 
 function kpiSaveToStorage(){
   try{
-    // Сохраняем данные за текущий месяц
     const monthKey = kpiGetMonthKey();
-    const monthData = {};
-    Object.keys(kpiDepts).forEach(dept=>{
-      monthData[dept] = kpiDepts[dept].map(e=>({
-        name:e.name, hours:e.hours, fd:e.fd, fp:e.fp,
-        csi:e.csi, loss:e.loss, comp:e.comp, sla:e.sla||0,
-        bron:e.bron||0, loaded:e.loaded||false
-      }));
-    });
-    const history = JSON.parse(localStorage.getItem('fcs_kpi_history')||'{}');
-    history[monthKey] = monthData;
-    localStorage.setItem('fcs_kpi_history', JSON.stringify(history));
+    // Сохраняем только если есть реальные данные (хотя бы один loaded)
+    const hasData = Object.values(kpiDepts).flat().some(e=>e.loaded||e.hours>0||e.fd>0);
+    if(hasData){
+      const monthData = {};
+      Object.keys(kpiDepts).forEach(dept=>{
+        monthData[dept] = kpiDepts[dept].map(e=>({
+          name:e.name, hours:e.hours, fd:e.fd, fp:e.fp,
+          csi:e.csi, loss:e.loss, comp:e.comp, sla:e.sla||0,
+          bron:e.bron||0, loaded:e.loaded||false
+        }));
+      });
+      const history = JSON.parse(localStorage.getItem('fcs_kpi_history')||'{}');
+      history[monthKey] = monthData;
+      localStorage.setItem('fcs_kpi_history', JSON.stringify(history));
+    }
     localStorage.setItem('fcs_kpi_curr_month_key', monthKey);
     localStorage.setItem('fcs_kpi_month', kpiCurrMonth);
     localStorage.setItem('fcs_kpi_year', kpiCurrYear);
     localStorage.setItem('fcs_kpi_month_num', kpiCurrMonthNum);
-    // Структура сотрудников хранится в HR (fcs_hr_staff)
   }catch(e){ console.log('KPI save error:',e); }
 }
 
