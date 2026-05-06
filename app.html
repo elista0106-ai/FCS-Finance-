@@ -222,6 +222,15 @@ tr:hover td{background:var(--bg2)}
 .kpi-stab{font-size:12px;padding:6px 14px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text2);cursor:pointer}
 .kpi-stab:hover{background:var(--bg3)}
 .kpi-stab.active{background:var(--accent);color:#fff}
+.kpi-year-btn{padding:8px 12px;font-size:12px;color:var(--text3);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;white-space:nowrap;font-family:inherit;font-weight:500}
+.kpi-year-btn:hover{color:var(--text2)}
+.kpi-year-btn.active{color:var(--text);border-bottom-color:var(--accent)}
+.kpi-month-btn{padding:8px 10px;font-size:12px;color:var(--text3);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;white-space:nowrap;font-family:inherit}
+.kpi-month-btn:hover{color:var(--text2)}
+.kpi-month-btn.active{color:var(--text);border-bottom-color:var(--accent);font-weight:500}
+.kpi-month-btn.has-data{color:var(--green)}
+.kpi-month-btn.has-data.active{color:var(--green);border-bottom-color:var(--green)}
+.kpi-year-sep{width:0.5px;background:var(--border);height:20px;margin:0 4px;align-self:center}
 
 /* ===== HR ===== */
 .hr-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
@@ -432,6 +441,10 @@ tr:hover td{background:var(--bg2)}
 
     <!-- KPI VIEW -->
     <div id="view-kpi" style="display:none">
+      <!-- KPI Month/Year Bar -->
+      <div style="background:var(--bg2);border-bottom:0.5px solid var(--border);padding:0 20px;position:sticky;top:89px;z-index:97;overflow-x:auto">
+        <div id="kpi-year-bar" style="display:flex;align-items:center;gap:0"></div>
+      </div>
       <div class="content">
         <!-- Sub-tabs -->
         <div class="kpi-sub-tabs">
@@ -1603,7 +1616,7 @@ function switchTab(t){
   else if(t==='dept') renderDeptView();
   else if(t==='days') renderDays();
   else if(t==='clients') renderClients();
-  else if(t==='kpi'){ if(typeof kpiSyncFromHR==='function') kpiSyncFromHR(); kpiShowScreen('upload'); }
+  else if(t==='kpi'){ if(typeof kpiSyncFromHR==='function') kpiSyncFromHR(); kpiRenderYearBar(); kpiShowScreen('upload'); }
   else if(t==='hr'){ hrRender(); }
   else renderTable();
 }
@@ -2464,7 +2477,63 @@ let kpiCurrMonth = 143;
 let kpiUploadData = null;
 let kpiCalcTab = 0;
 
-// ---- NAVIGATION ----
+// ---- YEAR/MONTH NAVIGATION ----
+const KPI_YEARS = [2025, 2026, 2027];
+const KPI_MONTH_NORMS = {1:136,2:151,3:167,4:175,5:143,6:167,7:184,8:168,9:176,10:176,11:159,12:176};
+const KPI_MONTH_NAMES = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+let kpiCurrYear = 2026;
+let kpiCurrMonthNum = 5; // 1-12
+
+function kpiMonthKeyFromYM(year, month){
+  return year + '-' + String(month).padStart(2,'0');
+}
+
+function kpiRenderYearBar(){
+  const bar = document.getElementById('kpi-year-bar');
+  if(!bar) return;
+  const history = kpiGetHistory();
+  let html = '';
+  KPI_YEARS.forEach((year, yi)=>{
+    if(yi>0) html += '<div class="kpi-year-sep"></div>';
+    html += `<button class="kpi-year-btn${year===kpiCurrYear?' active':''}" onclick="kpiSetYear(${year})">${year}</button>`;
+    if(year===kpiCurrYear){
+      for(let m=1;m<=12;m++){
+        const key = kpiMonthKeyFromYM(year,m);
+        const hasData = !!history[key];
+        const norm = KPI_MONTH_NORMS[m];
+        const isActive = (year===kpiCurrYear && m===kpiCurrMonthNum);
+        html += `<button class="kpi-month-btn${isActive?' active':''}${hasData?' has-data':''}" onclick="kpiSetMonth(${year},${m},${norm})" title="${hasData?'Есть данные':''}">${KPI_MONTH_NAMES[m-1]}${hasData?' ✓':''}</button>`;
+      }
+    }
+  });
+  bar.innerHTML = html;
+}
+
+window.kpiSetYear = function(year){
+  kpiCurrYear = year;
+  kpiRenderYearBar();
+};
+
+window.kpiSetMonth = function(year, month, norm){
+  kpiCurrYear = year;
+  kpiCurrMonthNum = month;
+  kpiCurrMonth = norm;
+  // Синхронизируем селект если открыт экран загрузки
+  const sel = document.getElementById('kpi-upload-month');
+  if(sel){
+    const key = kpiMonthKeyFromYM(year, month);
+    for(let i=0;i<sel.options.length;i++){
+      if(sel.options[i].dataset.key===key){ sel.selectedIndex=i; break; }
+    }
+  }
+  // Загружаем данные за выбранный месяц
+  kpiSyncFromHR();
+  kpiRenderYearBar();
+  // Обновляем текущий экран
+  const deptEl = document.getElementById('kpi-sc-dept');
+  if(deptEl && deptEl.classList.contains('active')) kpiRenderDept();
+  showToast(KPI_MONTH_NAMES[month-1]+' '+year+' — данные загружены');
+};
 window.kpiShowScreen = function(id){
   document.querySelectorAll('.kpi-screen').forEach(s=>s.classList.remove('active'));
   // Обновляем только верхние sub-tabs (не те что внутри manual)
@@ -2514,7 +2583,12 @@ window.kpiHandleFile = function(file){
 };
 
 window.kpiApplyUpload = function(){
-  kpiCurrMonth = parseInt(document.getElementById('kpi-upload-month').value);
+  const sel = document.getElementById('kpi-upload-month');
+  kpiCurrMonth = parseInt(sel?.value || 143);
+  // Синхронизируем год и месяц из data-key
+  const key = sel?.options[sel?.selectedIndex]?.dataset?.key || '2026-05';
+  const parts = key.split('-');
+  if(parts.length===2){ kpiCurrYear=parseInt(parts[0]); kpiCurrMonthNum=parseInt(parts[1]); }
   if(!kpiUploadData || kpiUploadData.length === 0){
     alert('Сначала выберите файл!');
     return;
@@ -2545,6 +2619,7 @@ window.kpiApplyUpload = function(){
   });
   // Сохраняем в localStorage
   kpiSaveToStorage();
+  kpiRenderYearBar();
   showToast(`✅ Загружено: ${updated} сотрудников, создано новых: ${created}`);
   kpiShowScreen('dept');
 };
@@ -2586,11 +2661,7 @@ function kpiSaveToStorage(){
 }
 
 function kpiGetMonthKey(){
-  const sel = document.getElementById('kpi-upload-month');
-  if(sel && sel.options[sel.selectedIndex]){
-    return sel.options[sel.selectedIndex].dataset.key || '2026-05';
-  }
-  return '2026-05';
+  return kpiMonthKeyFromYM(kpiCurrYear, kpiCurrMonthNum);
 }
 
 function kpiLoadFromStorage(){
@@ -3501,8 +3572,9 @@ function hrSyncToKPI(){
 }
 
 hrLoadFromStorage();
-// После загрузки HR — синхронизируем KPI
+// После загрузки HR — синхронизируем KPI и обновляем навигацию
 if(typeof kpiSyncFromHR === 'function') kpiSyncFromHR();
+if(typeof kpiRenderYearBar === 'function') kpiRenderYearBar();
 
 window.hrSave = function(){
   hrSaveToStorage();
