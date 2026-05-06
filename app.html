@@ -2656,6 +2656,8 @@ function kpiSaveToStorage(){
     localStorage.setItem('fcs_kpi_history', JSON.stringify(history));
     localStorage.setItem('fcs_kpi_curr_month_key', monthKey);
     localStorage.setItem('fcs_kpi_month', kpiCurrMonth);
+    localStorage.setItem('fcs_kpi_year', kpiCurrYear);
+    localStorage.setItem('fcs_kpi_month_num', kpiCurrMonthNum);
     // Структура сотрудников хранится в HR (fcs_hr_staff)
   }catch(e){ console.log('KPI save error:',e); }
 }
@@ -2666,10 +2668,23 @@ function kpiGetMonthKey(){
 
 function kpiLoadFromStorage(){
   try{
-    const savedMonth = localStorage.getItem('fcs_kpi_month');
-    if(savedMonth) kpiCurrMonth = parseInt(savedMonth);
-    // Данные сотрудников берём из HR через kpiSyncFromHR()
-    // Вызывается после инициализации HR модуля
+    const savedKey = localStorage.getItem('fcs_kpi_curr_month_key');
+    if(savedKey){
+      const parts = savedKey.split('-');
+      if(parts.length===2){
+        kpiCurrYear = parseInt(parts[0]);
+        kpiCurrMonthNum = parseInt(parts[1]);
+        kpiCurrMonth = KPI_MONTH_NORMS[kpiCurrMonthNum] || 143;
+      }
+    } else {
+      // Fallback — читаем отдельные ключи
+      const y = localStorage.getItem('fcs_kpi_year');
+      const mn = localStorage.getItem('fcs_kpi_month_num');
+      const m = localStorage.getItem('fcs_kpi_month');
+      if(y) kpiCurrYear = parseInt(y);
+      if(mn) kpiCurrMonthNum = parseInt(mn);
+      if(m) kpiCurrMonth = parseInt(m);
+    }
   }catch(e){ console.log('KPI load error:', e); }
 }
 
