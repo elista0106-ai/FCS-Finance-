@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KPI Калькулятор — FCS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&display=swap');
+:root{--bg:#f5f4f1;--sur:#fff;--sur2:#f0efe9;--bor:rgba(0,0,0,.10);--bor2:rgba(0,0,0,.18);--tx:#1a1917;--tx2:#6b6a65;--tx3:#a09f9a;--green:#1a7a50;--gbg:#eaf5ee;--red:#c0392b;--rbg:#fdf0ee;--acc:#2c4a8c;--abg:#eef1f9;--r:10px;--rl:14px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Golos Text',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;padding:20px 12px}
+.container{max-width:960px;margin:0 auto}
+.page-header{text-align:center;margin-bottom:24px}
+.page-header h1{font-size:22px;font-weight:600;letter-spacing:-.3px}
+.page-header p{font-size:13px;color:var(--tx2);margin-top:4px}
+
+/* MAIN TABS */
+.main-tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rl);padding:6px;flex-wrap:wrap}
+.mtab{flex:1;min-width:100px;font-size:12px;font-weight:500;padding:7px 10px;border:none;border-radius:8px;background:transparent;color:var(--tx2);cursor:pointer;font-family:'Golos Text',sans-serif;transition:all .15s;text-align:center}
+.mtab:hover{background:var(--sur2);color:var(--tx)}
+.mtab.active{background:var(--acc);color:#fff}
+
+/* SCREENS */
+.screen{display:none}.screen.active{display:block}
+
+/* CARD */
+.card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--rl);padding:20px;margin-bottom:16px}
+
+/* UPLOAD */
+.upload-zone{border:2px dashed var(--bor2);border-radius:var(--rl);padding:32px;text-align:center;cursor:pointer;transition:background .15s;margin-bottom:16px}
+.upload-zone:hover,.upload-zone.drag{background:var(--abg);border-color:var(--acc)}
+.upload-zone input[type=file]{display:none}
+.upload-icon{width:48px;height:48px;margin:0 auto 12px;background:var(--sur2);border-radius:50%;display:flex;align-items:center;justify-content:center}
+.upload-icon svg{width:22px;height:22px;stroke:var(--tx2);fill:none;stroke-width:1.5}
+.uz-title{font-size:14px;font-weight:500;margin-bottom:4px}
+.uz-sub{font-size:12px;color:var(--tx2)}
+.uz-btn{display:inline-block;margin-top:12px;font-size:12px;padding:7px 18px;border:1px solid var(--bor2);border-radius:var(--r);background:var(--sur);color:var(--tx2);cursor:pointer}
+.month-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.month-row label{font-size:12px;color:var(--tx2)}
+.month-row select,.month-row input{font-size:13px;padding:6px 10px;border:1px solid var(--bor2);border-radius:var(--r);background:var(--sur);color:var(--tx);font-family:'Golos Text',sans-serif}
+.apply-btn{font-size:13px;padding:7px 18px;border:none;border-radius:var(--r);background:var(--acc);color:#fff;cursor:pointer;font-family:'Golos Text',sans-serif}
+.apply-btn:hover{opacity:.9}
+.sample-btn{font-size:12px;padding:6px 14px;border:1px solid var(--bor2);border-radius:var(--r);background:var(--sur);color:var(--tx2);cursor:pointer;font-family:'Golos Text',sans-serif}
+.sample-btn:hover{background:var(--sur2)}
+
+/* SAMPLE TABLE */
+.sample-tbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
+.sample-tbl th{padding:7px 10px;text-align:left;background:var(--sur2);color:var(--tx2);font-weight:500;border-bottom:1px solid var(--bor)}
+.sample-tbl td{padding:7px 10px;border-bottom:1px solid var(--bor);color:var(--tx)}
+.sample-tbl tr:last-child td{border-bottom:none}
+
+/* DEPT TABS */
+.dept-tabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap}
+.dtab{font-size:12px;padding:6px 14px;border:1px solid var(--bor2);border-radius:var(--r);background:var(--sur);color:var(--tx2);cursor:pointer;font-family:'Golos Text',sans-serif}
+.dtab:hover{background:var(--sur2)}
+.dtab.active{background:var(--tx);color:var(--sur)}
+
+/* EMP TABLE */
+.tbl-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--bor)}
+.tbl-title{font-size:14px;font-weight:500}
+.add-btn{font-size:12px;padding:6px 14px;border:1px solid var(--bor2);border-radius:var(--r);background:var(--sur);color:var(--tx2);cursor:pointer;font-family:'Golos Text',sans-serif}
+.add-btn:hover{background:var(--sur2)}
+.etable{width:100%;border-collapse:collapse;font-size:12px}
+.etable th{padding:8px 12px;text-align:right;font-weight:500;color:var(--tx2);background:var(--sur2);border-bottom:1px solid var(--bor);font-size:11px;white-space:nowrap}
+.etable th:first-child{text-align:left}
+.etable td{padding:9px 12px;text-align:right;vertical-align:middle;border-bottom:1px solid var(--bor)}
+.etable td:first-child{text-align:left}
+.etable tbody tr:last-child td{border-bottom:none}
+.etable tbody tr{cursor:pointer;transition:background .1s}
+.etable tbody tr:hover{background:var(--sur2)}
+.emp-cell{display:flex;align-items:center;gap:8px}
+.av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0}
+.role-pill{display:inline-block;font-size:10px;padding:2px 7px;border-radius:20px;margin-top:2px}
+.rp-exec{background:#e1f5ee;color:#085041}
+.rp-lead{background:#e6f1fb;color:#0c447c}
+.rp-chief{background:#faeeda;color:#633806}
+.val-ok{color:var(--green);font-weight:500}
+.val-warn{color:var(--red)}
+.val-mid{color:#ba7517;font-weight:500}
+.chev{color:var(--tx3);font-size:14px}
+.badge-loaded{font-size:10px;padding:2px 8px;border-radius:20px;background:var(--gbg);color:#085041;margin-left:8px}
+
+/* ADD ROW */
+.add-row{background:var(--sur2)}
+.add-row td{padding:7px 12px}
+.add-inp{width:100%;font-size:12px;padding:5px 8px;border:1px solid var(--bor2);border-radius:var(--r);background:var(--sur);color:var(--tx);font-family:'Golos Text',sans-serif}
+.role-sel{width:100%;font-size:12px;padding:5px 8px;border:1px solid var(--bor2);border-radius:var(--r);background:var(--sur);color:var(--tx);font-family:'Golos Text',sans-serif}
+.save-row-btn{font-size:12px;padding:5px 12px;border:1px solid var(--bor2);border-radius:var(--r);background:var(--acc);color:#fff;cursor:pointer;font-family:'Golos Text',sans-serif}
+
+/* INDIVIDUAL CALC */
+.back-btn{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--tx2);cursor:pointer;margin-bottom:16px;background:none;border:none;font-family:'Golos Text',sans-serif;padding:0}
+.back-btn:hover{color:var(--tx)}
+.emp-header{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.emp-av-lg{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;flex-shrink:0}
+.emp-info h3{font-size:16px;font-weight:600;margin-bottom:3px}
+.emp-info p{font-size:12px;color:var(--tx2)}
+.sec-label{font-size:10px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin:16px 0 10px}
+.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:11px;color:var(--tx2);font-weight:500}
+.field input,.field select{font-size:13px;padding:7px 10px;border:1px solid var(--bor2);border-radius:var(--r);background:var(--sur);color:var(--tx);font-family:'Golos Text',sans-serif;outline:none;transition:border-color .15s}
+.field input:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(44,74,140,.08)}
+.field .auto{font-size:13px;padding:7px 10px;border:1px solid var(--bor);border-radius:var(--r);background:var(--sur2);color:var(--tx3)}
+.field .auto.hi{color:var(--acc);font-weight:600;background:var(--abg);border-color:rgba(44,74,140,.2)}
+.field .auto.warn{color:var(--red);font-weight:600;background:var(--rbg)}
+.from-file{font-size:9px;color:var(--green);font-weight:600;margin-left:4px}
+.hint{font-size:11px;color:var(--tx2);background:var(--sur2);border-left:3px solid var(--bor2);padding:8px 12px;border-radius:0 var(--r) var(--r) 0;margin-bottom:12px;line-height:1.7}
+.hint b{color:var(--tx)}
+.res-box{background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rl);padding:16px 18px;margin-top:16px}
+.res-row{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--bor);font-size:13px;gap:8px}
+.res-row:last-child{border-bottom:none;padding-top:10px;margin-top:4px;font-size:15px;font-weight:600}
+.res-lbl{color:var(--tx2);flex:1}
+.res-v{font-weight:500;white-space:nowrap}
+.res-v.pos{color:var(--green)}
+.res-v.neg{color:var(--red)}
+.res-v.zero{color:var(--tx3)}
+.kpi-sub{display:flex;justify-content:space-between;padding:8px 12px;background:var(--sur);border:1px solid var(--bor2);border-radius:var(--r);margin:6px 0;font-size:13px;font-weight:600}
+
+/* CALC TABS */
+.calc-tabs{display:flex;gap:4px;margin-bottom:16px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rl);padding:5px;flex-wrap:wrap}
+.ctab{flex:1;min-width:100px;font-size:11px;font-weight:500;padding:6px 8px;border:none;border-radius:7px;background:transparent;color:var(--tx2);cursor:pointer;font-family:'Golos Text',sans-serif;text-align:center}
+.ctab:hover{background:var(--sur2)}
+.ctab.active{background:var(--acc);color:#fff}
+
+@media(max-width:600px){.fg{grid-template-columns:1fr 1fr}.main-tabs .mtab{font-size:11px;padding:6px 6px}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="page-header">
+    <h1>KPI Калькулятор</h1>
+    <p>First Concierge Service — расчёт вознаграждения</p>
+  </div>
+
+  <div class="main-tabs">
+    <button class="mtab active" onclick="showMain('upload')">Загрузка данных</button>
+    <button class="mtab" onclick="showMain('dept')">По отделам</button>
+    <button class="mtab" onclick="showMain('manual')">Ручной расчёт</button>
+  </div>
+
+  <!-- ======== UPLOAD SCREEN ======== -->
+  <div class="screen active" id="sc-upload">
+    <div class="card">
+      <label class="upload-zone" id="dropzone" for="fileInput">
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFile(this.files[0])">
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <div class="uz-title" id="uz-title">Загрузить данные за месяц</div>
+        <div class="uz-sub">Excel (.xlsx) или CSV с данными сотрудников</div>
+        <div class="uz-btn">Выбрать файл</div>
+      </label>
+      <div class="month-row">
+        <label>Расчётный месяц:</label>
+        <select id="upload-month">
+          <option value="136">Январь (136ч)</option>
+          <option value="151">Февраль (151ч)</option>
+          <option value="167">Март (167ч)</option>
+          <option value="175">Апрель (175ч)</option>
+          <option value="143" selected>Май (143ч)</option>
+          <option value="167">Июнь (167ч)</option>
+          <option value="184">Июль (184ч)</option>
+          <option value="168">Август (168ч)</option>
+          <option value="176">Сентябрь (176ч)</option>
+          <option value="176">Октябрь (176ч)</option>
+          <option value="159">Ноябрь (159ч)</option>
+          <option value="176">Декабрь (176ч)</option>
+        </select>
+        <button class="apply-btn" onclick="applyUpload()">Загрузить и рассчитать</button>
+        <button class="sample-btn" onclick="downloadSample()">Скачать образец</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:13px;font-weight:500;margin-bottom:12px">Образец файла (8 колонок)</div>
+      <div style="overflow-x:auto">
+        <table class="sample-tbl">
+          <thead>
+            <tr><th>Сотрудник</th><th>Отдел</th><th>Факт часов</th><th>Факт сделок</th><th>Факт проверок</th><th>CSI</th><th>Потери ₽</th><th>Жалобы</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Долматова Надежда</td><td>Lifestyle</td><td>202</td><td>103</td><td>367</td><td>4.83</td><td>0</td><td>0</td></tr>
+            <tr><td>Рудченко Юлия</td><td>Lifestyle</td><td>211</td><td>157</td><td>317</td><td>4.90</td><td>0</td><td>0</td></tr>
+            <tr><td>Иванов Петр</td><td>Travel</td><td>175</td><td>89</td><td>0</td><td>4.95</td><td>5000</td><td>1</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="font-size:11px;color:var(--tx3);margin-top:10px;line-height:1.7">
+        Имена должны совпадать с именами в списке сотрудников. Ставка и должность берутся из настроек отдела.<br>
+        «Факт проверок» — только для Ведущих, для остальных можно оставить 0.
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== DEPT SCREEN ======== -->
+  <div class="screen" id="sc-dept">
+    <div class="dept-tabs" id="dept-tabs"></div>
+    <div id="dept-content"></div>
+  </div>
+
+  <!-- ======== INDIVIDUAL CALC ======== -->
+  <div class="screen" id="sc-emp">
+    <button class="back-btn" onclick="backToDept()">← Назад к списку</button>
+    <div id="emp-calc-content"></div>
+  </div>
+
+  <!-- ======== MANUAL CALC ======== -->
+  <div class="screen" id="sc-manual">
+    <div class="calc-tabs">
+      <button class="ctab active" onclick="showCalc(0)">Исполнитель</button>
+      <button class="ctab" onclick="showCalc(1)">Ведущий</button>
+      <button class="ctab" onclick="showCalc(2)">ГК (не КБР)</button>
+      <button class="ctab" onclick="showCalc(3)">КБР Исп/Вед</button>
+      <button class="ctab" onclick="showCalc(4)">ГК КБР</button>
+    </div>
+    <div id="manual-calc-content"></div>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+const NORM = {136:136,151:151,167:167,175:175,143:143,184:184,168:168,176:176,159:159};
+const MONTHS = [{v:136,l:'Январь (136ч)'},{v:151,l:'Февраль (151ч)'},{v:167,l:'Март (167ч)'},{v:175,l:'Апрель (175ч)'},{v:143,l:'Май (143ч)'},{v:167,l:'Июнь (167ч)'},{v:184,l:'Июль (184ч)'},{v:168,l:'Август (168ч)'},{v:176,l:'Сентябрь (176ч)'},{v:176,l:'Октябрь (176ч)'},{v:159,l:'Ноябрь (159ч)'},{v:176,l:'Декабрь (176ч)'}];
+const ROLES = ['Исполнитель','Ведущий','Главный Консьерж'];
+const DEPT_LIST = ['Lifestyle','Travel','Логистика','КБР','Корп'];
+const AV_COLORS = [
+  {bg:'#E6F1FB',cl:'#0C447C'},{bg:'#E1F5EE',cl:'#085041'},
+  {bg:'#FAEEDA',cl:'#633806'},{bg:'#FBEAF0',cl:'#72243E'},
+  {bg:'#EAF3DE',cl:'#27500A'},{bg:'#EEEDFE',cl:'#3C3489'}
+];
+
+let departments = {
+  'Lifestyle': [
+    {name:'Долматова Надежда',rate:500,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
+    {name:'Ефимцева Любовь',rate:500,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
+    {name:'Иванова Владлена',rate:500,role:'Ведущий',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
+    {name:'Ложечникова Екатерина',rate:500,role:'Ведущий',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
+    {name:'Мохова Мария',rate:500,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
+    {name:'Хон Ирина',rate:500,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
+    {name:'Виноградов Александр',rate:402,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
+    {name:'Еловская Софья',rate:402,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
+    {name:'Лисова Анна',rate:402,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
+    {name:'Меркулова Екатерина',rate:468,role:'Главный Консьерж',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
+    {name:'Рудченко Юлия',rate:468,role:'Ведущий',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
+    {name:'Тоцкая Алёна',rate:468,role:'Ведущий',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
+    {name:'Хамзин Руша',rate:402,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
+    {name:'Шевякова Екатерина',rate:402,role:'Исполнитель',hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false},
+  ],
+  'Travel':[],
+  'Логистика':[],
+  'КБР':[],
+  'Корп':[]
+};
+
+let currentDept = 'Lifestyle';
+let currentEmpIdx = 0;
+let currentMonth = 143;
+let uploadedData = null;
+let prevScreen = 'dept';
+let currentCalcTab = 0;
+
+// ===== NAVIGATION =====
+function showMain(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.mtab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('sc-'+id).classList.add('active');
+  const idx = ['upload','dept','manual'].indexOf(id);
+  document.querySelectorAll('.mtab')[idx].classList.add('active');
+  if(id==='dept') renderDept();
+  if(id==='manual') renderManual();
+}
+
+function backToDept(){
+  document.getElementById('sc-emp').classList.remove('active');
+  document.getElementById('sc-dept').classList.add('active');
+  document.querySelectorAll('.mtab').forEach((t,i)=>t.classList.toggle('active',i===1));
+}
+
+// ===== UPLOAD =====
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');handleFile(e.dataTransfer.files[0]);});
+
+function handleFile(file){
+  if(!file) return;
+  document.getElementById('uz-title').textContent = '📄 '+file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const wb = XLSX.read(e.target.result,{type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws,{defval:''});
+      uploadedData = rows;
+    }catch(err){alert('Ошибка чтения файла: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function applyUpload(){
+  currentMonth = parseInt(document.getElementById('upload-month').value);
+  if(uploadedData){
+    uploadedData.forEach(row=>{
+      const name = (row['Сотрудник']||'').toString().trim();
+      const dept = (row['Отдел']||'').toString().trim();
+      if(!departments[dept]) return;
+      const emp = departments[dept].find(e=>e.name===name);
+      if(emp){
+        emp.hours = parseFloat(row['Факт часов'])||0;
+        emp.fd    = parseFloat(row['Факт сделок'])||0;
+        emp.fp    = parseFloat(row['Факт проверок'])||0;
+        emp.csi   = parseFloat(row['CSI'])||4.83;
+        emp.loss  = parseFloat(row['Потери ₽'])||0;
+        emp.comp  = parseFloat(row['Жалобы'])||0;
+        emp.loaded= true;
+      }
+    });
+    alert('Данные загружены успешно!');
+  }
+  showMain('dept');
+}
+
+function downloadSample(){
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['Сотрудник','Отдел','Факт часов','Факт сделок','Факт проверок','CSI','Потери ₽','Жалобы'],
+    ['Долматова Надежда','Lifestyle',202,103,367,4.83,0,0],
+    ['Рудченко Юлия','Lifestyle',211,157,317,4.90,0,0],
+    ['Иванов Пётр','Travel',175,89,0,4.95,5000,1],
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Данные');
+  XLSX.writeFile(wb,'kpi_sample.xlsx');
+}
+
+// ===== DEPT VIEW =====
+function renderDept(){
+  const tabs = document.getElementById('dept-tabs');
+  tabs.innerHTML = DEPT_LIST.map(d=>`<button class="dtab${d===currentDept?' active':''}" onclick="switchDept('${d}')">${d} (${departments[d].length})</button>`).join('');
+  renderDeptTable();
+}
+
+function switchDept(d){
+  currentDept = d;
+  renderDept();
+}
+
+function renderDeptTable(){
+  const emps = departments[currentDept];
+  const hasLoaded = emps.some(e=>e.loaded);
+  let html = `<div class="card" style="padding:0;overflow:hidden">
+    <div class="tbl-header">
+      <span class="tbl-title">${currentDept}${hasLoaded?'<span class="badge-loaded">Данные загружены</span>':''}</span>
+      <button class="add-btn" onclick="showAddRow()">+ Добавить сотрудника</button>
+    </div>
+    <div style="overflow-x:auto">
+    <table class="etable">
+      <thead><tr>
+        <th>Сотрудник</th>
+        <th>Ставка</th>
+        <th>Факт ч</th>
+        <th>Plan/Факт</th>
+        <th>CSI</th>
+        <th>Итого KPI</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="emp-tbody">`;
+
+  emps.forEach((e,i)=>{
+    const c = calcEmp(e, currentMonth);
+    const initials = e.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const av = AV_COLORS[i % AV_COLORS.length];
+    const planLabel = e.role==='Ведущий' ? Math.round(2.0*(e.hours||0)*10)/10+'/'+(e.fp||0) : Math.round(0.75*(e.hours||0)*10)/10+'/'+(e.fd||0);
+    const pctOk = c.pctMain >= 1.0;
+    const pctWarn = c.pctMain < 0.85 && e.hours > 0;
+    const pctCls = pctOk?'val-ok':pctWarn?'val-warn':'val-mid';
+    const rp = e.role==='Исполнитель'?'rp-exec':e.role==='Ведущий'?'rp-lead':'rp-chief';
+    html += `<tr onclick="openEmp(${i})">
+      <td><div class="emp-cell">
+        <div class="av" style="background:${av.bg};color:${av.cl}">${initials}</div>
+        <div><div>${e.name}</div><span class="role-pill ${rp}">${e.role}</span></div>
+      </div></td>
+      <td>${e.rate} ₽</td>
+      <td>${e.hours||'—'}</td>
+      <td class="${pctCls}">${e.hours?planLabel:'—'}</td>
+      <td>${e.csi||'—'}</td>
+      <td class="${c.bonus>0?'val-ok':'val-warn'}">${c.bonus>0?'+'+fmt(c.bonus)+' ₽':'0 ₽'}</td>
+      <td class="chev">›</td>
+    </tr>`;
+  });
+
+  html += `<tr class="add-row" id="add-row-hidden" style="display:none">
+    <td><input class="add-inp" id="new-name" placeholder="Имя сотрудника"></td>
+    <td><input class="add-inp" id="new-rate" type="number" placeholder="Ставка" style="width:80px"></td>
+    <td>—</td>
+    <td><select class="role-sel" id="new-role">${ROLES.map(r=>`<option>${r}</option>`).join('')}</select></td>
+    <td>—</td><td>—</td>
+    <td><button class="save-row-btn" onclick="addEmp()">Добавить</button></td>
+  </tr>`;
+
+  html += '</tbody></table></div></div>';
+  document.getElementById('dept-content').innerHTML = html;
+}
+
+function showAddRow(){
+  document.getElementById('add-row-hidden').style.display='';
+  document.getElementById('new-name').focus();
+}
+
+function addEmp(){
+  const name = document.getElementById('new-name').value.trim();
+  const rate = parseFloat(document.getElementById('new-rate').value)||0;
+  const role = document.getElementById('new-role').value;
+  if(!name){alert('Введите имя');return;}
+  departments[currentDept].push({name,rate,role,hours:0,fd:0,fp:0,csi:4.83,loss:0,comp:0,loaded:false});
+  renderDeptTable();
+}
+
+function openEmp(i){
+  currentEmpIdx = i;
+  document.getElementById('sc-dept').classList.remove('active');
+  document.getElementById('sc-emp').classList.add('active');
+  document.querySelectorAll('.mtab').forEach(t=>t.classList.remove('active'));
+  renderEmpCalc();
+}
+
+// ===== EMP CALC =====
+function renderEmpCalc(){
+  const e = departments[currentDept][currentEmpIdx];
+  const norm = currentMonth;
+  const initials = e.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const av = AV_COLORS[currentEmpIdx % AV_COLORS.length];
+  const rp = e.role==='Исполнитель'?'rp-exec':e.role==='Ведущий'?'rp-lead':'rp-chief';
+  const isExec = e.role==='Исполнитель';
+  const isLead = e.role==='Ведущий';
+  const isChief = e.role==='Главный Консьерж';
+  const isKBR = currentDept==='КБР';
+
+  let html = `
+  <div class="emp-header">
+    <div class="emp-av-lg" style="background:${av.bg};color:${av.cl}">${initials}</div>
+    <div class="emp-info">
+      <h3>${e.name}</h3>
+      <p><span class="role-pill ${rp}">${e.role}</span> · ${currentDept} ${e.loaded?'<span class="badge-loaded">Данные из файла</span>':''}</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec-label">Основные данные</div>
+    <div class="fg">
+      <div class="field"><label>Должность</label>
+        <select onchange="updEmp('role',this.value)">
+          ${ROLES.map(r=>`<option${r===e.role?' selected':''}>${r}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>Ставка ₽/час</label><input type="number" value="${e.rate}" onchange="updEmp('rate',+this.value)"></div>
+      <div class="field"><label>Факт часов${e.loaded?'<span class="from-file">из файла</span>':''}</label><input type="number" value="${e.hours}" onchange="updEmp('hours',+this.value)"></div>
+      <div class="field"><label>Месяц (норма)</label>
+        <select onchange="currentMonth=+this.value;renderEmpCalc()">
+          ${MONTHS.map(m=>`<option value="${m.v}"${m.v===currentMonth?' selected':''}>${m.l}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>База KPI (авто)</label><div class="auto hi" id="ec-base">—</div></div>
+      <div class="field"><label>Макс KPI 40% (авто)</label><div class="auto hi" id="ec-maxkpi">—</div></div>
+    </div>
+  </div>`;
+
+  if(isExec || isKBR){
+    html += `<div class="card">
+      <div class="sec-label">KPI1 · Сделки (50%)</div>
+      <div class="hint"><b>Шкала:</b> &lt;85%→0 · 85–99%→60% · 100%→линейно${isKBR?' (макс 150%)':' (макс 200%)'}</div>
+      <div class="fg">
+        <div class="field"><label>План сделок (авто)</label><div class="auto" id="ec-plan">—</div></div>
+        <div class="field"><label>Факт сделок${e.loaded?'<span class="from-file">из файла</span>':''}</label><input type="number" value="${e.fd}" onchange="updEmp('fd',+this.value)"></div>
+        <div class="field"><label>Коэф (авто)</label><div class="auto" id="ec-c1">—</div></div>
+      </div>
+    </div>`;
+  }
+
+  if(isLead){
+    html += `<div class="card">
+      <div class="sec-label">KPI1 · Проверки (50%)</div>
+      <div class="hint"><b>Шкала:</b> &lt;85%→0 · 85–99%→60% · 100%→линейно (макс 200%)</div>
+      <div class="fg">
+        <div class="field"><label>План проверок (авто)</label><div class="auto" id="ec-planp">—</div></div>
+        <div class="field"><label>Факт проверок${e.loaded?'<span class="from-file">из файла</span>':''}</label><input type="number" value="${e.fp}" onchange="updEmp('fp',+this.value)"></div>
+        <div class="field"><label>Коэф (авто)</label><div class="auto" id="ec-c1">—</div></div>
+      </div>
+      <div class="sec-label" style="margin-top:12px">KPI3 · Исполнение (20%)</div>
+      <div class="fg">
+        <div class="field"><label>План сделок (авто)</label><div class="auto" id="ec-pland">—</div></div>
+        <div class="field"><label>Факт сделок${e.loaded?'<span class="from-file">из файла</span>':''}</label><input type="number" value="${e.fd}" onchange="updEmp('fd',+this.value)"></div>
+        <div class="field"><label>Коэф (авто)</label><div class="auto" id="ec-c3">—</div></div>
+      </div>
+    </div>`;
+  }
+
+  if(isKBR){
+    html += `<div class="card">
+      <div class="sec-label">KPI3 · Бронирования (20%)</div>
+      <div class="hint"><b>Шкала:</b> &lt;70%→0 · 70–84%→50% · 85–94%→80% · 95–100%→100%</div>
+      <div class="fg">
+        <div class="field"><label>% бронирований</label><input type="number" id="ec-bron-inp" value="${e.bron||0}" onchange="updEmp('bron',+this.value)"></div>
+        <div class="field"><label>Коэф (авто)</label><div class="auto" id="ec-c3">—</div></div>
+      </div>
+    </div>`;
+  }
+
+  if(isChief){
+    html += `<div class="card">
+      <div class="sec-label">KPI1 · Финансовые потери (30%)</div>
+      <div class="hint"><b>Потери:</b> &gt;100к→0 · 50–100к→0.5 · 1–50к→0.7 · 0→1.0</div>
+      <div class="fg">
+        <div class="field"><label>Сумма потерь ₽</label><input type="number" value="${e.loss}" onchange="updEmp('loss',+this.value)"></div>
+        <div class="field"><label>Коэф (авто)</label><div class="auto" id="ec-lk">—</div></div>
+      </div>
+      <div class="sec-label" style="margin-top:12px">KPI2 · SLA (30%)</div>
+      <div class="hint"><b>SLA:</b> &lt;70%→0 · 70–80%→0.7 · 81–89%→1.0 · 90–95%→1.2 · 96–100%→1.5</div>
+      <div class="fg">
+        <div class="field"><label>SLA %</label><input type="number" id="ec-sla-inp" value="${e.sla||0}" onchange="updEmp('sla',+this.value)"></div>
+        <div class="field"><label>Коэф (авто)</label><div class="auto" id="ec-sk">—</div></div>
+      </div>
+    </div>`;
+  }
+
+  html += `<div class="card">
+    <div class="sec-label">CSI${isChief?' (KPI3 · 40%)':isLead?' (KPI2 · 30%)':' (KPI2 · 50%)'}</div>
+    <div class="hint"><b>CSI:</b> &lt;4.90→0% · 4.90–4.95→60% · 4.96–4.97→${isChief?'100%':'80%'} · 4.98–5.0→${isChief?'150%':'100%'}</div>
+    <div class="fg">
+      <div class="field"><label>CSI${e.loaded?'<span class="from-file">из файла</span>':''}</label><input type="number" value="${e.csi}" step="0.01" onchange="updEmp('csi',+this.value)"></div>
+      <div class="field"><label>Коэф (авто)</label><div class="auto" id="ec-c2">—</div></div>
+    </div>
+  </div>`;
+
+  if(!isChief){
+    html += `<div class="card">
+      <div class="sec-label">Штрафы</div>
+      <div class="hint"><b>Жалобы:</b> 1→−20% · 2→−50% · 3+→−100% &nbsp;|&nbsp; <b>Потери:</b> 1–10к→−20% · 10–30к→−50% · &gt;30к→−100% · суммируются, макс −100%</div>
+      <div class="fg">
+        <div class="field"><label>Кол-во жалоб${e.loaded?'<span class="from-file">из файла</span>':''}</label><input type="number" value="${e.comp}" onchange="updEmp('comp',+this.value)"></div>
+        <div class="field"><label>Финансовые потери ₽${e.loaded?'<span class="from-file">из файла</span>':''}</label><input type="number" value="${e.loss}" onchange="updEmp('loss',+this.value)"></div>
+        <div class="field"><label>Штраф (авто)</label><div class="auto warn" id="ec-pen">0%</div></div>
+      </div>
+    </div>`;
+  }
+
+  html += `<div class="res-box" id="ec-results"></div>`;
+  document.getElementById('emp-calc-content').innerHTML = html;
+  updateEmpCalc();
+}
+
+function updEmp(field, val){
+  departments[currentDept][currentEmpIdx][field] = val;
+  updateEmpCalc();
+}
+
+function updateEmpCalc(){
+  const e = departments[currentDept][currentEmpIdx];
+  const norm = currentMonth;
+  const base = e.rate * norm;
+  const maxkpi = base * 0.4;
+  const sal = e.rate * e.hours;
+
+  setText('ec-base', e.rate ? fmt(base)+' ₽' : '—');
+  setText('ec-maxkpi', e.rate ? fmt(maxkpi)+' ₽' : '—');
+
+  const isExec = e.role==='Исполнитель';
+  const isLead = e.role==='Ведущий';
+  const isChief = e.role==='Главный Консьерж';
+  const isKBR = currentDept==='КБР';
+
+  let rows = [];
+  let totalBonus = 0;
+
+  if(isExec){
+    const plan = Math.round(0.75*e.hours*10)/10;
+    const c1 = isKBR ? dealCoefKBR(e.fd,plan) : dealCoef(e.fd,plan);
+    const c2 = csiCoef(e.csi);
+    const pen = penaltyPct(e.comp,e.loss);
+    const kpi1 = 0.5*c1*maxkpi, kpi2 = 0.5*c2*maxkpi;
+    const raw = kpi1+kpi2, penAmt = raw*pen, bonus = raw-penAmt;
+    totalBonus = Math.round(bonus);
+    setText('ec-plan', plan||'—');
+    setText('ec-c1', e.hours ? (e.fd/plan*100).toFixed(0)+'% → '+(c1*100).toFixed(0)+'%' : '—');
+    setText('ec-c2', (c2*100).toFixed(0)+'%');
+    setText('ec-pen', pen>0?'−'+(pen*100).toFixed(0)+'%':'0%');
+    const pEx = plan>0&&e.fd>0?(e.fd/plan*100).toFixed(0)+'%':'—';
+    rows = [
+      {l:'KPI1 Сделки — '+e.fd+'/'+plan+' ('+pEx+') → коэф '+(c1*100).toFixed(0)+'%',v:'+'+fmt(kpi1)+' ₽',cls:'pos'},
+      {l:'KPI2 CSI — '+e.csi+' → коэф '+(c2*100).toFixed(0)+'%',v:'+'+fmt(kpi2)+' ₽',cls:'pos'},
+      {l:'Штраф → −'+(pen*100).toFixed(0)+'% от надбавки',v:pen>0?'−'+fmt(penAmt)+' ₽':'0 ₽',cls:pen>0?'neg':'zero'},
+    ];
+  }
+
+  if(isLead){
+    const planP = Math.round(2.0*e.hours*10)/10;
+    const planD = Math.round(0.25*e.hours*10)/10;
+    const c1 = dealCoef(e.fp,planP);
+    const c2 = csiCoef(e.csi);
+    const c3 = dealCoef(e.fd,planD);
+    const pen = penaltyPct(e.comp,e.loss);
+    const kpi1=0.5*c1*maxkpi,kpi2=0.3*c2*maxkpi,kpi3=0.2*c3*maxkpi;
+    const raw=kpi1+kpi2+kpi3,penAmt=raw*pen,bonus=raw-penAmt;
+    totalBonus=Math.round(bonus);
+    setText('ec-planp',planP||'—');
+    setText('ec-pland',planD||'—');
+    setText('ec-c1',e.hours?(e.fp/planP*100).toFixed(0)+'% → '+(c1*100).toFixed(0)+'%':'—');
+    setText('ec-c2',(c2*100).toFixed(0)+'%');
+    setText('ec-c3',e.hours?(e.fd/planD*100).toFixed(0)+'% → '+(c3*100).toFixed(0)+'%':'—');
+    setText('ec-pen',pen>0?'−'+(pen*100).toFixed(0)+'%':'0%');
+    const pP=planP>0&&e.fp>0?(e.fp/planP*100).toFixed(0)+'%':'—';
+    const pD=planD>0&&e.fd>0?(e.fd/planD*100).toFixed(0)+'%':'—';
+    rows=[
+      {l:'KPI1 Проверки — '+e.fp+'/'+planP+' ('+pP+') → '+(c1*100).toFixed(0)+'%',v:'+'+fmt(kpi1)+' ₽',cls:'pos'},
+      {l:'KPI2 CSI — '+e.csi+' → '+(c2*100).toFixed(0)+'%',v:'+'+fmt(kpi2)+' ₽',cls:'pos'},
+      {l:'KPI3 Исполнение — '+e.fd+'/'+planD+' ('+pD+') → '+(c3*100).toFixed(0)+'%',v:'+'+fmt(kpi3)+' ₽',cls:'pos'},
+      {l:'Штраф → −'+(pen*100).toFixed(0)+'% от надбавки',v:pen>0?'−'+fmt(penAmt)+' ₽':'0 ₽',cls:pen>0?'neg':'zero'},
+    ];
+  }
+
+  if(isChief){
+    const lK=lossCoefGK(e.loss),sK=slaCoef(e.sla||0),cK=csiCoefGK(e.csi);
+    const kpi1=0.30*maxkpi*lK,kpi2=0.30*maxkpi*sK,kpi3=0.40*maxkpi*cK;
+    totalBonus=Math.round(kpi1+kpi2+kpi3);
+    setText('ec-lk',(lK*100).toFixed(0)+'%');
+    setText('ec-sk',(sK*100).toFixed(0)+'%');
+    setText('ec-c2',(cK*100).toFixed(0)+'%');
+    rows=[
+      {l:'KPI1 Потери '+fmt(e.loss)+'₽ → '+(lK*100).toFixed(0)+'%',v:'+'+fmt(kpi1)+' ₽',cls:'pos'},
+      {l:'KPI2 SLA '+(e.sla||0)+'% → '+(sK*100).toFixed(0)+'%',v:'+'+fmt(kpi2)+' ₽',cls:'pos'},
+      {l:'KPI3 CSI '+e.csi+' → '+(cK*100).toFixed(0)+'%',v:'+'+fmt(kpi3)+' ₽',cls:'pos'},
+    ];
+  }
+
+  const total = sal + totalBonus;
+  let resHtml = '<div style="font-size:11px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Итог расчёта</div>';
+  resHtml += `<div class="res-row"><span class="res-lbl">Зарплата (${e.rate} ₽ × ${e.hours} ч)</span><span class="res-v">${fmt(sal)} ₽</span></div>`;
+  rows.forEach(r=>{
+    resHtml += `<div class="res-row"><span class="res-lbl">${r.l}</span><span class="res-v ${r.cls}">${r.v}</span></div>`;
+  });
+  resHtml += `<div class="kpi-sub"><span>Итого надбавка KPI</span><span class="${totalBonus>0?'val-ok':'val-warn'}">${totalBonus>0?'+':''} ${fmt(totalBonus)} ₽</span></div>`;
+  resHtml += `<div class="res-row"><span class="res-lbl">Зарплата ${fmt(sal)} ₽ + KPI ${fmt(totalBonus)} ₽</span><span class="res-v pos" style="font-size:17px">${fmt(total)} ₽</span></div>`;
+  document.getElementById('ec-results').innerHTML = resHtml;
+}
+
+function setText(id,val){
+  const el=document.getElementById(id);
+  if(el) el.textContent=val;
+}
+
+// ===== CALC FUNCTIONS =====
+function calcEmp(e, norm){
+  if(!e.rate||!e.hours) return {bonus:0,pctMain:0};
+  const base=e.rate*norm, maxkpi=base*0.4, sal=e.rate*e.hours;
+  let bonus=0, pctMain=0;
+  if(e.role==='Исполнитель'){
+    const plan=0.75*e.hours;
+    pctMain=plan?e.fd/plan:0;
+    const c1=dealCoef(e.fd,plan),c2=csiCoef(e.csi);
+    const raw=0.5*c1*maxkpi+0.5*c2*maxkpi;
+    bonus=Math.round(raw*(1-penaltyPct(e.comp,e.loss)));
+  } else if(e.role==='Ведущий'){
+    const planP=2.0*e.hours;
+    pctMain=planP?e.fp/planP:0;
+    const c1=dealCoef(e.fp,planP),c2=csiCoef(e.csi),c3=dealCoef(e.fd,0.25*e.hours);
+    const raw=0.5*c1*maxkpi+0.3*c2*maxkpi+0.2*c3*maxkpi;
+    bonus=Math.round(raw*(1-penaltyPct(e.comp,e.loss)));
+  } else {
+    pctMain=1;
+    bonus=Math.round(0.30*maxkpi*lossCoefGK(e.loss)+0.30*maxkpi*slaCoef(e.sla||0)+0.40*maxkpi*csiCoefGK(e.csi));
+  }
+  return {bonus, pctMain};
+}
+
+function dealCoef(fact,plan){
+  if(!plan||!fact) return 0;
+  const p=fact/plan;
+  if(p<0.85) return 0; if(p<1.0) return 0.6;
+  if(p<=1.80) return p; if(p<=1.90) return Math.min(1.80+(p-1.80)*2,2.0);
+  return 2.0;
+}
+function dealCoefKBR(fact,plan){
+  if(!plan||!fact) return 0;
+  const p=fact/plan;
+  if(p<0.85) return 0; if(p<1.0) return 0.6;
+  if(p<=1.10) return p; if(p<=1.25) return Math.min(1.10+(p-1.10)*2,1.50);
+  return 1.50;
+}
+function csiCoef(csi){if(!csi||csi<4.90) return 0;if(csi<=4.95) return 0.6;if(csi<=4.97) return 0.8;return 1.0;}
+function csiCoefGK(csi){if(!csi||csi<4.90) return 0;if(csi<=4.95) return 0.6;if(csi<=4.97) return 1.0;return 1.5;}
+function bronCoef(p){if(!p||p<70) return 0;if(p<85) return 0.5;if(p<95) return 0.8;return 1.0;}
+function slaCoef(p){if(!p||p<70) return 0;if(p<=80) return 0.7;if(p<=89) return 1.0;if(p<=95) return 1.2;return 1.5;}
+function lossCoefGK(l){if(!l||l<=0) return 1.0;if(l<=50000) return 0.7;if(l<=100000) return 0.5;return 0;}
+function penaltyPct(comp,loss){
+  let p=0;
+  if(comp>=3) p+=1.0; else if(comp===2) p+=0.5; else if(comp===1) p+=0.2;
+  if(loss>30000) p+=1.0; else if(loss>10000) p+=0.5; else if(loss>0) p+=0.2;
+  return Math.min(p,1.0);
+}
+function fmt(n){return Math.round(n).toLocaleString('ru-RU');}
+
+// ===== MANUAL CALC =====
+function showCalc(i){
+  currentCalcTab=i;
+  document.querySelectorAll('.ctab').forEach((t,j)=>t.classList.toggle('active',i===j));
+  renderManual();
+}
+
+function renderManual(){
+  const tabs=['Исполнитель','Ведущий','ГК (не КБР)','КБР Исп/Вед','ГК КБР'];
+  const mSel = id=>`<select id="${id}" onchange="manCalc()">${MONTHS.map(m=>`<option value="${m.v}"${m.v===currentMonth?' selected':''}>${m.l}</option>`).join('')}</select>`;
+  const i = currentCalcTab;
+  let html = '';
+
+  if(i===0){
+    html=`<div class="card"><div style="font-size:14px;font-weight:500;margin-bottom:14px">Исполнитель — Lifestyle / Travel / Логистика</div>
+    <div class="hint"><b>Сделки:</b> &lt;85%→0 · 85–99%→60% · 100–180%→факт/план · 181–190%→+2%/шаг · &gt;190%→200%<br><b>CSI:</b> &lt;4.90→0% · 4.90–4.95→60% · 4.96–4.97→80% · 4.98–5.0→100%</div>
+    <div class="fg">
+      <div class="field"><label>Расчётный месяц</label>${mSel('m0_month')}</div>
+      <div class="field"><label>Ставка ₽/час</label><input type="number" id="m0_rate" placeholder="468" oninput="manCalc()"></div>
+      <div class="field"><label>Факт часов</label><input type="number" id="m0_hours" placeholder="211" oninput="manCalc()"></div>
+      <div class="field"><label>База KPI (авто)</label><div class="auto hi" id="m0_base">—</div></div>
+      <div class="field"><label>Макс KPI 40% (авто)</label><div class="auto hi" id="m0_maxkpi">—</div></div>
+    </div>
+    <div class="fg">
+      <div class="field"><label>План сделок (авто)</label><div class="auto" id="m0_plan">—</div></div>
+      <div class="field"><label>Факт сделок</label><input type="number" id="m0_fd" placeholder="157" oninput="manCalc()"></div>
+      <div class="field"><label>CSI</label><input type="number" id="m0_csi" placeholder="4.95" step="0.01" oninput="manCalc()"></div>
+    </div>
+    <div class="sec-label">Штрафы</div>
+    <div class="hint"><b>Жалобы:</b> 1→−20% · 2→−50% · 3+→−100% · <b>Потери:</b> 1–10к→−20% · 10–30к→−50% · &gt;30к→−100%</div>
+    <div class="fg">
+      <div class="field"><label>Жалоб / низких оценок</label><input type="number" id="m0_comp" placeholder="0" oninput="manCalc()"></div>
+      <div class="field"><label>Финансовые потери ₽</label><input type="number" id="m0_loss" placeholder="0" oninput="manCalc()"></div>
+      <div class="field"><label>Штраф (авто)</label><div class="auto warn" id="m0_pen">0%</div></div>
+    </div>
+    <div class="res-box" id="m0_res"></div></div>`;
+  } else if(i===1){
+    html=`<div class="card"><div style="font-size:14px;font-weight:500;margin-bottom:14px">Ведущий — Lifestyle / Travel / Логистика</div>
+    <div class="fg">
+      <div class="field"><label>Расчётный месяц</label>${mSel('m1_month')}</div>
+      <div class="field"><label>Ставка ₽/час</label><input type="number" id="m1_rate" placeholder="500" oninput="manCalc()"></div>
+      <div class="field"><label>Факт часов</label><input type="number" id="m1_hours" placeholder="180" oninput="manCalc()"></div>
+      <div class="field"><label>База KPI (авто)</label><div class="auto hi" id="m1_base">—</div></div>
+      <div class="field"><label>Макс KPI 40% (авто)</label><div class="auto hi" id="m1_maxkpi">—</div></div>
+    </div>
+    <div class="sec-label">Проверки (KPI1 · 50%)</div>
+    <div class="fg">
+      <div class="field"><label>План проверок (авто)</label><div class="auto" id="m1_planp">—</div></div>
+      <div class="field"><label>Факт проверок</label><input type="number" id="m1_fp" placeholder="233" oninput="manCalc()"></div>
+    </div>
+    <div class="sec-label">Исполнение (KPI3 · 20%) + CSI (KPI2 · 30%)</div>
+    <div class="fg">
+      <div class="field"><label>План сделок (авто)</label><div class="auto" id="m1_pland">—</div></div>
+      <div class="field"><label>Факт сделок</label><input type="number" id="m1_fd" placeholder="89" oninput="manCalc()"></div>
+      <div class="field"><label>CSI</label><input type="number" id="m1_csi" placeholder="4.95" step="0.01" oninput="manCalc()"></div>
+    </div>
+    <div class="sec-label">Штрафы</div>
+    <div class="hint"><b>Жалобы:</b> 1→−20% · 2→−50% · 3+→−100% · <b>Потери:</b> 1–10к→−20% · 10–30к→−50% · &gt;30к→−100%</div>
+    <div class="fg">
+      <div class="field"><label>Жалоб / низких оценок</label><input type="number" id="m1_comp" placeholder="0" oninput="manCalc()"></div>
+      <div class="field"><label>Финансовые потери ₽</label><input type="number" id="m1_loss" placeholder="0" oninput="manCalc()"></div>
+      <div class="field"><label>Штраф (авто)</label><div class="auto warn" id="m1_pen">0%</div></div>
+    </div>
+    <div class="res-box" id="m1_res"></div></div>`;
+  } else if(i===2){
+    html=`<div class="card"><div style="font-size:14px;font-weight:500;margin-bottom:14px">Главный Консьерж — Travel / Lifestyle / Логистика</div>
+    <div class="hint"><b>Потери:</b> &gt;100к→0 · 50–100к→0.5 · 1–50к→0.7 · 0→1.0 &nbsp;|&nbsp; <b>SLA:</b> &lt;70%→0 · 70–80%→0.7 · 81–89%→1.0 · 90–95%→1.2 · 96–100%→1.5 &nbsp;|&nbsp; <b>CSI:</b> &lt;4.89→0 · 4.90–4.95→0.6 · 4.96–4.97→1.0 · 4.98–5.0→1.5</div>
+    <div class="fg">
+      <div class="field"><label>Расчётный месяц</label>${mSel('m2_month')}</div>
+      <div class="field"><label>Ставка ₽/час</label><input type="number" id="m2_rate" placeholder="587" oninput="manCalc()"></div>
+      <div class="field"><label>Факт часов</label><input type="number" id="m2_hours" placeholder="175" oninput="manCalc()"></div>
+      <div class="field"><label>База KPI (авто)</label><div class="auto hi" id="m2_base">—</div></div>
+      <div class="field"><label>Макс KPI 40% (авто)</label><div class="auto hi" id="m2_maxkpi">—</div></div>
+    </div>
+    <div class="fg">
+      <div class="field"><label>Потери ₽</label><input type="number" id="m2_loss" placeholder="0" oninput="manCalc()"></div>
+      <div class="field"><label>Коэф потери (авто)</label><div class="auto hi" id="m2_lk">—</div></div>
+      <div class="field"><label>SLA %</label><input type="number" id="m2_sla" placeholder="85" oninput="manCalc()"></div>
+      <div class="field"><label>Коэф SLA (авто)</label><div class="auto hi" id="m2_sk">—</div></div>
+      <div class="field"><label>CSI</label><input type="number" id="m2_csi" placeholder="4.95" step="0.01" oninput="manCalc()"></div>
+      <div class="field"><label>Коэф CSI (авто)</label><div class="auto hi" id="m2_ck">—</div></div>
+    </div>
+    <div class="res-box" id="m2_res"></div></div>`;
+  } else if(i===3){
+    html=`<div class="card"><div style="font-size:14px;font-weight:500;margin-bottom:14px">КБР — Исполнитель / Ведущий</div>
+    <div class="hint"><b>Сделки КБР:</b> &lt;85%→0 · 85–99%→60% · 100–110%→факт/план · 111–125%→+2%/шаг · ≥125%→150%<br><b>Бронирования:</b> &lt;70%→0 · 70–84%→50% · 85–94%→80% · 95–100%→100%</div>
+    <div class="fg">
+      <div class="field"><label>Расчётный месяц</label>${mSel('m3_month')}</div>
+      <div class="field"><label>Ставка ₽/час</label><input type="number" id="m3_rate" placeholder="500" oninput="manCalc()"></div>
+      <div class="field"><label>Факт часов</label><input type="number" id="m3_hours" placeholder="183" oninput="manCalc()"></div>
+      <div class="field"><label>База KPI (авто)</label><div class="auto hi" id="m3_base">—</div></div>
+      <div class="field"><label>Макс KPI 40% (авто)</label><div class="auto hi" id="m3_maxkpi">—</div></div>
+    </div>
+    <div class="fg">
+      <div class="field"><label>План сделок (авто)</label><div class="auto" id="m3_plan">—</div></div>
+      <div class="field"><label>Факт сделок</label><input type="number" id="m3_fd" placeholder="102" oninput="manCalc()"></div>
+      <div class="field"><label>% бронирований</label><input type="number" id="m3_bron" placeholder="90" oninput="manCalc()"></div>
+      <div class="field"><label>CSI</label><input type="number" id="m3_csi" placeholder="4.95" step="0.01" oninput="manCalc()"></div>
+    </div>
+    <div class="sec-label">Штрафы</div>
+    <div class="fg">
+      <div class="field"><label>Жалоб</label><input type="number" id="m3_comp" placeholder="0" oninput="manCalc()"></div>
+      <div class="field"><label>Потери ₽</label><input type="number" id="m3_loss" placeholder="0" oninput="manCalc()"></div>
+      <div class="field"><label>Штраф (авто)</label><div class="auto warn" id="m3_pen">0%</div></div>
+    </div>
+    <div class="res-box" id="m3_res"></div></div>`;
+  } else {
+    html=`<div class="card"><div style="font-size:14px;font-weight:500;margin-bottom:14px">Главный Консьерж КБР</div>
+    <div class="hint"><b>Бронирования:</b> &lt;70%→0 · 70–84%→0.5 · 85–94%→0.8 · 95–100%→1.0 &nbsp;|&nbsp; <b>SLA:</b> &lt;70%→0 · 70–80%→0.7 · 81–89%→1.0 · 90–95%→1.2 · 96–100%→1.5 &nbsp;|&nbsp; <b>CSI:</b> &lt;4.89→0 · 4.90–4.95→0.6 · 4.96–4.97→1.0 · 4.98–5.0→1.5</div>
+    <div class="fg">
+      <div class="field"><label>Расчётный месяц</label>${mSel('m4_month')}</div>
+      <div class="field"><label>Ставка ₽/час</label><input type="number" id="m4_rate" placeholder="587" oninput="manCalc()"></div>
+      <div class="field"><label>Факт часов</label><input type="number" id="m4_hours" placeholder="175" oninput="manCalc()"></div>
+      <div class="field"><label>База KPI (авто)</label><div class="auto hi" id="m4_base">—</div></div>
+      <div class="field"><label>Макс KPI 40% (авто)</label><div class="auto hi" id="m4_maxkpi">—</div></div>
+    </div>
+    <div class="fg">
+      <div class="field"><label>% бронирований</label><input type="number" id="m4_bron" placeholder="80" oninput="manCalc()"></div>
+      <div class="field"><label>SLA %</label><input type="number" id="m4_sla" placeholder="85" oninput="manCalc()"></div>
+      <div class="field"><label>CSI</label><input type="number" id="m4_csi" placeholder="4.95" step="0.01" oninput="manCalc()"></div>
+    </div>
+    <div class="res-box" id="m4_res"></div></div>`;
+  }
+
+  document.getElementById('manual-calc-content').innerHTML = html;
+  manCalc();
+}
+
+function g(id){return parseFloat(document.getElementById(id)?.value)||0;}
+
+function manCalc(){
+  const i = currentCalcTab;
+  const norm = g(`m${i}_month`);
+  const rate = g(`m${i}_rate`);
+  const hours = g(`m${i}_hours`);
+  const base = rate*norm, maxkpi = base*0.4, sal = rate*hours;
+  setText(`m${i}_base`, rate?fmt(base)+' ₽':'—');
+  setText(`m${i}_maxkpi`, rate?fmt(maxkpi)+' ₽':'—');
+
+  let rows=[], bonus=0;
+
+  if(i===0){
+    const fd=g('m0_fd'),csi=g('m0_csi'),comp=g('m0_comp'),loss=g('m0_loss');
+    const plan=Math.round(0.75*hours*10)/10;
+    setText('m0_plan',plan||'—');
+    const c1=dealCoef(fd,plan),c2=csiCoef(csi),pen=penaltyPct(comp,loss);
+    const kpi1=0.5*c1*maxkpi,kpi2=0.5*c2*maxkpi,raw=kpi1+kpi2,penAmt=raw*pen;
+    bonus=Math.round(raw-penAmt);
+    setText('m0_pen',pen>0?'−'+(pen*100).toFixed(0)+'%':'0%');
+    const pEx=plan>0&&fd>0?(fd/plan*100).toFixed(0)+'%':'—';
+    rows=[
+      {l:'KPI1 Сделки — '+fd+'/'+plan+' ('+pEx+') → '+(c1*100).toFixed(0)+'%',v:'+'+fmt(kpi1)+' ₽',cls:'pos'},
+      {l:'KPI2 CSI — '+csi+' → '+(c2*100).toFixed(0)+'%',v:'+'+fmt(kpi2)+' ₽',cls:'pos'},
+      {l:'Штраф → −'+(pen*100).toFixed(0)+'%',v:pen>0?'−'+fmt(penAmt)+' ₽':'0 ₽',cls:pen>0?'neg':'zero'},
+    ];
+  } else if(i===1){
+    const fp=g('m1_fp'),fd=g('m1_fd'),csi=g('m1_csi'),comp=g('m1_comp'),loss=g('m1_loss');
+    const planP=Math.round(2.0*hours*10)/10,planD=Math.round(0.25*hours*10)/10;
+    setText('m1_planp',planP||'—');setText('m1_pland',planD||'—');
+    const c1=dealCoef(fp,planP),c2=csiCoef(csi),c3=dealCoef(fd,planD),pen=penaltyPct(comp,loss);
+    const kpi1=0.5*c1*maxkpi,kpi2=0.3*c2*maxkpi,kpi3=0.2*c3*maxkpi,raw=kpi1+kpi2+kpi3,penAmt=raw*pen;
+    bonus=Math.round(raw-penAmt);
+    setText('m1_pen',pen>0?'−'+(pen*100).toFixed(0)+'%':'0%');
+    rows=[
+      {l:'KPI1 Проверки '+fp+'/'+planP+' → '+(c1*100).toFixed(0)+'%',v:'+'+fmt(kpi1)+' ₽',cls:'pos'},
+      {l:'KPI2 CSI '+csi+' → '+(c2*100).toFixed(0)+'%',v:'+'+fmt(kpi2)+' ₽',cls:'pos'},
+      {l:'KPI3 Исполнение '+fd+'/'+planD+' → '+(c3*100).toFixed(0)+'%',v:'+'+fmt(kpi3)+' ₽',cls:'pos'},
+      {l:'Штраф → −'+(pen*100).toFixed(0)+'%',v:pen>0?'−'+fmt(penAmt)+' ₽':'0 ₽',cls:pen>0?'neg':'zero'},
+    ];
+  } else if(i===2){
+    const loss=g('m2_loss'),sla=g('m2_sla'),csi=g('m2_csi');
+    const lK=lossCoefGK(loss),sK=slaCoef(sla),cK=csiCoefGK(csi);
+    setText('m2_lk',(lK*100).toFixed(0)+'%');setText('m2_sk',(sK*100).toFixed(0)+'%');setText('m2_ck',(cK*100).toFixed(0)+'%');
+    const kpi1=0.30*maxkpi*lK,kpi2=0.30*maxkpi*sK,kpi3=0.40*maxkpi*cK;
+    bonus=Math.round(kpi1+kpi2+kpi3);
+    rows=[
+      {l:'KPI1 Потери '+fmt(loss)+'₽ → '+(lK*100).toFixed(0)+'%',v:'+'+fmt(kpi1)+' ₽',cls:'pos'},
+      {l:'KPI2 SLA '+sla+'% → '+(sK*100).toFixed(0)+'%',v:'+'+fmt(kpi2)+' ₽',cls:'pos'},
+      {l:'KPI3 CSI '+csi+' → '+(cK*100).toFixed(0)+'%',v:'+'+fmt(kpi3)+' ₽',cls:'pos'},
+    ];
+  } else if(i===3){
+    const fd=g('m3_fd'),bron=g('m3_bron'),csi=g('m3_csi'),comp=g('m3_comp'),loss=g('m3_loss');
+    const plan=Math.round(1.80*hours*10)/10;
+    setText('m3_plan',plan||'—');
+    const c1=dealCoefKBR(fd,plan),c2=csiCoef(csi),c3=bronCoef(bron),pen=penaltyPct(comp,loss);
+    const kpi1=0.5*c1*maxkpi,kpi2=0.3*c2*maxkpi,kpi3=0.2*c3*maxkpi,raw=kpi1+kpi2+kpi3,penAmt=raw*pen;
+    bonus=Math.round(raw-penAmt);
+    setText('m3_pen',pen>0?'−'+(pen*100).toFixed(0)+'%':'0%');
+    rows=[
+      {l:'KPI1 Сделки '+fd+'/'+plan+' → '+(c1*100).toFixed(0)+'%',v:'+'+fmt(kpi1)+' ₽',cls:'pos'},
+      {l:'KPI2 CSI '+csi+' → '+(c2*100).toFixed(0)+'%',v:'+'+fmt(kpi2)+' ₽',cls:'pos'},
+      {l:'KPI3 Бронирования '+bron+'% → '+(c3*100).toFixed(0)+'%',v:'+'+fmt(kpi3)+' ₽',cls:'pos'},
+      {l:'Штраф → −'+(pen*100).toFixed(0)+'%',v:pen>0?'−'+fmt(penAmt)+' ₽':'0 ₽',cls:pen>0?'neg':'zero'},
+    ];
+  } else {
+    const bron=g('m4_bron'),sla=g('m4_sla'),csi=g('m4_csi');
+    const bK=bronCoef(bron),sK=slaCoef(sla),cK=csiCoefGK(csi);
+    const kpi1=0.40*maxkpi*bK,kpi2=0.20*maxkpi*sK,kpi3=0.40*maxkpi*cK;
+    bonus=Math.round(kpi1+kpi2+kpi3);
+    rows=[
+      {l:'KPI1 Бронирования '+bron+'% → '+(bK*100).toFixed(0)+'%',v:'+'+fmt(kpi1)+' ₽',cls:'pos'},
+      {l:'KPI2 SLA '+sla+'% → '+(sK*100).toFixed(0)+'%',v:'+'+fmt(kpi2)+' ₽',cls:'pos'},
+      {l:'KPI3 CSI '+csi+' → '+(cK*100).toFixed(0)+'%',v:'+'+fmt(kpi3)+' ₽',cls:'pos'},
+    ];
+  }
+
+  const resEl = document.getElementById(`m${i}_res`);
+  if(!resEl) return;
+  const total = sal+bonus;
+  let html='';
+  html+=`<div class="res-row"><span class="res-lbl">Зарплата (${rate} ₽ × ${hours} ч)</span><span class="res-v">${fmt(sal)} ₽</span></div>`;
+  rows.forEach(r=>html+=`<div class="res-row"><span class="res-lbl">${r.l}</span><span class="res-v ${r.cls}">${r.v}</span></div>`);
+  html+=`<div class="kpi-sub"><span>Итого надбавка KPI</span><span class="${bonus>0?'val-ok':'val-warn'}">${bonus>0?'+':''}${fmt(bonus)} ₽</span></div>`;
+  html+=`<div class="res-row"><span class="res-lbl">Зарплата ${fmt(sal)} ₽ + KPI ${fmt(bonus)} ₽</span><span class="res-v pos" style="font-size:17px">${fmt(total)} ₽</span></div>`;
+  resEl.innerHTML=html;
+}
+
+renderManual();
+</script>
+</body>
+</html>
