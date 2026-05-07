@@ -1082,10 +1082,18 @@ function renderStats(){
   const data = monthEntries();
   const rubEntries = data.filter(e=>e.currency==='RUB');
   const total = rubEntries.reduce((s,e)=>s+(+e.amount||0),0);
+  const statsEl = document.getElementById('stats');
+  if(!statsEl) return;
+  // Показываем статистику только на вкладке "Все заявки"
+  if(activeTab !== 'main'){
+    statsEl.style.display = 'none';
+    return;
+  }
+  statsEl.style.display = '';
   const comm = data.reduce((s,e)=>s+(+e.commission||0),0);
   const paid = data.filter(e=>e.status==='paid').length;
   const losses = data.filter(e=>e.is_loss).length;
-  document.getElementById('stats').innerHTML = `
+  statsEl.innerHTML = `
     <div class="stat"><div class="stat-label">Записей</div><div class="stat-value">${data.length}</div></div>
     <div class="stat"><div class="stat-label">Оплачено</div><div class="stat-value" style="color:#2ECC71">${paid}</div></div>
     <div class="stat"><div class="stat-label">Сумма FCS</div><div class="stat-value" style="font-size:15px;color:#60A5FA">${fmt(total)} ₽</div></div>
@@ -1718,6 +1726,8 @@ function switchTab(t){
   else if(t==='hr'){ hrRender(); }
   else if(t==='partners'){ ptnRender(); }
   else renderTable();
+  // Скрываем/показываем статистику в зависимости от вкладки
+  renderStats();
 }
 
 function switchMonth(m){
