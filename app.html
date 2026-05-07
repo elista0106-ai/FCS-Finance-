@@ -344,30 +344,44 @@ tr:hover td{background:var(--bg2)}
   <!-- Month switcher -->
   <div class="month-bar" id="month-bar"></div>
 
-  <!-- Main tabs -->
-  <div class="tabs" style="overflow-x:auto;flex-wrap:nowrap;position:relative">
-    <div class="tab active" id="tab-main" onclick="switchTab('main')">Все заявки <span class="cnt" id="cnt-main"></span></div>
-    <div class="tab" id="tab-treasury" onclick="switchTab('treasury')" style="color:#F59E0B">💰 Казначей <span class="cnt" id="cnt-treasury"></span></div>
-    <div class="tab" id="tab-loss" onclick="switchTab('loss')">⚠ Потери <span class="cnt" id="cnt-loss"></span></div>
-    <div class="tab" id="tab-expense" onclick="switchTab('expense')">💼 Расходы <span class="cnt" id="cnt-expense"></span></div>
-    <div class="tab" id="tab-corp" onclick="switchTab('corp')">🏢 Корп карта <span class="cnt" id="cnt-corp"></span></div>
-    <div class="tab" id="tab-invoice" onclick="switchTab('invoice')">📄 По счёту <span class="cnt" id="cnt-invoice"></span></div>
-    <div class="tab" id="tab-dept" onclick="switchTab('dept')">📊 По отделам <span class="cnt" id="cnt-dept"></span></div>
-    <div class="tab" id="tab-days" onclick="switchTab('days')">📅 По дням</div>
-    <div class="tab" id="tab-clients" onclick="switchTab('clients')">👤 Клиенты</div>
-    <!-- Скрытые вкладки — активируются из меню -->
-    <div class="tab" id="tab-kpi" onclick="switchTab('kpi')" style="display:none">🏆 KPI</div>
-    <div class="tab" id="tab-hr" onclick="switchTab('hr')" style="display:none">👥 НР</div>
-    <div class="tab" id="tab-partners" onclick="switchTab('partners')" style="display:none">🤝 Партнёры</div>
-    <!-- Меню ••• справа -->
-    <div style="margin-left:auto;position:relative;flex-shrink:0">
-      <button id="more-menu-btn" onclick="toggleMoreMenu()" style="padding:6px 12px;background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);cursor:pointer;font-size:13px;white-space:nowrap">••• Ещё</button>
-      <div id="more-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:200;min-width:180px;overflow:hidden">
-        <div onclick="switchTabMenu('kpi')" class="more-menu-item" id="mmenu-kpi">🏆 KPI</div>
-        <div onclick="switchTabMenu('hr')" class="more-menu-item" id="mmenu-hr">👥 НР — Сотрудники</div>
-        <div onclick="switchTabMenu('partners')" class="more-menu-item" id="mmenu-partners">🤝 Партнёры</div>
+  <!-- Nav bar — все вкладки в меню -->
+  <div style="background:var(--bg2);border-bottom:0.5px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:42px;position:sticky;top:89px;z-index:98">
+    <!-- Текущая вкладка -->
+    <div id="current-tab-title" style="font-size:13px;font-weight:500;color:var(--text)">📋 Все заявки</div>
+    <!-- Кнопка меню -->
+    <div style="position:relative">
+      <button id="more-menu-btn" onclick="toggleMoreMenu()" style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);cursor:pointer;font-size:13px;font-weight:500">
+        <span>☰ Меню</span>
+      </button>
+      <div id="more-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius);box-shadow:0 12px 32px rgba(0,0,0,.4);z-index:300;min-width:220px;overflow:hidden">
+        <div style="padding:8px 12px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:0.5px solid var(--border)">Журнал</div>
+        <div onclick="switchTabMenu('main','📋 Все заявки')" class="more-menu-item" id="mmenu-main">📋 Все заявки</div>
+        <div onclick="switchTabMenu('treasury','💰 Казначей')" class="more-menu-item" id="mmenu-treasury">💰 Казначей</div>
+        <div onclick="switchTabMenu('loss','⚠ Потери')" class="more-menu-item" id="mmenu-loss">⚠ Потери</div>
+        <div onclick="switchTabMenu('expense','💼 Расходы')" class="more-menu-item" id="mmenu-expense">💼 Расходы</div>
+        <div onclick="switchTabMenu('corp','🏢 Корп карта')" class="more-menu-item" id="mmenu-corp">🏢 Корп карта</div>
+        <div onclick="switchTabMenu('invoice','📄 По счёту')" class="more-menu-item" id="mmenu-invoice">📄 По счёту</div>
+        <div style="padding:8px 12px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:0.5px solid var(--border);border-top:0.5px solid var(--border)">Аналитика</div>
+        <div onclick="switchTabMenu('dept','📊 По отделам')" class="more-menu-item" id="mmenu-dept">📊 По отделам</div>
+        <div onclick="switchTabMenu('days','📅 По дням')" class="more-menu-item" id="mmenu-days">📅 По дням</div>
+        <div onclick="switchTabMenu('clients','👤 Клиенты')" class="more-menu-item" id="mmenu-clients">👤 Клиенты</div>
+        <div style="padding:8px 12px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:0.5px solid var(--border);border-top:0.5px solid var(--border)">Управление</div>
+        <div onclick="switchTabMenu('kpi','🏆 KPI')" class="more-menu-item" id="mmenu-kpi">🏆 KPI</div>
+        <div onclick="switchTabMenu('hr','👥 НР — Сотрудники')" class="more-menu-item" id="mmenu-hr">👥 НР — Сотрудники</div>
+        <div onclick="switchTabMenu('partners','🤝 Партнёры')" class="more-menu-item" id="mmenu-partners">🤝 Партнёры</div>
       </div>
     </div>
+  </div>
+  <!-- Скрытые tab-элементы для совместимости с switchTab -->
+  <div style="display:none">
+    <div id="tab-main"></div><div id="tab-treasury"></div><div id="tab-loss"></div>
+    <div id="tab-expense"></div><div id="tab-corp"></div><div id="tab-invoice"></div>
+    <div id="tab-dept"></div><div id="tab-days"></div><div id="tab-clients"></div>
+    <div id="tab-kpi"></div><div id="tab-hr"></div><div id="tab-partners"></div>
+    <span class="cnt" id="cnt-main"></span><span class="cnt" id="cnt-treasury"></span>
+    <span class="cnt" id="cnt-loss"></span><span class="cnt" id="cnt-expense"></span>
+    <span class="cnt" id="cnt-corp"></span><span class="cnt" id="cnt-invoice"></span>
+    <span class="cnt" id="cnt-dept"></span>
   </div>
 
   <!-- Bulk action bar -->
@@ -1665,18 +1679,16 @@ function toggleMoreMenu(){
   if(m) m.style.display = m.style.display==='none'?'block':'none';
 }
 
-function switchTabMenu(t){
-  // Закрываем меню
+function switchTabMenu(t, title){
   const m = document.getElementById('more-menu');
   if(m) m.style.display='none';
-  // Подсвечиваем активный пункт меню
-  ['kpi','hr','partners'].forEach(x=>{
-    const el = document.getElementById('mmenu-'+x);
-    if(el) el.classList.toggle('active-menu', x===t);
-  });
-  // Подсвечиваем кнопку меню
-  const btn = document.getElementById('more-menu-btn');
-  if(btn) btn.style.color = ['kpi','hr','partners'].includes(activeTab)?'var(--accent)':'';
+  // Подсвечиваем активный пункт
+  document.querySelectorAll('.more-menu-item').forEach(el=>el.classList.remove('active-menu'));
+  const active = document.getElementById('mmenu-'+t);
+  if(active) active.classList.add('active-menu');
+  // Показываем название текущей вкладки
+  const titleEl = document.getElementById('current-tab-title');
+  if(titleEl && title) titleEl.textContent = title;
   switchTab(t);
 }
 
