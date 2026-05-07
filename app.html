@@ -441,43 +441,35 @@ tr:hover td{background:var(--bg2)}
 
     <!-- KPI VIEW -->
     <div id="view-kpi" style="display:none">
-      <!-- KPI Month/Year Bar -->
-      <div style="background:var(--bg2);border-bottom:0.5px solid var(--border);padding:0 20px;position:sticky;top:89px;z-index:97;overflow-x:auto">
-        <div id="kpi-year-bar" style="display:flex;align-items:center;gap:0"></div>
+
+      <!-- ГОД + МЕСЯЦА — sticky bar -->
+      <div style="background:var(--bg2);border-bottom:0.5px solid var(--border);position:sticky;top:89px;z-index:97">
+        <!-- Год -->
+        <div style="display:flex;align-items:center;gap:0;padding:0 20px;border-bottom:0.5px solid var(--border)" id="kpi-year-row"></div>
+        <!-- Месяца текущего года -->
+        <div style="display:flex;align-items:center;gap:0;padding:0 20px;overflow-x:auto" id="kpi-month-row"></div>
       </div>
+
       <div class="content">
         <!-- Sub-tabs -->
         <div class="kpi-sub-tabs">
-          <button class="kpi-stab active" onclick="kpiShowScreen('upload')">📥 Загрузка данных</button>
-          <button class="kpi-stab" onclick="kpiShowScreen('dept')">👥 По отделам</button>
+          <button class="kpi-stab active" onclick="kpiShowScreen('dept')">👥 По отделам</button>
+          <button class="kpi-stab" onclick="kpiShowScreen('upload')">📥 Загрузить данные</button>
           <button class="kpi-stab" onclick="kpiShowScreen('manual')">🧮 Ручной расчёт</button>
+          <button class="kpi-stab" onclick="kpiShowScreen('settings')">⚙️ Настройки</button>
+        </div>
+
+        <!-- DEPT SCREEN (default) -->
+        <div class="kpi-screen active" id="kpi-sc-dept">
+          <div class="kpi-dept-tabs" id="kpi-dept-tabs"></div>
+          <div id="kpi-dept-content"></div>
         </div>
 
         <!-- UPLOAD SCREEN -->
-        <div class="kpi-screen active" id="kpi-sc-upload">
-
-          <!-- БЛОК: Сохранение настроек -->
-          <div class="kpi-card" style="padding:16px;margin-bottom:12px;background:#EAF3DE;border-color:#B5D49A">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-              <div>
-                <div style="font-size:13px;font-weight:600;color:var(--green2);margin-bottom:3px">💾 Настройки сотрудников</div>
-                <div style="font-size:11px;color:var(--text2)">Сохраните список сотрудников, ставки и должности — они не потеряются при обновлении программы</div>
-              </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <button class="btn btn-sm" onclick="kpiSaveSettings()" style="background:var(--green2);color:#fff;border-color:var(--green2);font-weight:600">💾 Сохранить настройки</button>
-                <button class="btn btn-sm" onclick="kpiExportSettings()">⬇ Скачать резерв (.json)</button>
-                <label class="btn btn-sm" style="cursor:pointer" title="Восстановить из файла .json">
-                  📂 Загрузить резерв
-                  <input type="file" accept=".json" style="display:none" onchange="kpiImportSettings(this)">
-                </label>
-              </div>
-            </div>
-            <div id="kpi-save-status" style="font-size:11px;color:var(--green2);margin-top:8px;display:none"></div>
-          </div>
-
-          <!-- БЛОК: Загрузка данных за месяц -->
+        <div class="kpi-screen" id="kpi-sc-upload">
           <div class="kpi-card" style="padding:20px">
-            <div style="font-size:13px;font-weight:600;margin-bottom:12px">📥 Загрузка данных за месяц</div>
+            <div style="font-size:14px;font-weight:600;margin-bottom:4px" id="kpi-upload-month-title">📥 Загрузка данных</div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:16px">Данные загрузятся в выбранный месяц</div>
             <label class="kpi-upload-zone" id="kpi-dropzone" for="kpiFileInput">
               <input type="file" id="kpiFileInput" accept=".xlsx,.xls,.csv" onchange="kpiHandleFile(this.files[0])">
               <div style="font-size:32px;margin-bottom:10px">📂</div>
@@ -485,57 +477,34 @@ tr:hover td{background:var(--bg2)}
               <div style="font-size:12px;color:var(--text2)">Сотрудник, Отдел, Факт часов, Факт сделок, Факт проверок, CSI, Потери ₽, Жалобы</div>
               <div style="display:inline-block;margin-top:12px;padding:6px 16px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);font-size:12px;color:var(--text2)">Выбрать файл</div>
             </label>
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-              <label style="font-size:12px;color:var(--text2)">Расчётный месяц:</label>
-              <select id="kpi-upload-month" style="font-size:13px;padding:5px 8px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text)" onchange="kpiCurrMonth=+this.value">
-                <option value="136" data-key="2026-01">Январь 2026 (136ч)</option>
-                <option value="151" data-key="2026-02">Февраль 2026 (151ч)</option>
-                <option value="167" data-key="2026-03">Март 2026 (167ч)</option>
-                <option value="175" data-key="2026-04">Апрель 2026 (175ч)</option>
-                <option value="143" data-key="2026-05" selected>Май 2026 (143ч)</option>
-                <option value="167" data-key="2026-06">Июнь 2026 (167ч)</option>
-                <option value="184" data-key="2026-07">Июль 2026 (184ч)</option>
-                <option value="168" data-key="2026-08">Август 2026 (168ч)</option>
-                <option value="176" data-key="2026-09">Сентябрь 2026 (176ч)</option>
-                <option value="176" data-key="2026-10">Октябрь 2026 (176ч)</option>
-                <option value="159" data-key="2026-11">Ноябрь 2026 (159ч)</option>
-                <option value="176" data-key="2026-12">Декабрь 2026 (176ч)</option>
-              </select>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
               <button class="btn btn-primary btn-sm" onclick="kpiApplyUpload()">Загрузить и рассчитать</button>
               <button class="btn btn-sm" onclick="kpiExportExcel()">⬇ Выгрузить Excel</button>
               <button class="btn btn-sm" onclick="kpiDownloadSample()">📋 Образец файла</button>
               <button class="btn btn-sm" onclick="kpiResetData()" style="color:var(--red);border-color:var(--red)">🗑 Сбросить месяц</button>
             </div>
           </div>
-
           <div class="kpi-card" style="padding:16px">
-            <div style="font-size:13px;font-weight:600;margin-bottom:10px">Образец файла</div>
-            <div style="overflow-x:auto">
-              <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text2)">Образец файла (8 колонок)</div>
+            <div style="overflow-x:auto;font-size:11px">
+              <table style="width:100%;border-collapse:collapse">
                 <thead><tr style="background:var(--bg3)">
-                  <th style="padding:7px 10px;text-align:left;border-bottom:0.5px solid var(--border);color:var(--text2);font-weight:500">Сотрудник</th>
-                  <th style="padding:7px 10px;text-align:left;border-bottom:0.5px solid var(--border);color:var(--text2);font-weight:500">Отдел</th>
-                  <th style="padding:7px 10px;text-align:right;border-bottom:0.5px solid var(--border);color:var(--text2);font-weight:500">Факт часов</th>
-                  <th style="padding:7px 10px;text-align:right;border-bottom:0.5px solid var(--border);color:var(--text2);font-weight:500">Факт сделок</th>
-                  <th style="padding:7px 10px;text-align:right;border-bottom:0.5px solid var(--border);color:var(--text2);font-weight:500">Факт проверок</th>
-                  <th style="padding:7px 10px;text-align:right;border-bottom:0.5px solid var(--border);color:var(--text2);font-weight:500">CSI</th>
-                  <th style="padding:7px 10px;text-align:right;border-bottom:0.5px solid var(--border);color:var(--text2);font-weight:500">Потери ₽</th>
-                  <th style="padding:7px 10px;text-align:right;border-bottom:0.5px solid var(--border);color:var(--text2);font-weight:500">Жалобы</th>
+                  <th style="padding:6px 10px;text-align:left;border-bottom:0.5px solid var(--border);color:var(--text2)">Сотрудник</th>
+                  <th style="padding:6px 10px;text-align:left;border-bottom:0.5px solid var(--border);color:var(--text2)">Отдел</th>
+                  <th style="padding:6px 10px;text-align:right;border-bottom:0.5px solid var(--border);color:var(--text2)">Факт часов</th>
+                  <th style="padding:6px 10px;text-align:right;border-bottom:0.5px solid var(--border);color:var(--text2)">Факт сделок</th>
+                  <th style="padding:6px 10px;text-align:right;border-bottom:0.5px solid var(--border);color:var(--text2)">Факт проверок</th>
+                  <th style="padding:6px 10px;text-align:right;border-bottom:0.5px solid var(--border);color:var(--text2)">CSI</th>
+                  <th style="padding:6px 10px;text-align:right;border-bottom:0.5px solid var(--border);color:var(--text2)">Потери ₽</th>
+                  <th style="padding:6px 10px;text-align:right;border-bottom:0.5px solid var(--border);color:var(--text2)">Жалобы</th>
                 </tr></thead>
                 <tbody>
-                  <tr><td style="padding:7px 10px;border-bottom:0.5px solid var(--border)">Долматова Надежда</td><td style="padding:7px 10px;border-bottom:0.5px solid var(--border);color:var(--text2)">Lifestyle</td><td style="padding:7px 10px;text-align:right;border-bottom:0.5px solid var(--border)">202</td><td style="padding:7px 10px;text-align:right;border-bottom:0.5px solid var(--border)">103</td><td style="padding:7px 10px;text-align:right;border-bottom:0.5px solid var(--border)">367</td><td style="padding:7px 10px;text-align:right;border-bottom:0.5px solid var(--border)">4.83</td><td style="padding:7px 10px;text-align:right;border-bottom:0.5px solid var(--border)">0</td><td style="padding:7px 10px;text-align:right;border-bottom:0.5px solid var(--border)">0</td></tr>
-                  <tr><td style="padding:7px 10px">Рудченко Юлия</td><td style="padding:7px 10px;color:var(--text2)">Lifestyle</td><td style="padding:7px 10px;text-align:right">211</td><td style="padding:7px 10px;text-align:right">157</td><td style="padding:7px 10px;text-align:right">317</td><td style="padding:7px 10px;text-align:right">4.90</td><td style="padding:7px 10px;text-align:right">0</td><td style="padding:7px 10px;text-align:right">0</td></tr>
+                  <tr><td style="padding:6px 10px;border-bottom:0.5px solid var(--border)">Долматова Надежда</td><td style="padding:6px 10px;border-bottom:0.5px solid var(--border);color:var(--text2)">Lifestyle</td><td style="padding:6px 10px;text-align:right;border-bottom:0.5px solid var(--border)">202</td><td style="padding:6px 10px;text-align:right;border-bottom:0.5px solid var(--border)">103</td><td style="padding:6px 10px;text-align:right;border-bottom:0.5px solid var(--border)">367</td><td style="padding:6px 10px;text-align:right;border-bottom:0.5px solid var(--border)">4.83</td><td style="padding:6px 10px;text-align:right;border-bottom:0.5px solid var(--border)">0</td><td style="padding:6px 10px;text-align:right;border-bottom:0.5px solid var(--border)">0</td></tr>
+                  <tr><td style="padding:6px 10px">Рудченко Юлия</td><td style="padding:6px 10px;color:var(--text2)">Lifestyle</td><td style="padding:6px 10px;text-align:right">211</td><td style="padding:6px 10px;text-align:right">157</td><td style="padding:6px 10px;text-align:right">317</td><td style="padding:6px 10px;text-align:right">4.90</td><td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0</td></tr>
                 </tbody>
               </table>
             </div>
-            <div style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.7">Имена должны совпадать с именами в списке отдела. «Факт проверок» — только для Ведущих.</div>
           </div>
-        </div>
-
-        <!-- DEPT SCREEN -->
-        <div class="kpi-screen" id="kpi-sc-dept">
-          <div class="kpi-dept-tabs" id="kpi-dept-tabs"></div>
-          <div id="kpi-dept-content"></div>
         </div>
 
         <!-- INDIVIDUAL EMP SCREEN -->
@@ -555,6 +524,19 @@ tr:hover td{background:var(--bg2)}
             <button class="kpi-stab" onclick="kpiShowCalc(5)">Корп</button>
           </div>
           <div id="kpi-manual-content"></div>
+        </div>
+
+        <!-- SETTINGS SCREEN -->
+        <div class="kpi-screen" id="kpi-sc-settings">
+          <div class="kpi-card" style="padding:16px;background:#EAF3DE;border-color:#B5D49A">
+            <div style="font-size:13px;font-weight:600;color:var(--green2);margin-bottom:10px">💾 Резервное копирование</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-sm" onclick="kpiSaveSettings()" style="background:var(--green2);color:#fff;border-color:var(--green2);font-weight:600">💾 Сохранить</button>
+              <button class="btn btn-sm" onclick="kpiExportSettings()">⬇ Скачать резерв (.json)</button>
+              <label class="btn btn-sm" style="cursor:pointer">📂 Загрузить резерв<input type="file" accept=".json" style="display:none" onchange="kpiImportSettings(this)"></label>
+            </div>
+            <div id="kpi-save-status" style="font-size:11px;color:var(--green2);margin-top:8px;display:none"></div>
+          </div>
         </div>
 
       </div>
@@ -2489,24 +2471,36 @@ function kpiMonthKeyFromYM(year, month){
 }
 
 function kpiRenderYearBar(){
-  const bar = document.getElementById('kpi-year-bar');
-  if(!bar) return;
+  const yearRow = document.getElementById('kpi-year-row');
+  const monthRow = document.getElementById('kpi-month-row');
+  if(!yearRow||!monthRow) return;
   const history = kpiGetHistory();
-  let html = '';
-  KPI_YEARS.forEach((year, yi)=>{
-    if(yi>0) html += '<div class="kpi-year-sep"></div>';
-    html += `<button class="kpi-year-btn${year===kpiCurrYear?' active':''}" onclick="kpiSetYear(${year})">${year}</button>`;
-    if(year===kpiCurrYear){
-      for(let m=1;m<=12;m++){
-        const key = kpiMonthKeyFromYM(year,m);
-        const hasData = !!history[key];
-        const norm = KPI_MONTH_NORMS[m];
-        const isActive = (year===kpiCurrYear && m===kpiCurrMonthNum);
-        html += `<button class="kpi-month-btn${isActive?' active':''}${hasData?' has-data':''}" onclick="kpiSetMonth(${year},${m},${norm})" title="${hasData?'Есть данные':''}">${KPI_MONTH_NAMES[m-1]}${hasData?' ✓':''}</button>`;
-      }
-    }
-  });
-  bar.innerHTML = html;
+
+  // Годы
+  yearRow.innerHTML = KPI_YEARS.map(y=>
+    `<button class="kpi-year-btn${y===kpiCurrYear?' active':''}" onclick="kpiSetYear(${y})">${y}</button>`
+  ).join('');
+
+  // Месяца текущего года
+  let mHtml = '';
+  for(let m=1;m<=12;m++){
+    const key = kpiMonthKeyFromYM(kpiCurrYear, m);
+    const hasData = !!history[key];
+    const isActive = (m===kpiCurrMonthNum);
+    const norm = KPI_MONTH_NORMS[m];
+    const mn = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][m-1];
+    mHtml += `<button class="kpi-month-btn${isActive?' active':''}${hasData?' has-data':''}" onclick="kpiSetMonth(${kpiCurrYear},${m},${norm})" title="${mn} ${kpiCurrYear} (${norm}ч)${hasData?' · данные есть':''}">${KPI_MONTH_NAMES[m-1]}${hasData?' ✓':''}</button>`;
+  }
+  monthRow.innerHTML = mHtml;
+
+  // Обновляем заголовок загрузки
+  const uploadTitle = document.getElementById('kpi-upload-month-title');
+  if(uploadTitle){
+    const mn = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][kpiCurrMonthNum-1];
+    const key = kpiGetMonthKey();
+    const hasData = !!kpiGetHistory()[key];
+    uploadTitle.innerHTML = `📥 Загрузка данных — <b>${mn} ${kpiCurrYear}</b>${hasData?' <span style="color:var(--green);font-size:12px">✓ данные загружены</span>':''}`;
+  }
 }
 
 window.kpiSetYear = function(year){
@@ -2835,7 +2829,8 @@ window.kpiExportExcel = function(){
     kpiDepts[dept].forEach(e=>{
       const c = kpiCalcEmp(e, kpiCurrMonth, dept);
       const sal = e.rate*e.hours;
-      const base = e.rate*kpiCurrMonth;
+      const baseHours = Math.min(kpiCurrMonth, e.hours);
+      const base = e.rate*baseHours;
       rows.push([e.name,e.role,e.rate,kpiCurrMonth,e.hours,base,Math.round(base*0.4),e.fd,e.fp,e.csi,e.loss,e.comp,c.bonus,sal,sal+c.bonus]);
     });
     const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -3135,7 +3130,8 @@ window.kpiUpdEmp=function(field,val){
 function kpiUpdateEmpCalc(){
   const e=kpiDepts[kpiCurrDept][kpiCurrEmp];
   const norm=kpiCurrMonth;
-  const base=e.rate*norm, maxkpi=base*0.4, sal=e.rate*e.hours;
+  const baseHours = Math.min(norm, e.hours); // MIN(норма, факт)
+  const base=e.rate*baseHours, maxkpi=base*0.4, sal=e.rate*e.hours;
   const isExec=e.role==="Исполнитель"||e.role==="Корп"||e.role==="Стажёр";
   const isLead=e.role==='Ведущий';
   const isChief=e.role==='Главный Консьерж';
@@ -3355,7 +3351,8 @@ window.kpiManCalc=function(){
   const st=kpiSetTxt;
   const norm=gv('km_month');
   const rate=gv('km_rate'),hours=gv('km_hours');
-  const base=rate*norm,maxkpi=base*0.4,sal=rate*hours;
+  const baseHours = Math.min(norm, hours); // MIN(норма, факт)
+  const base=rate*baseHours,maxkpi=base*0.4,sal=rate*hours;
   st('km_base',rate?kpiFmt(base)+' ₽':'—');
   st('km_maxkpi',rate?kpiFmt(maxkpi)+' ₽':'—');
 
@@ -3454,7 +3451,7 @@ window.kpiManCalc=function(){
 // ---- CALC HELPERS ----
 function kpiCalcEmp(e,norm,dept){
   if(!e.rate||!e.hours) return {bonus:0,pctMain:0};
-  const maxkpi=e.rate*norm*0.4;
+  const maxkpi=e.rate*Math.min(norm,e.hours)*0.4; // MIN(норма, факт)
   let bonus=0,pctMain=0;
   if(e.role==='Исполнитель'||e.role==='Корп'||e.role==='Стажёр'){
     const plan=0.75*e.hours;pctMain=plan?e.fd/plan:0;
