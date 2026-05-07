@@ -255,6 +255,34 @@ tr:hover td{background:var(--bg2)}
 .hr-role-chief{background:#FAEEDA;color:#633806}
 .hr-role-corp{background:#EEEDFE;color:#3C3489}
 .hr-role-intern{background:#F3E8FF;color:#6B21A8}
+
+/* ===== PARTNERS ===== */
+.ptn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:16px}
+.ptn-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:18px;cursor:pointer;transition:border-color .15s}
+.ptn-card:hover{border-color:var(--accent)}
+.ptn-card.active{border-color:var(--accent);background:var(--bg3)}
+.ptn-name{font-size:15px;font-weight:600;margin-bottom:4px}
+.ptn-contact{font-size:12px;color:var(--text2);margin-bottom:12px}
+.ptn-deposit{font-size:22px;font-weight:600;color:var(--green)}
+.ptn-deposit.negative{color:var(--red)}
+.ptn-deposit-lbl{font-size:11px;color:var(--text3);margin-top:2px}
+.ptn-stats{display:flex;gap:12px;margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)}
+.ptn-stat{flex:1;text-align:center}
+.ptn-stat-val{font-size:14px;font-weight:600}
+.ptn-stat-lbl{font-size:10px;color:var(--text3);margin-top:1px}
+.ptn-detail{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.ptn-detail-header{padding:16px 20px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.ptn-topup-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ptn-inp{font-size:13px;padding:6px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg3);color:var(--text);outline:none;width:130px}
+.ptn-inp:focus{border-color:var(--accent)}
+.ptn-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:2000;padding:20px;backdrop-filter:blur(4px)}
+.ptn-modal{background:var(--bg2);border:0.5px solid var(--border2);border-radius:14px;padding:24px;width:100%;max-width:460px}
+.ptn-modal h3{font-size:16px;font-weight:600;margin-bottom:18px}
+.ptn-field{margin-bottom:14px}
+.ptn-field label{display:block;font-size:11px;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+.ptn-field input,.ptn-field textarea{width:100%;padding:8px 12px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none;font-family:inherit}
+.ptn-field input:focus,.ptn-field textarea:focus{border-color:var(--accent)}
+.ptn-modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:0.5px solid var(--border)}
 .hr-av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0}
 .hr-emp-cell{display:flex;align-items:center;gap:8px}
 .hr-edit-btn{background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:2px 5px;border-radius:4px}
@@ -326,6 +354,7 @@ tr:hover td{background:var(--bg2)}
     <div class="tab" id="tab-clients" onclick="switchTab('clients')">👥 Клиенты</div>
     <div class="tab" id="tab-kpi" onclick="switchTab('kpi')">🏆 KPI</div>
     <div class="tab" id="tab-hr" onclick="switchTab('hr')">👥 НР</div>
+    <div class="tab" id="tab-partners" onclick="switchTab('partners')">🤝 Партнёры</div>
   </div>
 
   <!-- Bulk action bar -->
@@ -555,7 +584,39 @@ tr:hover td{background:var(--bg2)}
       </div>
     </div>
 
-    <!-- HR MODAL -->
+    <!-- PARTNERS VIEW -->
+    <div id="view-partners" style="display:none">
+      <div class="content">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:16px;font-weight:600">🤝 Партнёры</div>
+          <button class="btn btn-primary btn-sm" onclick="ptnOpenAdd()">+ Добавить партнёра</button>
+        </div>
+        <!-- Карточки партнёров -->
+        <div class="ptn-grid" id="ptn-cards"></div>
+        <!-- Детальная страница партнёра -->
+        <div id="ptn-detail-wrap" style="display:none">
+          <button class="kpi-back-btn" onclick="ptnCloseDet()">← Назад к списку</button>
+          <div id="ptn-detail"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PARTNER MODAL -->
+    <div class="ptn-modal-bg" id="ptn-modal" style="display:none">
+      <div class="ptn-modal">
+        <h3 id="ptn-modal-title">Добавить партнёра</h3>
+        <input type="hidden" id="ptn-edit-idx">
+        <div class="ptn-field"><label>Название партнёра</label><input type="text" id="ptn-f-name" placeholder="ООО Ресторан..."></div>
+        <div class="ptn-field"><label>Контакт / телефон</label><input type="text" id="ptn-f-contact" placeholder="+7 999 ..."></div>
+        <div class="ptn-field"><label>Email</label><input type="text" id="ptn-f-email" placeholder="partner@email.com"></div>
+        <div class="ptn-field"><label>Начальный депозит ₽</label><input type="number" id="ptn-f-deposit" placeholder="0"></div>
+        <div class="ptn-field"><label>Заметки</label><textarea id="ptn-f-note" rows="2" placeholder="Условия работы..."></textarea></div>
+        <div class="ptn-modal-actions">
+          <button class="btn" onclick="ptnCloseModal()">Отмена</button>
+          <button class="btn btn-primary" onclick="ptnSaveModal()">Сохранить</button>
+        </div>
+      </div>
+    </div>
     <div class="hr-modal-bg" id="hr-modal" style="display:none">
       <div class="hr-modal">
         <h3 id="hr-modal-title">Сотрудник</h3>
@@ -695,6 +756,7 @@ tr:hover td{background:var(--bg2)}
         <option value="invoice">Счёт</option>
         <option value="corp_card">Корп Карта</option>
         <option value="cash">Наличные</option>
+        <option value="partner_deposit">🤝 Депозит партнёра</option>
       </select>
     </div>
     <div class="field" id="receipt-field" style="display:none">
@@ -1588,7 +1650,7 @@ function renderTable(){
 function switchTab(t){
   activeTab = t;
   clearSelection();
-  ['main','loss','expense','corp','invoice','treasury','dept','days','clients','kpi','hr'].forEach(tab=>{
+  ['main','loss','expense','corp','invoice','treasury','dept','days','clients','kpi','hr','partners'].forEach(tab=>{
     const v = document.getElementById('view-'+tab);
     const b = document.getElementById('tab-'+tab);
     if(v) v.style.display = tab===t?'block':'none';
@@ -1600,6 +1662,7 @@ function switchTab(t){
   else if(t==='clients') renderClients();
   else if(t==='kpi'){ if(typeof kpiSyncFromHR==='function') kpiSyncFromHR(); kpiRenderYearBar(); kpiShowScreen('upload'); }
   else if(t==='hr'){ hrRender(); }
+  else if(t==='partners'){ ptnRender(); }
   else renderTable();
 }
 
@@ -3765,6 +3828,240 @@ document.getElementById('hr-modal')?.addEventListener('click',function(e){
 });
 
 })(); // end HR module
+
+// ============================================================
+// PARTNERS MODULE
+// ============================================================
+(function(){
+
+// Структура партнёра: {id, name, contact, email, note, topups:[{date,amount,note}]}
+window.ptnList = [];
+let ptnCurrIdx = -1;
+
+function ptnLoad(){
+  try{
+    const s = localStorage.getItem('fcs_partners');
+    if(s){ window.ptnList = JSON.parse(s); }
+  }catch(e){}
+}
+
+function ptnSave(){
+  try{ localStorage.setItem('fcs_partners', JSON.stringify(window.ptnList)); }catch(e){}
+}
+
+// Считаем баланс депозита партнёра
+function ptnBalance(p){
+  // Пополнения
+  const topupSum = (p.topups||[]).reduce((s,t)=>s+(+t.amount||0),0);
+  // Списания из заявок (agent_pay_type === 'partner_deposit' и agent === name партнёра)
+  const spent = (allData||[]).filter(e=>
+    e.agent_pay_type==='partner_deposit' &&
+    (e.agent||'').trim().toLowerCase()===p.name.trim().toLowerCase()
+  ).reduce((s,e)=>s+(+e.agent_amount||0),0);
+  return topupSum - spent;
+}
+
+// Заявки партнёра
+function ptnEntries(p){
+  return (allData||[]).filter(e=>
+    (e.agent||'').trim().toLowerCase()===p.name.trim().toLowerCase()
+  ).sort((a,b)=>b.date.localeCompare(a.date));
+}
+
+function ptnFmt(n){ return Math.round(n).toLocaleString('ru-RU'); }
+
+window.ptnRender = function(){
+  const cards = document.getElementById('ptn-cards');
+  const detWrap = document.getElementById('ptn-detail-wrap');
+  if(!cards) return;
+  if(detWrap) detWrap.style.display='none';
+  cards.style.display='';
+
+  if(!window.ptnList.length){
+    cards.innerHTML=`<div class="empty" style="grid-column:1/-1">Партнёры не добавлены.<br>Нажмите «+ Добавить партнёра»</div>`;
+    return;
+  }
+
+  cards.innerHTML = window.ptnList.map((p,i)=>{
+    const bal = ptnBalance(p);
+    const entries = ptnEntries(p);
+    const totalSpent = entries.filter(e=>e.agent_pay_type==='partner_deposit').reduce((s,e)=>s+(+e.agent_amount||0),0);
+    const totalDirect = entries.filter(e=>e.agent_pay_type!=='partner_deposit').reduce((s,e)=>s+(+e.agent_amount||0),0);
+    return `<div class="ptn-card" onclick="ptnOpenDet(${i})">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="ptn-name">${p.name}</div>
+          <div class="ptn-contact">${p.contact||''} ${p.email?'· '+p.email:''}</div>
+        </div>
+        <button onclick="event.stopPropagation();ptnOpenEdit(${i})" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:2px 6px">✏️</button>
+      </div>
+      <div class="ptn-deposit ${bal<0?'negative':''}">${ptnFmt(bal)} ₽</div>
+      <div class="ptn-deposit-lbl">Остаток депозита</div>
+      <div class="ptn-stats">
+        <div class="ptn-stat"><div class="ptn-stat-val">${entries.length}</div><div class="ptn-stat-lbl">Заявок</div></div>
+        <div class="ptn-stat"><div class="ptn-stat-val" style="color:var(--red)">${ptnFmt(totalSpent)} ₽</div><div class="ptn-stat-lbl">С депозита</div></div>
+        <div class="ptn-stat"><div class="ptn-stat-val">${ptnFmt(totalDirect)} ₽</div><div class="ptn-stat-lbl">По счёту</div></div>
+      </div>
+    </div>`;
+  }).join('');
+};
+
+window.ptnOpenDet = function(i){
+  ptnCurrIdx = i;
+  const p = window.ptnList[i];
+  const cards = document.getElementById('ptn-cards');
+  const detWrap = document.getElementById('ptn-detail-wrap');
+  if(cards) cards.style.display='none';
+  if(detWrap) detWrap.style.display='block';
+
+  const bal = ptnBalance(p);
+  const entries = ptnEntries(p);
+  const topups = (p.topups||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
+
+  // Объединяем операции в хронологию
+  let ops = [];
+  topups.forEach(t=>ops.push({type:'topup',date:t.date,amount:+t.amount,note:t.note||'Пополнение депозита'}));
+  entries.forEach(e=>ops.push({
+    type: e.agent_pay_type==='partner_deposit'?'spend':'direct',
+    date: e.date, amount: +e.agent_amount||0,
+    note: e.service||'—', dept: e.dept, link: e.link, id: e.id
+  }));
+  ops.sort((a,b)=>b.date.localeCompare(a.date));
+
+  let opsHtml = ops.map(op=>{
+    if(op.type==='topup'){
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:0.5px solid var(--border)">
+        <div><div style="font-size:12px;font-weight:500;color:var(--green)">📥 Пополнение депозита</div><div style="font-size:11px;color:var(--text3)">${op.date}${op.note?' · '+op.note:''}</div></div>
+        <div style="font-weight:600;color:var(--green)">+${ptnFmt(op.amount)} ₽</div>
+      </div>`;
+    } else if(op.type==='spend'){
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:0.5px solid var(--border)">
+        <div><div style="font-size:12px;font-weight:500">🤝 Списание с депозита</div><div style="font-size:11px;color:var(--text3)">${op.date} · ${op.note}</div></div>
+        <div style="font-weight:600;color:var(--red)">−${ptnFmt(op.amount)} ₽</div>
+      </div>`;
+    } else {
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:0.5px solid var(--border)">
+        <div><div style="font-size:12px;font-weight:500">📄 Прямая оплата</div><div style="font-size:11px;color:var(--text3)">${op.date} · ${op.note}</div></div>
+        <div style="font-weight:500;color:var(--text2)">${ptnFmt(op.amount)} ₽</div>
+      </div>`;
+    }
+  }).join('') || '<div style="color:var(--text3);font-size:13px;padding:20px 0;text-align:center">Операций нет</div>';
+
+  document.getElementById('ptn-detail').innerHTML = `
+  <div class="ptn-detail">
+    <div class="ptn-detail-header">
+      <div>
+        <div style="font-size:18px;font-weight:600;margin-bottom:2px">${p.name}</div>
+        <div style="font-size:12px;color:var(--text2)">${p.contact||''} ${p.email?'· '+p.email:''}</div>
+        ${p.note?`<div style="font-size:12px;color:var(--text3);margin-top:4px">${p.note}</div>`:''}
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:24px;font-weight:700;color:${bal<0?'var(--red)':'var(--green)'}">${ptnFmt(bal)} ₽</div>
+        <div style="font-size:11px;color:var(--text3)">Остаток депозита</div>
+      </div>
+    </div>
+    <div style="padding:16px 20px;border-bottom:0.5px solid var(--border);background:var(--bg3)">
+      <div style="font-size:12px;font-weight:500;margin-bottom:8px;color:var(--text2)">ПОПОЛНИТЬ ДЕПОЗИТ</div>
+      <div class="ptn-topup-form">
+        <input class="ptn-inp" type="date" id="ptn-topup-date" value="${new Date().toISOString().split('T')[0]}">
+        <input class="ptn-inp" type="number" id="ptn-topup-amount" placeholder="Сумма ₽">
+        <input class="ptn-inp" type="text" id="ptn-topup-note" placeholder="Заметка (необязательно)" style="width:200px">
+        <button class="btn btn-primary btn-sm" onclick="ptnAddTopup()">+ Пополнить</button>
+        <button class="btn btn-sm" style="color:var(--red)" onclick="ptnDeletePartner(${i})">🗑 Удалить партнёра</button>
+      </div>
+    </div>
+    <div style="padding:16px 20px">
+      <div style="font-size:12px;font-weight:500;margin-bottom:12px;color:var(--text2)">ИСТОРИЯ ОПЕРАЦИЙ</div>
+      ${opsHtml}
+    </div>
+  </div>`;
+};
+
+window.ptnCloseDet = function(){
+  document.getElementById('ptn-cards').style.display='';
+  document.getElementById('ptn-detail-wrap').style.display='none';
+  ptnCurrIdx=-1;
+};
+
+window.ptnAddTopup = function(){
+  if(ptnCurrIdx<0) return;
+  const date = document.getElementById('ptn-topup-date').value;
+  const amount = parseFloat(document.getElementById('ptn-topup-amount').value)||0;
+  const note = document.getElementById('ptn-topup-note').value.trim();
+  if(!amount){ alert('Введите сумму'); return; }
+  if(!window.ptnList[ptnCurrIdx].topups) window.ptnList[ptnCurrIdx].topups=[];
+  window.ptnList[ptnCurrIdx].topups.push({date, amount, note});
+  ptnSave();
+  ptnOpenDet(ptnCurrIdx);
+  showToast('Депозит пополнен на '+ptnFmt(amount)+' ₽');
+};
+
+window.ptnDeletePartner = function(i){
+  if(!confirm('Удалить партнёра «'+window.ptnList[i].name+'»?')) return;
+  window.ptnList.splice(i,1);
+  ptnSave();
+  ptnCloseDet();
+  ptnRender();
+};
+
+window.ptnOpenAdd = function(){
+  document.getElementById('ptn-modal-title').textContent='Добавить партнёра';
+  document.getElementById('ptn-edit-idx').value='';
+  document.getElementById('ptn-f-name').value='';
+  document.getElementById('ptn-f-contact').value='';
+  document.getElementById('ptn-f-email').value='';
+  document.getElementById('ptn-f-deposit').value='';
+  document.getElementById('ptn-f-note').value='';
+  document.getElementById('ptn-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('ptn-f-name').focus(),50);
+};
+
+window.ptnOpenEdit = function(i){
+  const p = window.ptnList[i];
+  document.getElementById('ptn-modal-title').textContent='Редактировать партнёра';
+  document.getElementById('ptn-edit-idx').value=i;
+  document.getElementById('ptn-f-name').value=p.name||'';
+  document.getElementById('ptn-f-contact').value=p.contact||'';
+  document.getElementById('ptn-f-email').value=p.email||'';
+  document.getElementById('ptn-f-deposit').value='';
+  document.getElementById('ptn-f-note').value=p.note||'';
+  document.getElementById('ptn-modal').style.display='flex';
+};
+
+window.ptnCloseModal = function(){
+  document.getElementById('ptn-modal').style.display='none';
+};
+
+window.ptnSaveModal = function(){
+  const name=(document.getElementById('ptn-f-name').value||'').trim();
+  if(!name){alert('Введите название');return;}
+  const contact=document.getElementById('ptn-f-contact').value.trim();
+  const email=document.getElementById('ptn-f-email').value.trim();
+  const initDeposit=parseFloat(document.getElementById('ptn-f-deposit').value)||0;
+  const note=document.getElementById('ptn-f-note').value.trim();
+  const idx=document.getElementById('ptn-edit-idx').value;
+
+  if(idx!==''){
+    // Редактирование
+    window.ptnList[parseInt(idx)]={...window.ptnList[parseInt(idx)],name,contact,email,note};
+  } else {
+    // Новый партнёр
+    const topups = initDeposit>0 ? [{date:new Date().toISOString().split('T')[0],amount:initDeposit,note:'Начальный депозит'}] : [];
+    window.ptnList.push({name,contact,email,note,topups});
+  }
+  ptnSave();
+  ptnCloseModal();
+  ptnRender();
+  showToast(idx!==''?'Партнёр обновлён':'Партнёр добавлен');
+};
+
+document.getElementById('ptn-modal')?.addEventListener('click',function(e){
+  if(e.target===this) ptnCloseModal();
+});
+
+ptnLoad();
+
+})(); // end Partners module
 </script>
 </body>
 </html>
