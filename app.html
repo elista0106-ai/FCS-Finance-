@@ -60,6 +60,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 /* MAIN TABS */
 .tabs{background:var(--bg2);border-bottom:0.5px solid var(--border);padding:0 20px;display:flex;gap:2px;position:sticky;top:89px;z-index:98}
+.more-menu-item{padding:10px 16px;font-size:13px;color:var(--text);cursor:pointer;border-bottom:0.5px solid var(--border);transition:background .1s}
+.more-menu-item:last-child{border-bottom:none}
+.more-menu-item:hover{background:var(--bg3)}
+.more-menu-item.active-menu{background:var(--bg3);color:var(--accent);font-weight:500}
 .tab{padding:10px 14px;font-size:12px;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;white-space:nowrap}
 .tab:hover{color:var(--text2)}
 .tab.active{color:var(--text);border-bottom-color:var(--accent)}
@@ -341,7 +345,7 @@ tr:hover td{background:var(--bg2)}
   <div class="month-bar" id="month-bar"></div>
 
   <!-- Main tabs -->
-  <div class="tabs" style="overflow-x:auto;flex-wrap:nowrap">
+  <div class="tabs" style="overflow-x:auto;flex-wrap:nowrap;position:relative">
     <div class="tab active" id="tab-main" onclick="switchTab('main')">Все заявки <span class="cnt" id="cnt-main"></span></div>
     <div class="tab" id="tab-treasury" onclick="switchTab('treasury')" style="color:#F59E0B">💰 Казначей <span class="cnt" id="cnt-treasury"></span></div>
     <div class="tab" id="tab-loss" onclick="switchTab('loss')">⚠ Потери <span class="cnt" id="cnt-loss"></span></div>
@@ -351,10 +355,19 @@ tr:hover td{background:var(--bg2)}
     <div class="tab" id="tab-dept" onclick="switchTab('dept')">📊 По отделам <span class="cnt" id="cnt-dept"></span></div>
     <div class="tab" id="tab-days" onclick="switchTab('days')">📅 По дням</div>
     <div class="tab" id="tab-clients" onclick="switchTab('clients')">👤 Клиенты</div>
-    <div class="tab" id="tab-clients" onclick="switchTab('clients')">👥 Клиенты</div>
-    <div class="tab" id="tab-kpi" onclick="switchTab('kpi')">🏆 KPI</div>
-    <div class="tab" id="tab-hr" onclick="switchTab('hr')">👥 НР</div>
-    <div class="tab" id="tab-partners" onclick="switchTab('partners')">🤝 Партнёры</div>
+    <!-- Скрытые вкладки — активируются из меню -->
+    <div class="tab" id="tab-kpi" onclick="switchTab('kpi')" style="display:none">🏆 KPI</div>
+    <div class="tab" id="tab-hr" onclick="switchTab('hr')" style="display:none">👥 НР</div>
+    <div class="tab" id="tab-partners" onclick="switchTab('partners')" style="display:none">🤝 Партнёры</div>
+    <!-- Меню ••• справа -->
+    <div style="margin-left:auto;position:relative;flex-shrink:0">
+      <button id="more-menu-btn" onclick="toggleMoreMenu()" style="padding:6px 12px;background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);cursor:pointer;font-size:13px;white-space:nowrap">••• Ещё</button>
+      <div id="more-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:200;min-width:180px;overflow:hidden">
+        <div onclick="switchTabMenu('kpi')" class="more-menu-item" id="mmenu-kpi">🏆 KPI</div>
+        <div onclick="switchTabMenu('hr')" class="more-menu-item" id="mmenu-hr">👥 НР — Сотрудники</div>
+        <div onclick="switchTabMenu('partners')" class="more-menu-item" id="mmenu-partners">🤝 Партнёры</div>
+      </div>
+    </div>
   </div>
 
   <!-- Bulk action bar -->
@@ -1647,6 +1660,35 @@ function renderTable(){
 }
 
 // ===== TABS =====
+function toggleMoreMenu(){
+  const m = document.getElementById('more-menu');
+  if(m) m.style.display = m.style.display==='none'?'block':'none';
+}
+
+function switchTabMenu(t){
+  // Закрываем меню
+  const m = document.getElementById('more-menu');
+  if(m) m.style.display='none';
+  // Подсвечиваем активный пункт меню
+  ['kpi','hr','partners'].forEach(x=>{
+    const el = document.getElementById('mmenu-'+x);
+    if(el) el.classList.toggle('active-menu', x===t);
+  });
+  // Подсвечиваем кнопку меню
+  const btn = document.getElementById('more-menu-btn');
+  if(btn) btn.style.color = ['kpi','hr','partners'].includes(activeTab)?'var(--accent)':'';
+  switchTab(t);
+}
+
+// Закрывать меню при клике вне
+document.addEventListener('click', function(e){
+  const menu = document.getElementById('more-menu');
+  const btn = document.getElementById('more-menu-btn');
+  if(menu && btn && !btn.contains(e.target) && !menu.contains(e.target)){
+    menu.style.display='none';
+  }
+});
+
 function switchTab(t){
   activeTab = t;
   clearSelection();
@@ -3841,8 +3883,12 @@ let ptnCurrIdx = -1;
 function ptnLoad(){
   try{
     const s = localStorage.getItem('fcs_partners');
-    if(s){ window.ptnList = JSON.parse(s); }
-  }catch(e){}
+    if(s){
+      const parsed = JSON.parse(s);
+      window.ptnList.length = 0;
+      parsed.forEach(p => window.ptnList.push(p));
+    }
+  }catch(e){ console.log('Partners load error:', e); }
 }
 
 function ptnSave(){
