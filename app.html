@@ -4030,48 +4030,82 @@ function hrProbBadge(e){
 
 // ---- SUPABASE ----
 function getSB(){
-  if(typeof sb !== 'undefined') return sb;
-  if(typeof window.sb !== 'undefined') return window.sb;
+  // Пробуем разные способы найти Supabase клиент
+  if(typeof sb !== 'undefined' && sb) return sb;
+  if(typeof window.sb !== 'undefined' && window.sb) return window.sb;
+  if(typeof window.supabaseClient !== 'undefined') return window.supabaseClient;
+  // Пробуем создать клиент напрямую
+  try{
+    const SB_URL='https://krjhnwjiorpzgqpojgjt.supabase.co';
+    const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtyamhud2ppb3JwemdxcG9qZ2p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTY5NzAsImV4cCI6MjA5Mjg5Mjk3MH0.fgmrOZKVDTb8TOGHTnGXoDArCfB9IUm6rCEryNFTIUs';
+    if(typeof window.supabase !== 'undefined' && window.supabase.createClient){
+      window._hrSB = window.supabase.createClient(SB_URL, SB_KEY);
+      return window._hrSB;
+    }
+  }catch(e){}
   return null;
 }
 
 async function hrLoadAll(){
   const client = getSB();
-  if(!client){ hrUseFallback(); return; }
+  if(!client){
+    hrUseFallback();
+    return;
+  }
   try{
-    const [emps, vacs, gifts, events] = await Promise.all([
+    // Загружаем с таймаутом 8 секунд
+    const timeout = new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),8000));
+    const load = Promise.all([
       client.from('hr_employees').select('*').order('last_name'),
       client.from('hr_vacations').select('*').order('start_date',{ascending:false}),
       client.from('hr_gifts').select('*').order('gift_date',{ascending:false}),
       client.from('hr_events').select('*').order('event_date',{ascending:false}),
     ]);
+    const [emps, vacs, gifts, events] = await Promise.race([load, timeout]);
     hrEmployees = emps.data||[];
     hrVacations = vacs.data||[];
     hrGifts = gifts.data||[];
     hrEvents = events.data||[];
-    // Sync to window.hrStaff for KPI
+
+    // Если в Supabase пусто — используем localStorage как fallback
+    if(hrEmployees.length===0 && window.hrStaff && window.hrStaff.length>0){
+      hrUseFallback();
+      return;
+    }
     hrSyncToKPI();
     hrRefreshCurrentTab();
   }catch(e){
-    console.log('HR load error',e);
+    console.log('HR load error:', e);
     hrUseFallback();
   }
 }
 
 function hrUseFallback(){
-  // Fallback: use localStorage hrStaff
-  hrEmployees = (window.hrStaff||[]).map((e,i)=>({
-    id: 'local-'+i,
-    last_name: e.name.split(' ')[0]||e.name,
-    first_name: e.name.split(' ')[1]||'',
-    middle_name: e.name.split(' ')[2]||'',
-    department: e.dept,
-    position: e.role,
-    role: e.role,
-    rate: e.rate,
-    status: 'active',
-  }));
+  // Используем localStorage hrStaff как fallback
+  const localStaff = window.hrStaff || [];
+  if(localStaff.length > 0){
+    hrEmployees = localStaff.map((e,i)=>({
+      id: 'local-'+i,
+      last_name: (e.name||'').split(' ')[0]||e.name,
+      first_name: (e.name||'').split(' ')[1]||'',
+      middle_name: (e.name||'').split(' ').slice(2).join(' ')||'',
+      department: e.dept,
+      position: e.role,
+      role: e.role,
+      rate: e.rate,
+      status: 'active',
+    }));
+  }
   hrRefreshCurrentTab();
+  // Показываем подсказку об импорте на дашборде
+  const dash = document.getElementById('hr-dashboard-content');
+  if(dash && hrEmployees.length > 0){
+    const importHint = document.createElement('div');
+    importHint.className = 'hr-alert hr-alert-amber';
+    importHint.style.marginTop = '12px';
+    importHint.innerHTML = `⚠ Данные из локального хранилища. <button class="btn btn-primary btn-sm" style="margin-left:10px" onclick="hrImportAllStaff()">⬆ Импортировать в Supabase</button>`;
+    dash.appendChild(importHint);
+  }
 }
 
 function hrSyncToKPI(){
