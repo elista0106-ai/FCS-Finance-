@@ -4138,6 +4138,8 @@ function hrRefreshCurrentTab(){
   else if(hrCurrentTab==='vacations') hrVacRender();
   else if(hrCurrentTab==='gifts') hrGiftsRender();
   else if(hrCurrentTab==='events') hrEventsRender();
+  else if(hrCurrentTab==='history'){ hrLoadHistory().then(()=>{ hrHistRender(); hrPopulateHistFilter(); }); }
+  else if(hrCurrentTab==='analytics') hrRenderAnalytics();
 }
 
 window.hrRender = function(){
@@ -4288,6 +4290,20 @@ window.hrViewEmp = function(id){
   ${vacs.length?`<div style="font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;margin-bottom:6px">Отпуска</div>
   ${vacs.slice(0,3).map(v=>`<div style="font-size:12px;padding:4px 0;border-bottom:0.5px solid var(--border)">${v.start_date} — ${v.end_date} (${v.days} дн.)</div>`).join('')}`:''}`;
   document.getElementById('hr-view-edit-btn').onclick = ()=>{ document.getElementById('hr-view-modal').style.display='none'; hrOpenEditModal(id); };
+  // Кнопка обходного листа
+  const actionsEl = document.querySelector('#hr-view-modal .modal > div:last-child');
+  if(actionsEl){
+    const existing = actionsEl.querySelector('.hr-offboard-btn');
+    if(existing) existing.remove();
+    if(e.status==='active'){
+      const offBtn = document.createElement('button');
+      offBtn.className='btn hr-offboard-btn';
+      offBtn.style.color='var(--red)';
+      offBtn.textContent='🚪 Уволить';
+      offBtn.onclick=()=>{ document.getElementById('hr-view-modal').style.display='none'; hrOpenOffboard(id); };
+      actionsEl.insertBefore(offBtn, actionsEl.firstChild);
+    }
+  }
   document.getElementById('hr-view-modal').style.display='flex';
 };
 
@@ -5048,38 +5064,12 @@ function hrRenderAnalytics(){
   </div>`;
 }
 
-// Patch hrRefreshCurrentTab to include new tabs
-const _origRefresh = hrRefreshCurrentTab;
-function hrRefreshCurrentTab(){
-  if(hrCurrentTab==='history'){ hrLoadHistory().then(()=>{ hrHistRender(); hrPopulateHistFilter(); }); return; }
-  if(hrCurrentTab==='analytics'){ hrRenderAnalytics(); return; }
-  _origRefresh();
-}
-
 function hrPopulateHistFilter(){
   const sel = document.getElementById('hr-hist-emp-filter');
   if(!sel) return;
   sel.innerHTML='<option value="">Все сотрудники</option>'+
     hrEmployees.map(e=>`<option value="${e.id}">${hrFullName(e)}</option>`).join('');
 }
-
-// Add offboard button to view modal
-const _origViewEmp = window.hrViewEmp;
-window.hrViewEmp = function(id){
-  _origViewEmp(id);
-  const e = hrEmployees.find(x=>x.id===id);
-  if(!e) return;
-  // Add offboard btn if active
-  const actionsEl = document.querySelector('#hr-view-modal .modal > div:last-child');
-  if(actionsEl && e.status==='active'){
-    const offBtn = document.createElement('button');
-    offBtn.className='btn';
-    offBtn.style.color='var(--red)';
-    offBtn.textContent='🚪 Уволить';
-    offBtn.onclick=()=>{ document.getElementById('hr-view-modal').style.display='none'; hrOpenOffboard(id); };
-    actionsEl.insertBefore(offBtn, actionsEl.firstChild);
-  }
-};
 
 // Add history and offboard modal close handlers
 ['hr-hist-modal','hr-offboard-modal'].forEach(id=>{
