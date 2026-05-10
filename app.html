@@ -628,6 +628,8 @@ tr:hover td{background:var(--bg2)}
           <button class="hr-nav-btn" onclick="hrShowTab('vacations')">🏖 Отпуска</button>
           <button class="hr-nav-btn" onclick="hrShowTab('gifts')">🎁 Подарки</button>
           <button class="hr-nav-btn" onclick="hrShowTab('events')">🎉 Мероприятия</button>
+          <button class="hr-nav-btn" onclick="hrShowTab('history')">📋 История</button>
+          <button class="hr-nav-btn" onclick="hrShowTab('analytics')">📈 Аналитика</button>
         </div>
 
         <!-- DASHBOARD -->
@@ -682,6 +684,29 @@ tr:hover td{background:var(--bg2)}
             <button class="btn btn-primary btn-sm" onclick="hrOpenEventModal()">+ Добавить мероприятие</button>
           </div>
           <div id="hr-events-content"><div class="empty">Загрузка...</div></div>
+        </div>
+
+        <!-- HISTORY -->
+        <div class="hr-tab" id="hr-tab-history">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <select id="hr-hist-emp-filter" onchange="hrHistRender()" style="padding:6px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);font-size:12px;min-width:200px">
+              <option value="">Все сотрудники</option>
+            </select>
+            <select id="hr-hist-type-filter" onchange="hrHistRender()" style="padding:6px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);font-size:12px">
+              <option value="">Все типы</option>
+              <option value="salary">Оклад</option>
+              <option value="position">Должность</option>
+              <option value="department">Отдел</option>
+              <option value="status">Статус</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="hrOpenHistModal()">+ Записать изменение</button>
+          </div>
+          <div id="hr-hist-content"><div class="empty">Загрузка...</div></div>
+        </div>
+
+        <!-- ANALYTICS -->
+        <div class="hr-tab" id="hr-tab-analytics">
+          <div id="hr-analytics-content"><div class="empty">Загрузка...</div></div>
         </div>
       </div>
     </div>
@@ -889,6 +914,54 @@ tr:hover td{background:var(--bg2)}
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)">
           <button class="btn" onclick="document.getElementById('hr-event-modal').style.display='none'">Отмена</button>
           <button class="btn btn-primary" onclick="hrSaveEvent()">Сохранить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- История изменений modal -->
+    <div class="modal-bg" id="hr-hist-modal" style="display:none">
+      <div class="modal">
+        <h3>Записать изменение</h3>
+        <div class="field"><label>Сотрудник</label><select id="hhist-emp"></select></div>
+        <div class="grid2">
+          <div class="field"><label>Тип изменения</label>
+            <select id="hhist-type">
+              <option value="salary">Изменение оклада</option>
+              <option value="position">Изменение должности</option>
+              <option value="department">Перевод в отдел</option>
+              <option value="status">Изменение статуса</option>
+              <option value="other">Другое</option>
+            </select>
+          </div>
+          <div class="field"><label>Дата</label><input type="date" id="hhist-date"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Было</label><input id="hhist-old" placeholder="Старое значение"></div>
+          <div class="field"><label>Стало</label><input id="hhist-new" placeholder="Новое значение"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Номер приказа</label><input id="hhist-order" placeholder="П-001"></div>
+          <div class="field"><label>Автор</label><input id="hhist-author" placeholder="ФИО HR"></div>
+        </div>
+        <div class="field"><label>Комментарий</label><input id="hhist-comment" placeholder="Основание..."></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)">
+          <button class="btn" onclick="document.getElementById('hr-hist-modal').style.display='none'">Отмена</button>
+          <button class="btn btn-primary" onclick="hrSaveHist()">Сохранить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Обходной лист modal -->
+    <div class="modal-bg" id="hr-offboard-modal" style="display:none">
+      <div class="modal" style="max-width:560px">
+        <h3 id="hr-offboard-title">Обходной лист</h3>
+        <div id="hr-offboard-emp-info" style="font-size:12px;color:var(--text2);margin-bottom:14px"></div>
+        <div style="font-size:12px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Чек-лист</div>
+        <div id="hr-offboard-checklist"></div>
+        <div id="hr-offboard-block-msg" style="font-size:12px;color:var(--red);margin-top:10px;display:none"></div>
+        <div style="display:flex;gap:8px;justify-content:space-between;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)">
+          <button class="btn" onclick="document.getElementById('hr-offboard-modal').style.display='none'">Закрыть</button>
+          <button class="btn btn-primary" id="hr-offboard-confirm-btn" onclick="hrConfirmFire()" disabled>Создать приказ об увольнении</button>
         </div>
       </div>
     </div>
@@ -4535,8 +4608,451 @@ window.hrDownloadHireOrder = function(e){
   showToast('📄 Приказ скачан');
 };
 
-// ---- INIT ----
-// Populate vacation emp filter on load
+// ---- IMPORT ALL STAFF TO SUPABASE ----
+window.hrImportAllStaff = async function(){
+  const client = getSB();
+  if(!client){ alert('Нет подключения к Supabase'); return; }
+  const ALL_STAFF = [
+    // ЦПО
+    {last_name:'Затямина',first_name:'Александра',department:'ЦПО',role:'Исполнитель',rate:0,status:'active'},
+    {last_name:'Галиахметова',first_name:'Мария',department:'ЦПО',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Гвоздева',first_name:'Марина',department:'ЦПО',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Ряполова',first_name:'Юлия',department:'ЦПО',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Третьякова',first_name:'Кристина',department:'ЦПО',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Беспальченко',first_name:'Юлия',department:'ЦПО',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Жевлакова',first_name:'Елизавета',department:'ЦПО',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Исмаилова',first_name:'Карина',department:'ЦПО',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Козлова',first_name:'Анжелика',department:'ЦПО',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Наговицына',first_name:'Мария',department:'ЦПО',role:'Исполнитель',rate:402,status:'active'},
+    // ЦПО Ночь
+    {last_name:'Черемных',first_name:'Екатерина',department:'ЦПО Ночь',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Таюрская',first_name:'Галина',department:'ЦПО Ночь',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Батаева',first_name:'Юлия',department:'ЦПО Ночь',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Луговских',first_name:'Евгения',department:'ЦПО Ночь',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Витт',first_name:'Анна',department:'ЦПО Ночь',role:'Исполнитель',rate:402,status:'active'},
+    // Lifestyle
+    {last_name:'Соколова',first_name:'Наталия',department:'Lifestyle',role:'Главный Консьерж',rate:0,status:'active'},
+    {last_name:'Христич',first_name:'Александра',department:'Lifestyle',role:'Главный Консьерж',rate:0,status:'active'},
+    {last_name:'Долматова',first_name:'Надежда',department:'Lifestyle',role:'Ведущий',rate:500,status:'active'},
+    {last_name:'Ефимцева',first_name:'Любовь',department:'Lifestyle',role:'Ведущий',rate:500,status:'active'},
+    {last_name:'Иванова',first_name:'Владлена',department:'Lifestyle',role:'Ведущий',rate:500,status:'active'},
+    {last_name:'Ложечникова',first_name:'Екатерина',department:'Lifestyle',role:'Ведущий',rate:500,status:'active'},
+    {last_name:'Мохова',first_name:'Мария',department:'Lifestyle',role:'Ведущий',rate:500,status:'active'},
+    {last_name:'Хон',first_name:'Ирина',department:'Lifestyle',role:'Ведущий',rate:500,status:'active'},
+    {last_name:'Виноградов',first_name:'Александр',department:'Lifestyle',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Еловская',first_name:'Софья',department:'Lifestyle',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Лисова',first_name:'Анна',department:'Lifestyle',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Малых',first_name:'Ксения',middle_name:'(К)',department:'Lifestyle',role:'Исполнитель',rate:468,status:'active'},
+    {last_name:'Меркулова',first_name:'Екатерина',department:'Lifestyle',role:'Главный Консьерж',rate:468,status:'active'},
+    {last_name:'Петров',first_name:'Андрей',middle_name:'(К)',department:'Lifestyle',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Рудченко',first_name:'Юлия',department:'Lifestyle',role:'Ведущий',rate:468,status:'active'},
+    {last_name:'Тоцкая',first_name:'Алёна',department:'Lifestyle',role:'Ведущий',rate:468,status:'active'},
+    {last_name:'Хамзин',first_name:'Рушан',department:'Lifestyle',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Шевякова',first_name:'Екатерина',department:'Lifestyle',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Гулла',first_name:'Анна',department:'Lifestyle',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Киселева',first_name:'Анастасия',department:'Lifestyle',role:'Стажёр',rate:335,status:'active'},
+    {last_name:'Малых',first_name:'Ксения',middle_name:'(С)',department:'Lifestyle',role:'Исполнитель',rate:468,status:'active'},
+    {last_name:'Петрова',first_name:'Елизавета',department:'Lifestyle',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Петров',first_name:'Андрей',middle_name:'(С)',department:'Lifestyle',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Скороходова',first_name:'Мария',department:'Lifestyle',role:'Исполнитель',rate:402,status:'active'},
+    // Логистика
+    {last_name:'Хохлова',first_name:'Светлана',department:'Логистика',role:'Главный Консьерж',rate:0,status:'active'},
+    {last_name:'Макарова',first_name:'Софья',department:'Логистика',role:'Ведущий',rate:500,status:'active'},
+    {last_name:'Сафарова',first_name:'Анастасия',department:'Логистика',role:'Исполнитель',rate:468,status:'active'},
+    {last_name:'Магомедгаджиева',first_name:'Саида',department:'Логистика',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Хороших',first_name:'Антон',middle_name:'(К)',department:'Логистика',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Шумова',first_name:'Диана',department:'Логистика',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Щепетова',first_name:'Элина',middle_name:'(К)',department:'Логистика',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Жамамбалиева',first_name:'Асель',department:'Логистика',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Хороших',first_name:'Антон',middle_name:'(С)',department:'Логистика',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Щепетова',first_name:'Элина',middle_name:'(С)',department:'Логистика',role:'Исполнитель',rate:402,status:'active'},
+    // Travel
+    {last_name:'Глухова',first_name:'Виктория',department:'Travel',role:'Главный Консьерж',rate:0,status:'active'},
+    {last_name:'Сырцева',first_name:'Дарья',department:'Travel',role:'Ведущий',rate:500,status:'active'},
+    {last_name:'Зуева',first_name:'Елизавета',department:'Travel',role:'Ведущий',rate:500,status:'active'},
+    {last_name:'Клименко',first_name:'Дарья',department:'Travel',role:'Ведущий',rate:500,status:'active'},
+    {last_name:'Коблова',first_name:'Екатерина',department:'Travel',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Кузьмичёва',first_name:'Полина',department:'Travel',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Кузьмичев',first_name:'Кирилл',department:'Travel',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Радзюкевич',first_name:'Анастасия',department:'Travel',role:'Исполнитель',rate:468,status:'active'},
+    {last_name:'Баяндина',first_name:'Полина',department:'Travel',role:'Исполнитель',rate:468,status:'active'},
+    {last_name:'Бельченкова',first_name:'Александра',department:'Travel',role:'Исполнитель',rate:468,status:'active'},
+    {last_name:'Бердиева',first_name:'Алана',department:'Travel',role:'Исполнитель',rate:468,status:'active'},
+    {last_name:'Береснева',first_name:'Анна',department:'Travel',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Дмитриева',first_name:'Евгения',department:'Travel',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Калинина',first_name:'Марта',department:'Travel',role:'Исполнитель',rate:468,status:'active'},
+    {last_name:'Коротаева',first_name:'Валерия',department:'Travel',role:'Исполнитель',rate:468,status:'active'},
+    {last_name:'Пожарская',first_name:'Дарья',department:'Travel',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Сараева',first_name:'Наталья',middle_name:'(К)',department:'Travel',role:'Ведущий',rate:468,status:'active'},
+    {last_name:'Соловьева',first_name:'Анастасия',middle_name:'(К)',department:'Travel',role:'Ведущий',rate:468,status:'active'},
+    {last_name:'Яблочко',first_name:'Лилия',department:'Travel',role:'Исполнитель',rate:468,status:'active'},
+    {last_name:'Елизарова',first_name:'Мария',department:'Travel',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Парников',first_name:'Валерий',department:'Travel',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Сараева',first_name:'Наталья',middle_name:'(С)',department:'Travel',role:'Исполнитель',rate:468,status:'active'},
+    {last_name:'Середин',first_name:'Владислав',department:'Travel',role:'Исполнитель',rate:468,status:'active'},
+    {last_name:'Соловьева',first_name:'Анастасия',middle_name:'(С)',department:'Travel',role:'Исполнитель',rate:468,status:'active'},
+    {last_name:'Клинкевичиус',first_name:'Евгения',department:'Travel',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Столярова',first_name:'Вероника',department:'Travel',role:'Стажёр',rate:335,status:'active'},
+    // КБР
+    {last_name:'Гурлева',first_name:'Алина',department:'КБР',role:'Ведущий',rate:468,status:'active'},
+    {last_name:'Саркисова',first_name:'Дарья',department:'КБР',role:'Главный Консьерж',rate:0,status:'active'},
+    {last_name:'Долгова',first_name:'Олеся',department:'КБР',role:'Ведущий',rate:500,status:'active'},
+    {last_name:'Запольских',first_name:'Анастасия',department:'КБР',role:'Ведущий',rate:500,status:'active'},
+    {last_name:'Илинбаева',first_name:'Наталья',department:'КБР',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Карпов',first_name:'Дмитрий',department:'КБР',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Ширякова',first_name:'Виктория',department:'КБР',role:'Исполнитель',rate:500,status:'active'},
+    {last_name:'Адилова',first_name:'Адель',department:'КБР',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Баринова',first_name:'Дарья',department:'КБР',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Давлашян',first_name:'Анна',department:'КБР',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Кирикова',first_name:'Ирина',department:'КБР',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Ломовицкий',first_name:'Святослав',department:'КБР',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Мелюхина',first_name:'Полина',department:'КБР',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Никитина',first_name:'Александра',department:'КБР',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Рахимова',first_name:'Юлия',department:'КБР',role:'Исполнитель',rate:402,status:'active'},
+    {last_name:'Мирошниченко',first_name:'Мария',department:'КБР',role:'Исполнитель',rate:402,status:'active'},
+    // Корп
+    {last_name:'Суздальцева',first_name:'Марина',department:'Корп',role:'Корп',rate:0,status:'active'},
+    {last_name:'Буц',first_name:'Артур',department:'Корп',role:'Корп',rate:0,status:'active'},
+    {last_name:'Дзевицкая',first_name:'Анастасия',department:'Корп',role:'Корп',rate:0,status:'active'},
+    {last_name:'Максимова',first_name:'София',department:'Корп',role:'Корп',rate:0,status:'active'},
+    {last_name:'Опарина',first_name:'Елена',department:'Корп',role:'Корп',rate:0,status:'active'},
+    {last_name:'Самигуллина',first_name:'Наиля',department:'Корп',role:'Корп',rate:0,status:'active'},
+    {last_name:'Касымова',first_name:'Динара',department:'Корп',role:'Корп',rate:0,status:'active'},
+    {last_name:'Плотникова',first_name:'Екатерина',department:'Корп',role:'Корп',rate:0,status:'active'},
+  ];
+
+  // Проверяем сколько уже есть
+  const {data:existing} = await client.from('hr_employees').select('id');
+  if(existing && existing.length>0){
+    if(!confirm(`В Supabase уже есть ${existing.length} сотрудников. Добавить ещё ${ALL_STAFF.length}?`)) return;
+  }
+
+  showToast('⏳ Импортируем сотрудников...');
+  let ok=0, err=0;
+  for(let i=0;i<ALL_STAFF.length;i+=10){
+    const batch = ALL_STAFF.slice(i,i+10);
+    const {error} = await client.from('hr_employees').insert(batch);
+    if(error){ err+=batch.length; console.log('Import error:',error); }
+    else ok+=batch.length;
+  }
+  // Создаём балансы отпусков
+  const {data:emps} = await client.from('hr_employees').select('id');
+  if(emps){
+    const balances = emps.map(e=>({employee_id:e.id,main_days_total:28,main_days_used:0}));
+    for(let i=0;i<balances.length;i+=20){
+      await client.from('hr_vacation_balances').upsert(balances.slice(i,i+20));
+    }
+  }
+  showToast(`✅ Импорт завершён: ${ok} сотрудников загружено${err?', ошибок: '+err:''}`);
+  await hrLoadAll();
+};
+
+// ---- HISTORY ----
+let hrHistory = [];
+
+async function hrLoadHistory(){
+  const client = getSB();
+  if(!client) return;
+  const {data} = await client.from('hr_history').select('*').order('change_date',{ascending:false}).limit(200);
+  hrHistory = data||[];
+}
+
+window.hrHistRender = function(){
+  const el = document.getElementById('hr-hist-content');
+  if(!el) return;
+  const empF = document.getElementById('hr-hist-emp-filter')?.value||'';
+  const typeF = document.getElementById('hr-hist-type-filter')?.value||'';
+  let list = hrHistory.filter(h=>{
+    if(empF && h.employee_id!==empF) return false;
+    if(typeF && h.change_type!==typeF) return false;
+    return true;
+  });
+  if(!list.length){ el.innerHTML='<div class="empty">История изменений пуста</div>'; return; }
+  const typeLabels={salary:'Оклад',position:'Должность',department:'Отдел',status:'Статус',role:'Роль',other:'Другое'};
+  el.innerHTML=`<div class="kpi-card" style="padding:0;overflow:hidden">
+  <table class="hr-tbl">
+    <thead><tr><th>Дата</th><th>Сотрудник</th><th>Тип</th><th>Было</th><th>Стало</th><th>Приказ</th><th>Автор</th></tr></thead>
+    <tbody>
+    ${list.map(h=>{
+      const emp=hrEmployees.find(e=>e.id===h.employee_id);
+      return `<tr>
+        <td style="color:var(--text2)">${h.change_date}</td>
+        <td>${emp?hrFullName(emp):'—'}</td>
+        <td><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#E6F1FB;color:#0C447C">${typeLabels[h.change_type]||h.change_type}</span></td>
+        <td style="color:var(--text2)">${h.old_value||'—'}</td>
+        <td style="font-weight:500">${h.new_value||'—'}</td>
+        <td style="color:var(--text2)">${h.order_number||'—'}</td>
+        <td style="color:var(--text2)">${h.hr_author||'—'}</td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table></div>`;
+};
+
+window.hrOpenHistModal = function(){
+  const sel = document.getElementById('hhist-emp');
+  sel.innerHTML = hrEmployees.filter(e=>e.status==='active').map(e=>`<option value="${e.id}">${hrFullName(e)}</option>`).join('');
+  document.getElementById('hhist-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('hr-hist-modal').style.display='flex';
+};
+
+window.hrSaveHist = async function(){
+  const empId = document.getElementById('hhist-emp').value;
+  const data = {
+    employee_id:empId,
+    change_date:document.getElementById('hhist-date').value,
+    change_type:document.getElementById('hhist-type').value,
+    old_value:document.getElementById('hhist-old').value.trim()||null,
+    new_value:document.getElementById('hhist-new').value.trim()||null,
+    order_number:document.getElementById('hhist-order').value.trim()||null,
+    hr_author:document.getElementById('hhist-author').value.trim()||null,
+    comment:document.getElementById('hhist-comment').value.trim()||null,
+  };
+  const client = getSB();
+  if(client){
+    const {error} = await client.from('hr_history').insert(data);
+    if(error){ alert('Ошибка: '+error.message); return; }
+  } else {
+    hrHistory.unshift({...data,id:'local-'+Date.now()});
+  }
+  document.getElementById('hr-hist-modal').style.display='none';
+  showToast('✅ Изменение записано');
+  await hrLoadHistory();
+  hrHistRender();
+};
+
+// ---- OFFBOARDING ----
+let hrOffboardEmpId = null;
+const OFFBOARD_ITEMS = [
+  'Сдан пропуск / ключи',
+  'Сдан ноутбук / оборудование',
+  'Передача дел руководителю',
+  'Закрыты корпоративные аккаунты (IT)',
+  'Подписан обходной лист',
+  'Расчёт в бухгалтерии',
+  'Возврат корпоративной карты',
+];
+let hrOffboardChecked = {};
+
+window.hrOpenOffboard = function(empId){
+  hrOffboardEmpId = empId;
+  hrOffboardChecked = {};
+  const emp = hrEmployees.find(e=>e.id===empId);
+  if(!emp) return;
+  document.getElementById('hr-offboard-title').textContent = 'Обходной лист — '+hrFullName(emp);
+  document.getElementById('hr-offboard-emp-info').textContent = emp.department+' · '+emp.role;
+  document.getElementById('hr-offboard-checklist').innerHTML = OFFBOARD_ITEMS.map((item,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--border);font-size:13px">
+      <div onclick="hrToggleOffboard(${i})" id="offboard-chk-${i}" style="width:18px;height:18px;border-radius:4px;border:1.5px solid var(--border2);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center"></div>
+      <span>${item}</span>
+    </div>`).join('');
+  hrCheckOffboardComplete();
+  document.getElementById('hr-offboard-modal').style.display='flex';
+};
+
+window.hrToggleOffboard = function(i){
+  hrOffboardChecked[i] = !hrOffboardChecked[i];
+  const el = document.getElementById('offboard-chk-'+i);
+  if(hrOffboardChecked[i]){
+    el.style.background='#1D9E75'; el.style.borderColor='#1D9E75';
+    el.innerHTML='<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  } else {
+    el.style.background=''; el.style.borderColor=''; el.innerHTML='';
+  }
+  hrCheckOffboardComplete();
+};
+
+function hrCheckOffboardComplete(){
+  const total = OFFBOARD_ITEMS.length;
+  const done = Object.values(hrOffboardChecked).filter(Boolean).length;
+  const btn = document.getElementById('hr-offboard-confirm-btn');
+  const msg = document.getElementById('hr-offboard-block-msg');
+  if(done===total){
+    btn.disabled=false; msg.style.display='none';
+  } else {
+    btn.disabled=true;
+    msg.style.display='block';
+    msg.textContent=`Заблокировано: выполнено ${done} из ${total} пунктов`;
+  }
+}
+
+window.hrConfirmFire = async function(){
+  const emp = hrEmployees.find(e=>e.id===hrOffboardEmpId);
+  if(!emp) return;
+  const fireDate = new Date().toISOString().split('T')[0];
+  const client = getSB();
+  if(client){
+    await client.from('hr_employees').update({status:'fired',fired_date:fireDate}).eq('id',emp.id);
+    await client.from('hr_offboarding').insert({
+      employee_id:emp.id, fired_date:fireDate,
+      items:OFFBOARD_ITEMS.map((item,i)=>({item,done:!!hrOffboardChecked[i]})),
+      completed:true
+    });
+    await client.from('hr_documents').insert({
+      employee_id:emp.id, doc_type:'order_fire',
+      doc_number:'У-'+Date.now().toString().slice(-6),
+      doc_date:fireDate, content:{fired_reason:'Обходной лист выполнен'}
+    });
+    await client.from('hr_history').insert({
+      employee_id:emp.id, change_date:fireDate,
+      change_type:'status', old_value:'active', new_value:'fired',
+      hr_author:'HR', comment:'Обходной лист подписан'
+    });
+  }
+  document.getElementById('hr-offboard-modal').style.display='none';
+  showToast('✅ Сотрудник уволен. Приказ создан.');
+  hrDownloadFireOrder(emp, fireDate);
+  await hrLoadAll();
+};
+
+window.hrDownloadFireOrder = function(e, fireDate){
+  const name = hrFullName(e);
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>body{font-family:Arial,sans-serif;padding:40px;color:#000}h1{font-size:18px;text-align:center;margin-bottom:4px}
+  .sub{text-align:center;font-size:13px;margin-bottom:30px}.row{display:flex;margin-bottom:8px;font-size:13px}
+  .lbl{width:220px;color:#555}.val{font-weight:bold}
+  .sign{margin-top:60px;display:flex;justify-content:space-between;font-size:13px}
+  .sign-line{border-top:1px solid #000;width:200px;padding-top:4px;text-align:center}</style>
+  </head><body>
+  <h1>ПРИКАЗ ОБ УВОЛЬНЕНИИ</h1>
+  <div class="sub">First Concierge Service · ${fireDate}</div>
+  <div class="row"><div class="lbl">ФИО:</div><div class="val">${name}</div></div>
+  <div class="row"><div class="lbl">Отдел:</div><div class="val">${e.department||'—'}</div></div>
+  <div class="row"><div class="lbl">Должность:</div><div class="val">${e.role||'—'}</div></div>
+  <div class="row"><div class="lbl">Дата приёма:</div><div class="val">${e.hire_date||'—'}</div></div>
+  <div class="row"><div class="lbl">Дата увольнения:</div><div class="val">${fireDate}</div></div>
+  <div class="row"><div class="lbl">Обходной лист:</div><div class="val">Выполнен полностью</div></div>
+  <div class="sign">
+    <div><div class="sign-line">Руководитель</div></div>
+    <div><div class="sign-line">Сотрудник / Дата</div></div>
+  </div></body></html>`;
+  const blob=new Blob([html],{type:'text/html'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`Приказ_увольнение_${name.replace(/ /g,'_')}.html`;
+  a.click();
+};
+
+// ---- ANALYTICS ----
+function hrRenderAnalytics(){
+  const el=document.getElementById('hr-analytics-content');
+  if(!el) return;
+  const active=hrEmployees.filter(e=>e.status==='active');
+  const fired=hrEmployees.filter(e=>e.status==='fired');
+  // По отделам
+  const depts=['Lifestyle','Travel','Логистика','КБР','Корп','ЦПО','ЦПО Ночь'];
+  const deptPlan={Lifestyle:24,Travel:26,Логистика:10,КБР:16,Корп:8,ЦПО:10,'ЦПО Ночь':5};
+  // По ролям
+  const roles=['Исполнитель','Ведущий','Главный Консьерж','Корп','Стажёр'];
+  const byRole={};
+  roles.forEach(r=>{ byRole[r]=active.filter(e=>e.role===r).length; });
+  // По ставкам
+  const rateGroups={'до 400':0,'400–450':0,'450–500':0,'500+':0,'не указана':0};
+  active.forEach(e=>{
+    if(!e.rate) rateGroups['не указана']++;
+    else if(e.rate<400) rateGroups['до 400']++;
+    else if(e.rate<450) rateGroups['400–450']++;
+    else if(e.rate<500) rateGroups['450–500']++;
+    else rateGroups['500+']++;
+  });
+  const maxRole=Math.max(...Object.values(byRole),1);
+
+  el.innerHTML=`
+  <div class="hr-metric-grid" style="margin-bottom:1.5rem">
+    <div class="hr-metric"><div class="hr-metric-lbl">Активных</div><div class="hr-metric-val" style="color:#1D9E75">${active.length}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Уволено (всего)</div><div class="hr-metric-val" style="color:#E24B4A">${fired.length}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Отделов</div><div class="hr-metric-val">${depts.length}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Средняя ставка</div><div class="hr-metric-val" style="font-size:16px">${active.length?Math.round(active.filter(e=>e.rate).reduce((s,e)=>s+e.rate,0)/active.filter(e=>e.rate).length):0} ₽/ч</div></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+    <div class="kpi-card" style="padding:14px">
+      <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em">По отделам</div>
+      ${depts.map(dept=>{
+        const fact=active.filter(e=>e.department===dept).length;
+        const plan=deptPlan[dept]||0;
+        const pct=plan?Math.round(fact/plan*100):0;
+        const color=pct>=95?'#1D9E75':pct>=80?'#EF9F27':'#E24B4A';
+        return `<div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+            <span>${dept}</span><span style="color:${color}">${fact}/${plan} (${pct}%)</span>
+          </div>
+          <div class="hr-progress"><div class="hr-progress-bar" style="width:${Math.min(pct,100)}%;background:${color}"></div></div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="kpi-card" style="padding:14px">
+      <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em">По должностям</div>
+      ${roles.map(r=>{
+        const cnt=byRole[r]||0;
+        const pct=Math.round(cnt/maxRole*100);
+        return `<div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+            <span>${r}</span><span>${cnt}</span>
+          </div>
+          <div class="hr-progress"><div class="hr-progress-bar" style="width:${pct}%;background:#185FA5"></div></div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+
+  <div class="kpi-card" style="padding:14px">
+    <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em">Структура по ставкам</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      ${Object.entries(rateGroups).map(([label,cnt])=>`
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:22px;font-weight:500">${cnt}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${label}</div>
+        </div>`).join('')}
+    </div>
+  </div>
+
+  <div style="margin-top:14px">
+    <button class="btn btn-primary btn-sm" onclick="hrImportAllStaff()">⬆ Импортировать всех 99 сотрудников в Supabase</button>
+    <span style="font-size:11px;color:var(--text3);margin-left:10px">Используй если сотрудники ещё не в базе</span>
+  </div>`;
+}
+
+// Patch hrRefreshCurrentTab to include new tabs
+const _origRefresh = hrRefreshCurrentTab;
+function hrRefreshCurrentTab(){
+  if(hrCurrentTab==='history'){ hrLoadHistory().then(()=>{ hrHistRender(); hrPopulateHistFilter(); }); return; }
+  if(hrCurrentTab==='analytics'){ hrRenderAnalytics(); return; }
+  _origRefresh();
+}
+
+function hrPopulateHistFilter(){
+  const sel = document.getElementById('hr-hist-emp-filter');
+  if(!sel) return;
+  sel.innerHTML='<option value="">Все сотрудники</option>'+
+    hrEmployees.map(e=>`<option value="${e.id}">${hrFullName(e)}</option>`).join('');
+}
+
+// Add offboard button to view modal
+const _origViewEmp = window.hrViewEmp;
+window.hrViewEmp = function(id){
+  _origViewEmp(id);
+  const e = hrEmployees.find(x=>x.id===id);
+  if(!e) return;
+  // Add offboard btn if active
+  const actionsEl = document.querySelector('#hr-view-modal .modal > div:last-child');
+  if(actionsEl && e.status==='active'){
+    const offBtn = document.createElement('button');
+    offBtn.className='btn';
+    offBtn.style.color='var(--red)';
+    offBtn.textContent='🚪 Уволить';
+    offBtn.onclick=()=>{ document.getElementById('hr-view-modal').style.display='none'; hrOpenOffboard(id); };
+    actionsEl.insertBefore(offBtn, actionsEl.firstChild);
+  }
+};
+
+// Add history and offboard modal close handlers
+['hr-hist-modal','hr-offboard-modal'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('click',function(e){
+    if(e.target===this) this.style.display='none';
+  });
+});
 function hrPopulateVacFilter(){
   const sel = document.getElementById('hr-vac-emp-filter');
   if(!sel) return;
