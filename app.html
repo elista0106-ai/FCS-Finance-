@@ -259,6 +259,26 @@ tr:hover td{background:var(--bg2)}
 .hr-role-chief{background:#FAEEDA;color:#633806}
 .hr-role-corp{background:#EEEDFE;color:#3C3489}
 .hr-role-intern{background:#F3E8FF;color:#6B21A8}
+.hr-nav-btn{padding:8px 14px;font-size:12px;border:none;background:none;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;font-family:inherit;font-weight:500;transition:all .15s}
+.hr-nav-btn:hover{color:var(--text)}
+.hr-nav-btn.active{color:var(--text);border-bottom-color:var(--accent)}
+.hr-tab{display:none}.hr-tab.active{display:block}
+.hr-metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1rem}
+.hr-metric{background:var(--bg3);border-radius:var(--radius-sm);padding:12px 14px}
+.hr-metric-lbl{font-size:11px;color:var(--text3);margin-bottom:4px}
+.hr-metric-val{font-size:22px;font-weight:500;color:var(--text)}
+.hr-alert{border-radius:var(--radius-sm);padding:9px 12px;font-size:12px;margin-bottom:6px;display:flex;align-items:flex-start;gap:8px}
+.hr-alert-red{background:var(--rbg);border:0.5px solid #F7C1C1;color:#791F1F}
+.hr-alert-amber{background:#FAEEDA;border:0.5px solid #FAC775;color:#633806}
+.hr-alert-blue{background:var(--abg);border:0.5px solid #B5D4F4;color:#0C447C}
+.hr-alert-green{background:#EAF3DE;border:0.5px solid #B5D49A;color:#27500A}
+.hr-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.hr-tbl th{padding:7px 12px;text-align:left;font-size:10px;color:var(--text3);border-bottom:0.5px solid var(--border);font-weight:500;text-transform:uppercase;letter-spacing:.04em;background:var(--bg3)}
+.hr-tbl td{padding:9px 12px;border-bottom:0.5px solid var(--border);vertical-align:middle}
+.hr-tbl tr:last-child td{border-bottom:none}
+.hr-tbl tbody tr:hover{background:var(--bg3);cursor:pointer}
+.hr-progress{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:4px}
+.hr-progress-bar{height:100%;border-radius:3px}
 
 /* ===== PARTNERS ===== */
 .ptn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:16px}
@@ -601,13 +621,287 @@ tr:hover td{background:var(--bg2)}
     <!-- HR VIEW -->
     <div id="view-hr" style="display:none">
       <div class="content">
-        <div class="hr-toolbar">
-          <input class="hr-search" type="text" id="hr-search" placeholder="🔍 Поиск по имени..." oninput="hrRender()">
-          <button class="btn btn-primary btn-sm" onclick="hrOpenAdd()">+ Добавить сотрудника</button>
-          <button class="btn btn-sm" onclick="hrSave()">💾 Сохранить</button>
+        <!-- HR Nav -->
+        <div style="display:flex;gap:0;border-bottom:0.5px solid var(--border);margin-bottom:1rem">
+          <button class="hr-nav-btn active" onclick="hrShowTab('dashboard')">📊 Дашборд</button>
+          <button class="hr-nav-btn" onclick="hrShowTab('employees')">👥 Сотрудники</button>
+          <button class="hr-nav-btn" onclick="hrShowTab('vacations')">🏖 Отпуска</button>
+          <button class="hr-nav-btn" onclick="hrShowTab('gifts')">🎁 Подарки</button>
+          <button class="hr-nav-btn" onclick="hrShowTab('events')">🎉 Мероприятия</button>
         </div>
-        <div class="hr-dept-tabs" id="hr-dept-tabs"></div>
-        <div id="hr-content"></div>
+
+        <!-- DASHBOARD -->
+        <div class="hr-tab active" id="hr-tab-dashboard">
+          <div id="hr-dashboard-content"><div class="empty">Загрузка...</div></div>
+        </div>
+
+        <!-- EMPLOYEES -->
+        <div class="hr-tab" id="hr-tab-employees">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <input id="hr-emp-search" placeholder="🔍 Поиск..." oninput="hrEmpRender()" style="padding:6px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);font-size:12px;width:200px">
+            <select id="hr-emp-dept-filter" onchange="hrEmpRender()" style="padding:6px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);font-size:12px">
+              <option value="">Все отделы</option>
+              <option>Lifestyle</option><option>Travel</option><option>Логистика</option>
+              <option>КБР</option><option>Корп</option><option>ЦПО</option><option>ЦПО Ночь</option>
+            </select>
+            <select id="hr-emp-status-filter" onchange="hrEmpRender()" style="padding:6px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);font-size:12px">
+              <option value="">Все статусы</option>
+              <option value="active">Активные</option>
+              <option value="fired">Уволенные</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="hrOpenHireModal()">+ Принять сотрудника</button>
+            <div id="hr-emp-count" style="margin-left:auto;font-size:12px;color:var(--text2)"></div>
+          </div>
+          <div id="hr-emp-content"><div class="empty">Загрузка...</div></div>
+        </div>
+
+        <!-- VACATIONS -->
+        <div class="hr-tab" id="hr-tab-vacations">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <select id="hr-vac-emp-filter" onchange="hrVacRender()" style="padding:6px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);font-size:12px;min-width:200px">
+              <option value="">Все сотрудники</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="hrOpenVacModal()">+ Запланировать отпуск</button>
+          </div>
+          <div id="hr-vac-content"><div class="empty">Загрузка...</div></div>
+        </div>
+
+        <!-- GIFTS -->
+        <div class="hr-tab" id="hr-tab-gifts">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="font-size:13px;color:var(--text2)">Подарки на ДР и праздники · лимит 3 000 / 5 000 ₽</div>
+            <button class="btn btn-primary btn-sm" onclick="hrOpenGiftModal()">+ Добавить подарок</button>
+          </div>
+          <div id="hr-gifts-content"><div class="empty">Загрузка...</div></div>
+        </div>
+
+        <!-- EVENTS -->
+        <div class="hr-tab" id="hr-tab-events">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="font-size:13px;color:var(--text2)">Корпоративы и мероприятия</div>
+            <button class="btn btn-primary btn-sm" onclick="hrOpenEventModal()">+ Добавить мероприятие</button>
+          </div>
+          <div id="hr-events-content"><div class="empty">Загрузка...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HR MODALS -->
+    <!-- Приём сотрудника -->
+    <div class="modal-bg" id="hr-hire-modal" style="display:none">
+      <div class="modal" style="max-width:600px">
+        <h3>Приём на работу</h3>
+        <div class="grid2">
+          <div class="field"><label>Фамилия *</label><input id="hh-last" placeholder="Иванова"></div>
+          <div class="field"><label>Имя *</label><input id="hh-first" placeholder="Мария"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Отчество</label><input id="hh-mid" placeholder="Петровна"></div>
+          <div class="field"><label>Дата рождения</label><input type="date" id="hh-birth"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Телефон</label><input id="hh-phone" placeholder="+7 999..."></div>
+          <div class="field"><label>Email</label><input id="hh-email" placeholder="ivan@..."></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Отдел *</label>
+            <select id="hh-dept">
+              <option>Lifestyle</option><option>Travel</option><option>Логистика</option>
+              <option>КБР</option><option>Корп</option><option>ЦПО</option><option>ЦПО Ночь</option>
+            </select>
+          </div>
+          <div class="field"><label>Должность *</label>
+            <select id="hh-role">
+              <option>Исполнитель</option><option>Ведущий</option>
+              <option>Главный Консьерж</option><option>Корп</option><option>Стажёр</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Ставка ₽/час</label><input type="number" id="hh-rate" placeholder="402"></div>
+          <div class="field"><label>Дата приёма *</label><input type="date" id="hh-hire-date"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Тип договора</label>
+            <select id="hh-contract">
+              <option value="permanent">Бессрочный</option>
+              <option value="fixed">Срочный</option>
+            </select>
+          </div>
+          <div class="field"><label>Конец испытательного</label><input type="date" id="hh-probation"></div>
+        </div>
+        <div class="field"><label>Заметки</label><textarea id="hh-note" rows="2" placeholder="Дополнительная информация..."></textarea></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)">
+          <button class="btn" onclick="hrCloseHireModal()">Отмена</button>
+          <button class="btn btn-primary" onclick="hrSaveHire()">Оформить приём + создать приказ</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Редактирование сотрудника -->
+    <div class="modal-bg" id="hr-edit-modal" style="display:none">
+      <div class="modal" style="max-width:600px">
+        <h3 id="hr-edit-modal-title">Сотрудник</h3>
+        <input type="hidden" id="hr-edit-id">
+        <div class="grid2">
+          <div class="field"><label>Фамилия</label><input id="he-last"></div>
+          <div class="field"><label>Имя</label><input id="he-first"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Отчество</label><input id="he-mid"></div>
+          <div class="field"><label>Дата рождения</label><input type="date" id="he-birth"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Телефон</label><input id="he-phone"></div>
+          <div class="field"><label>Email</label><input id="he-email"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Отдел</label>
+            <select id="he-dept">
+              <option>Lifestyle</option><option>Travel</option><option>Логистика</option>
+              <option>КБР</option><option>Корп</option><option>ЦПО</option><option>ЦПО Ночь</option>
+            </select>
+          </div>
+          <div class="field"><label>Должность</label>
+            <select id="he-role">
+              <option>Исполнитель</option><option>Ведущий</option>
+              <option>Главный Консьерж</option><option>Корп</option><option>Стажёр</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Ставка ₽/час</label><input type="number" id="he-rate"></div>
+          <div class="field"><label>Статус</label>
+            <select id="he-status">
+              <option value="active">Активен</option>
+              <option value="leave">В отпуске</option>
+              <option value="fired">Уволен</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Испытательный срок до</label><input type="date" id="he-probation"></div>
+          <div class="field"><label>Конец договора (если срочный)</label><input type="date" id="he-contract-end"></div>
+        </div>
+        <div class="field"><label>Заметки</label><textarea id="he-note" rows="2"></textarea></div>
+        <div id="he-fire-block" style="display:none;background:var(--bg3);border-radius:var(--radius-sm);padding:12px;margin-top:10px">
+          <div style="font-size:12px;font-weight:500;color:var(--red);margin-bottom:8px">Увольнение</div>
+          <div class="grid2">
+            <div class="field"><label>Дата увольнения</label><input type="date" id="he-fire-date"></div>
+            <div class="field"><label>Причина</label><input id="he-fire-reason" placeholder="По собственному желанию..."></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:space-between;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)">
+          <button class="btn" style="color:var(--red);border-color:var(--red)" onclick="hrToggleFireBlock()">🚪 Уволить</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn" onclick="hrCloseEditModal()">Отмена</button>
+            <button class="btn btn-primary" onclick="hrSaveEdit()">Сохранить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Отпуск -->
+    <div class="modal-bg" id="hr-vac-modal" style="display:none">
+      <div class="modal">
+        <h3>Запланировать отпуск</h3>
+        <div class="field"><label>Сотрудник</label><select id="hv-emp" onchange="hrCalcVacDays()"></select></div>
+        <div id="hv-balance" style="font-size:12px;color:var(--text2);margin-bottom:10px"></div>
+        <div class="grid2">
+          <div class="field"><label>Начало</label><input type="date" id="hv-start" onchange="hrCalcVacDays()"></div>
+          <div class="field"><label>Конец</label><input type="date" id="hv-end" onchange="hrCalcVacDays()"></div>
+        </div>
+        <div id="hv-days-info" style="font-size:13px;font-weight:500;margin-bottom:10px"></div>
+        <div class="grid2">
+          <div class="field"><label>Тип</label>
+            <select id="hv-type">
+              <option value="main">Основной</option>
+              <option value="additional">Дополнительный</option>
+              <option value="sick">Больничный</option>
+              <option value="unpaid">За свой счёт</option>
+            </select>
+          </div>
+          <div class="field"><label>Статус</label>
+            <select id="hv-status">
+              <option value="planned">Запланирован</option>
+              <option value="approved">Одобрен</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Комментарий</label><input id="hv-comment" placeholder=""></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)">
+          <button class="btn" onclick="document.getElementById('hr-vac-modal').style.display='none'">Отмена</button>
+          <button class="btn btn-primary" onclick="hrSaveVac()">Сохранить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Подарок -->
+    <div class="modal-bg" id="hr-gift-modal" style="display:none">
+      <div class="modal">
+        <h3>Добавить подарок</h3>
+        <div class="field"><label>Сотрудник</label><select id="hg-emp"></select></div>
+        <div class="grid2">
+          <div class="field"><label>Повод</label>
+            <select id="hg-occasion">
+              <option value="birthday">День рождения</option>
+              <option value="newyear">Новый год</option>
+              <option value="march8">8 марта</option>
+              <option value="feb23">23 февраля</option>
+              <option value="other">Другое</option>
+            </select>
+          </div>
+          <div class="field"><label>Дата</label><input type="date" id="hg-date"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Подарок</label><input id="hg-name" placeholder="Цветы, сертификат..."></div>
+          <div class="field"><label>Сумма ₽</label><input type="number" id="hg-amount" placeholder="0" oninput="hrCheckGiftLimit()"></div>
+        </div>
+        <div id="hg-limit-warn" style="display:none;font-size:12px;color:var(--red);margin-bottom:8px"></div>
+        <div class="grid2">
+          <div class="field"><label>Лимит ₽</label><input type="number" id="hg-limit" value="3000"></div>
+          <div class="field"><label>Вручил</label><input id="hg-by" placeholder="ФИО"></div>
+        </div>
+        <div class="field"><label>Статус</label>
+          <select id="hg-status">
+            <option value="planned">Запланирован</option>
+            <option value="handed">Вручён</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)">
+          <button class="btn" onclick="document.getElementById('hr-gift-modal').style.display='none'">Отмена</button>
+          <button class="btn btn-primary" onclick="hrSaveGift()">Сохранить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Мероприятие -->
+    <div class="modal-bg" id="hr-event-modal" style="display:none">
+      <div class="modal">
+        <h3>Добавить мероприятие</h3>
+        <div class="field"><label>Название</label><input id="hev-name" placeholder="День компании..."></div>
+        <div class="grid2">
+          <div class="field"><label>Дата</label><input type="date" id="hev-date"></div>
+          <div class="field"><label>Бюджет ₽</label><input type="number" id="hev-budget" placeholder="0"></div>
+        </div>
+        <div class="field"><label>Место</label><input id="hev-location" placeholder="Адрес..."></div>
+        <div class="field"><label>Описание</label><textarea id="hev-desc" rows="2"></textarea></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)">
+          <button class="btn" onclick="document.getElementById('hr-event-modal').style.display='none'">Отмена</button>
+          <button class="btn btn-primary" onclick="hrSaveEvent()">Сохранить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Просмотр сотрудника -->
+    <div class="modal-bg" id="hr-view-modal" style="display:none">
+      <div class="modal" style="max-width:640px">
+        <div id="hr-view-content"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)">
+          <button class="btn" onclick="document.getElementById('hr-view-modal').style.display='none'">Закрыть</button>
+          <button class="btn btn-primary" id="hr-view-edit-btn">✏️ Редактировать</button>
+          <button class="btn" onclick="hrDownloadOrder()" id="hr-view-order-btn">📄 Скачать приказ</button>
+        </div>
       </div>
     </div>
 
@@ -618,9 +912,7 @@ tr:hover td{background:var(--bg2)}
           <div style="font-size:16px;font-weight:600">🤝 Партнёры</div>
           <button class="btn btn-primary btn-sm" onclick="ptnOpenAdd()">+ Добавить партнёра</button>
         </div>
-        <!-- Карточки партнёров -->
         <div class="ptn-grid" id="ptn-cards"></div>
-        <!-- Детальная страница партнёра -->
         <div id="ptn-detail-wrap" style="display:none">
           <button class="kpi-back-btn" onclick="ptnCloseDet()">← Назад к списку</button>
           <div id="ptn-detail"></div>
@@ -628,7 +920,7 @@ tr:hover td{background:var(--bg2)}
       </div>
     </div>
 
-    <!-- PARTNER MODAL -->
+    <!-- PARTNER MODAL (вне view-partners чтобы работал когда view скрыт) -->
     <div class="ptn-modal-bg" id="ptn-modal" style="display:none">
       <div class="ptn-modal">
         <h3 id="ptn-modal-title">Добавить партнёра</h3>
@@ -3613,12 +3905,12 @@ function kpiSetTxt(id,val){const el=document.getElementById(id);if(el)el.textCon
 
 })(); // end KPI module
 
+
 // ============================================================
-// HR MODULE
+// HR MODULE — Supabase
 // ============================================================
 (function(){
 
-const HR_DEPTS = ['Все','Lifestyle','Travel','Логистика','КБР','Корп','ЦПО','ЦПО Ночь'];
 const HR_AV_COLORS = [
   {bg:'#E6F1FB',cl:'#0C447C'},{bg:'#EAF3DE',cl:'#27500A'},
   {bg:'#FAEEDA',cl:'#633806'},{bg:'#FBEAF0',cl:'#72243E'},
@@ -3626,272 +3918,649 @@ const HR_AV_COLORS = [
   {bg:'#FEF3E2',cl:'#854F0B'},{bg:'#F3E8FF',cl:'#6B21A8'}
 ];
 
-// Все сотрудники из документа — глобальная переменная
-window.hrStaff = [
-  // ЦПО
-  {name:'Затямина Александра',dept:'ЦПО',rate:0,role:'Исполнитель'},
-  {name:'Галиахметова Мария',dept:'ЦПО',rate:500,role:'Исполнитель'},
-  {name:'Гвоздева Марина',dept:'ЦПО',rate:500,role:'Исполнитель'},
-  {name:'Ряполова Юлия',dept:'ЦПО',rate:500,role:'Исполнитель'},
-  {name:'Третьякова Кристина',dept:'ЦПО',rate:500,role:'Исполнитель'},
-  {name:'Беспальченко Юлия',dept:'ЦПО',rate:402,role:'Исполнитель'},
-  {name:'Жевлакова Елизавета',dept:'ЦПО',rate:402,role:'Исполнитель'},
-  {name:'Исмаилова Карина',dept:'ЦПО',rate:402,role:'Исполнитель'},
-  {name:'Козлова Анжелика',dept:'ЦПО',rate:402,role:'Исполнитель'},
-  {name:'Наговицына Мария',dept:'ЦПО',rate:402,role:'Исполнитель'},
-  // ЦПО Ночь
-  {name:'Черемных Екатерина',dept:'ЦПО Ночь',rate:500,role:'Исполнитель'},
-  {name:'Таюрская Галина',dept:'ЦПО Ночь',rate:500,role:'Исполнитель'},
-  {name:'Батаева Юлия',dept:'ЦПО Ночь',rate:402,role:'Исполнитель'},
-  {name:'Луговских Евгения',dept:'ЦПО Ночь',rate:402,role:'Исполнитель'},
-  {name:'Витт Анна',dept:'ЦПО Ночь',rate:402,role:'Исполнитель'},
-  // Lifestyle
-  {name:'Соколова Наталия',dept:'Lifestyle',rate:0,role:'Исполнитель'},
-  {name:'Христич Александра',dept:'Lifestyle',rate:0,role:'Исполнитель'},
-  {name:'Долматова Надежда',dept:'Lifestyle',rate:500,role:'Исполнитель'},
-  {name:'Ефимцева Любовь',dept:'Lifestyle',rate:500,role:'Исполнитель'},
-  {name:'Иванова Владлена',dept:'Lifestyle',rate:500,role:'Исполнитель'},
-  {name:'Ложечникова Екатерина',dept:'Lifestyle',rate:500,role:'Исполнитель'},
-  {name:'Мохова Мария',dept:'Lifestyle',rate:500,role:'Исполнитель'},
-  {name:'Хон Ирина',dept:'Lifestyle',rate:500,role:'Исполнитель'},
-  {name:'Виноградов Александр',dept:'Lifestyle',rate:402,role:'Исполнитель'},
-  {name:'Еловская Софья',dept:'Lifestyle',rate:402,role:'Исполнитель'},
-  {name:'Лисова Анна',dept:'Lifestyle',rate:402,role:'Исполнитель'},
-  {name:'Малых Ксения (К)',dept:'Lifestyle',rate:468,role:'Исполнитель'},
-  {name:'Меркулова Екатерина',dept:'Lifestyle',rate:468,role:'Исполнитель'},
-  {name:'Петров Андрей (К)',dept:'Lifestyle',rate:402,role:'Исполнитель'},
-  {name:'Рудченко Юлия',dept:'Lifestyle',rate:468,role:'Исполнитель'},
-  {name:'Тоцкая Алёна',dept:'Lifestyle',rate:468,role:'Исполнитель'},
-  {name:'Хамзин Рушан',dept:'Lifestyle',rate:402,role:'Исполнитель'},
-  {name:'Шевякова Екатерина',dept:'Lifestyle',rate:402,role:'Исполнитель'},
-  {name:'Гулла Анна',dept:'Lifestyle',rate:402,role:'Исполнитель'},
-  {name:'Киселева Анастасия',dept:'Lifestyle',rate:335,role:'Исполнитель'},
-  {name:'Малых Ксения (С)',dept:'Lifestyle',rate:468,role:'Исполнитель'},
-  {name:'Петрова Елизавета',dept:'Lifestyle',rate:402,role:'Исполнитель'},
-  {name:'Петров Андрей (С)',dept:'Lifestyle',rate:402,role:'Исполнитель'},
-  {name:'Скороходова Мария',dept:'Lifestyle',rate:402,role:'Исполнитель'},
-  // Логистика
-  {name:'Хохлова Светлана',dept:'Логистика',rate:0,role:'Исполнитель'},
-  {name:'Макарова Софья',dept:'Логистика',rate:500,role:'Исполнитель'},
-  {name:'Сафарова Анастасия',dept:'Логистика',rate:468,role:'Исполнитель'},
-  {name:'Магомедгаджиева Саида',dept:'Логистика',rate:402,role:'Исполнитель'},
-  {name:'Хороших Антон (К)',dept:'Логистика',rate:402,role:'Исполнитель'},
-  {name:'Шумова Диана',dept:'Логистика',rate:402,role:'Исполнитель'},
-  {name:'Щепетова Элина (К)',dept:'Логистика',rate:402,role:'Исполнитель'},
-  {name:'Жамамбалиева Асель',dept:'Логистика',rate:402,role:'Исполнитель'},
-  {name:'Хороших Антон (С)',dept:'Логистика',rate:402,role:'Исполнитель'},
-  {name:'Щепетова Элина (С)',dept:'Логистика',rate:402,role:'Исполнитель'},
-  // Travel
-  {name:'Глухова Виктория',dept:'Travel',rate:0,role:'Исполнитель'},
-  {name:'Сырцева Дарья',dept:'Travel',rate:500,role:'Исполнитель'},
-  {name:'Зуева Елизавета',dept:'Travel',rate:500,role:'Исполнитель'},
-  {name:'Клименко Дарья',dept:'Travel',rate:500,role:'Исполнитель'},
-  {name:'Коблова Екатерина',dept:'Travel',rate:500,role:'Исполнитель'},
-  {name:'Кузьмичёва Полина',dept:'Travel',rate:500,role:'Исполнитель'},
-  {name:'Кузьмичев Кирилл',dept:'Travel',rate:500,role:'Исполнитель'},
-  {name:'Радзюкевич Анастасия',dept:'Travel',rate:468,role:'Исполнитель'},
-  {name:'Баяндина Полина',dept:'Travel',rate:468,role:'Исполнитель'},
-  {name:'Бельченкова Александра',dept:'Travel',rate:468,role:'Исполнитель'},
-  {name:'Бердиева Алана',dept:'Travel',rate:468,role:'Исполнитель'},
-  {name:'Береснева Анна',dept:'Travel',rate:500,role:'Исполнитель'},
-  {name:'Дмитриева Евгения',dept:'Travel',rate:500,role:'Исполнитель'},
-  {name:'Калинина Марта',dept:'Travel',rate:468,role:'Исполнитель'},
-  {name:'Коротаева Валерия',dept:'Travel',rate:468,role:'Исполнитель'},
-  {name:'Пожарская Дарья',dept:'Travel',rate:402,role:'Исполнитель'},
-  {name:'Сараева Наталья (К)',dept:'Travel',rate:468,role:'Исполнитель'},
-  {name:'Соловьева Анастасия (К)',dept:'Travel',rate:468,role:'Исполнитель'},
-  {name:'Яблочко Лилия',dept:'Travel',rate:468,role:'Исполнитель'},
-  {name:'Елизарова Мария',dept:'Travel',rate:402,role:'Исполнитель'},
-  {name:'Парников Валерий',dept:'Travel',rate:402,role:'Исполнитель'},
-  {name:'Сараева Наталья (С)',dept:'Travel',rate:468,role:'Исполнитель'},
-  {name:'Середин Владислав',dept:'Travel',rate:468,role:'Исполнитель'},
-  {name:'Соловьева Анастасия (С)',dept:'Travel',rate:468,role:'Исполнитель'},
-  {name:'Клинкевичиус Евгения',dept:'Travel',rate:500,role:'Исполнитель'},
-  {name:'Столярова Вероника',dept:'Travel',rate:335,role:'Исполнитель'},
-  // КБР
-  {name:'Гурлева Алина',dept:'КБР',rate:468,role:'Исполнитель'},
-  {name:'Саркисова Дарья',dept:'КБР',rate:0,role:'Исполнитель'},
-  {name:'Долгова Олеся',dept:'КБР',rate:500,role:'Исполнитель'},
-  {name:'Запольских Анастасия',dept:'КБР',rate:500,role:'Исполнитель'},
-  {name:'Илинбаева Наталья',dept:'КБР',rate:500,role:'Исполнитель'},
-  {name:'Карпов Дмитрий',dept:'КБР',rate:500,role:'Исполнитель'},
-  {name:'Ширякова Виктория',dept:'КБР',rate:500,role:'Исполнитель'},
-  {name:'Адилова Адель',dept:'КБР',rate:402,role:'Исполнитель'},
-  {name:'Баринова Дарья',dept:'КБР',rate:402,role:'Исполнитель'},
-  {name:'Давлашян Анна',dept:'КБР',rate:402,role:'Исполнитель'},
-  {name:'Кирикова Ирина',dept:'КБР',rate:402,role:'Исполнитель'},
-  {name:'Ломовицкий Святослав',dept:'КБР',rate:402,role:'Исполнитель'},
-  {name:'Мелюхина Полина',dept:'КБР',rate:402,role:'Исполнитель'},
-  {name:'Никитина Александра',dept:'КБР',rate:402,role:'Исполнитель'},
-  {name:'Рахимова Юлия',dept:'КБР',rate:402,role:'Исполнитель'},
-  {name:'Мирошниченко Мария',dept:'КБР',rate:402,role:'Исполнитель'},
-  // Корп
-  {name:'Суздальцева Марина',dept:'Корп',rate:0,role:'Корп'},
-  {name:'Буц Артур',dept:'Корп',rate:0,role:'Корп'},
-  {name:'Дзевицкая Анастасия',dept:'Корп',rate:0,role:'Корп'},
-  {name:'Максимова София',dept:'Корп',rate:0,role:'Корп'},
-  {name:'Опарина Елена',dept:'Корп',rate:0,role:'Корп'},
-  {name:'Самигуллина Наиля',dept:'Корп',rate:0,role:'Корп'},
-  {name:'Касымова Динара',dept:'Корп',rate:0,role:'Корп'},
-  {name:'Плотникова Екатерина',dept:'Корп',rate:0,role:'Корп'},
-];
+// Keep window.hrStaff in sync for KPI module
+window.hrStaff = window.hrStaff || [];
 
-let hrCurrDept = 'Все';
-let hrEditingIdx = -1;
+let hrEmployees = [];
+let hrVacations = [];
+let hrGifts = [];
+let hrEvents = [];
+let hrCurrentTab = 'dashboard';
+let hrViewEmpId = null;
 
-// Загружаем сохранённые данные
-function hrLoadFromStorage(){
-  try{
-    const saved = localStorage.getItem('fcs_hr_staff');
-    if(saved){
-      const parsed = JSON.parse(saved);
-      // Мутируем массив вместо переприсваивания — чтобы ссылки не потерялись
-      window.hrStaff.length = 0;
-      parsed.forEach(e => window.hrStaff.push(e));
-    }
-  }catch(e){ console.log('HR load error:', e); }
+// ---- HELPERS ----
+function hrFmt(n){ return Math.round(n||0).toLocaleString('ru-RU'); }
+function hrAv(emp, idx){
+  const c = HR_AV_COLORS[(idx||0) % HR_AV_COLORS.length];
+  const init = ((emp.last_name||'?')[0]+(emp.first_name||'?')[0]).toUpperCase();
+  return `<div class="hr-av" style="background:${c.bg};color:${c.cl}">${init}</div>`;
+}
+function hrFullName(e){ return [e.last_name,e.first_name,e.middle_name].filter(Boolean).join(' '); }
+function hrDaysUntil(dateStr){
+  if(!dateStr) return null;
+  return Math.round((new Date(dateStr)-new Date())/(1000*86400));
+}
+function hrStatusBadge(s){
+  if(s==='active') return '<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#EAF3DE;color:#27500A">Активен</span>';
+  if(s==='fired') return '<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#F1EFE8;color:#444441">Уволен</span>';
+  if(s==='leave') return '<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#E6F1FB;color:#0C447C">В отпуске</span>';
+  return '';
+}
+function hrProbBadge(e){
+  if(!e.probation_end_date || e.probation_status==='passed') return '<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#EAF3DE;color:#27500A">Пройден</span>';
+  const d = hrDaysUntil(e.probation_end_date);
+  if(d<0) return '<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#EAF3DE;color:#27500A">Пройден</span>';
+  if(d<=7) return `<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#FCEBEB;color:#791F1F">${d} дн.</span>`;
+  if(d<=30) return `<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806">${d} дн.</span>`;
+  return `<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806">${d} дн.</span>`;
 }
 
-function hrSaveToStorage(){
+// ---- SUPABASE ----
+function getSB(){
+  if(typeof sb !== 'undefined') return sb;
+  if(typeof window.sb !== 'undefined') return window.sb;
+  return null;
+}
+
+async function hrLoadAll(){
+  const client = getSB();
+  if(!client){ hrUseFallback(); return; }
   try{
-    localStorage.setItem('fcs_hr_staff', JSON.stringify(window.hrStaff));
-    // Синхронизируем с KPI модулем
+    const [emps, vacs, gifts, events] = await Promise.all([
+      client.from('hr_employees').select('*').order('last_name'),
+      client.from('hr_vacations').select('*').order('start_date',{ascending:false}),
+      client.from('hr_gifts').select('*').order('gift_date',{ascending:false}),
+      client.from('hr_events').select('*').order('event_date',{ascending:false}),
+    ]);
+    hrEmployees = emps.data||[];
+    hrVacations = vacs.data||[];
+    hrGifts = gifts.data||[];
+    hrEvents = events.data||[];
+    // Sync to window.hrStaff for KPI
     hrSyncToKPI();
-  }catch(e){}
+    hrRefreshCurrentTab();
+  }catch(e){
+    console.log('HR load error',e);
+    hrUseFallback();
+  }
+}
+
+function hrUseFallback(){
+  // Fallback: use localStorage hrStaff
+  hrEmployees = (window.hrStaff||[]).map((e,i)=>({
+    id: 'local-'+i,
+    last_name: e.name.split(' ')[0]||e.name,
+    first_name: e.name.split(' ')[1]||'',
+    middle_name: e.name.split(' ')[2]||'',
+    department: e.dept,
+    position: e.role,
+    role: e.role,
+    rate: e.rate,
+    status: 'active',
+  }));
+  hrRefreshCurrentTab();
 }
 
 function hrSyncToKPI(){
-  // Делегируем синхронизацию в KPI модуль
-  if(typeof kpiSyncFromHR === 'function') kpiSyncFromHR();
+  window.hrStaff.length = 0;
+  hrEmployees.filter(e=>e.status!=='fired').forEach(e=>{
+    window.hrStaff.push({
+      name: hrFullName(e),
+      dept: e.department||'',
+      rate: e.rate||0,
+      role: e.role||e.position||'Исполнитель'
+    });
+  });
+  if(typeof kpiSyncFromHR==='function') kpiSyncFromHR();
+  localStorage.setItem('fcs_hr_staff', JSON.stringify(window.hrStaff));
 }
 
-hrLoadFromStorage();
-// После загрузки HR — синхронизируем KPI и обновляем навигацию
-if(typeof kpiSyncFromHR === 'function') kpiSyncFromHR();
-if(typeof kpiRenderYearBar === 'function') kpiRenderYearBar();
-
-window.hrSave = function(){
-  hrSaveToStorage();
-  showToast('✅ Справочник сотрудников сохранён!');
+// ---- TAB NAVIGATION ----
+window.hrShowTab = function(tab){
+  hrCurrentTab = tab;
+  document.querySelectorAll('.hr-nav-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.hr-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('hr-tab-'+tab)?.classList.add('active');
+  event?.target?.classList.add('active');
+  hrRefreshCurrentTab();
 };
+
+function hrRefreshCurrentTab(){
+  if(hrCurrentTab==='dashboard') hrRenderDashboard();
+  else if(hrCurrentTab==='employees') hrEmpRender();
+  else if(hrCurrentTab==='vacations') hrVacRender();
+  else if(hrCurrentTab==='gifts') hrGiftsRender();
+  else if(hrCurrentTab==='events') hrEventsRender();
+}
 
 window.hrRender = function(){
-  const q = (document.getElementById('hr-search')?.value||'').toLowerCase();
-  // Dept tabs
-  const tabsEl = document.getElementById('hr-dept-tabs');
-  if(tabsEl){
-    tabsEl.innerHTML = HR_DEPTS.map(d=>{
-      const cnt = d==='Все' ? window.hrStaff.length : window.hrStaff.filter(e=>e.dept===d).length;
-      return `<button class="hr-dtab${d===hrCurrDept?' active':''}" onclick="hrSetDept('${d}')">${d} (${cnt})</button>`;
-    }).join('');
-  }
+  hrLoadAll();
+};
 
-  // Filter
-  let list = hrCurrDept==='Все' ? window.hrStaff : window.hrStaff.filter(e=>e.dept===hrCurrDept);
-  if(q) list = list.filter(e=>e.name.toLowerCase().includes(q));
+// ---- DASHBOARD ----
+function hrRenderDashboard(){
+  const el = document.getElementById('hr-dashboard-content');
+  if(!el) return;
+  const active = hrEmployees.filter(e=>e.status==='active');
+  const probation = active.filter(e=>e.probation_end_date && e.probation_status!=='passed' && hrDaysUntil(e.probation_end_date)>=0);
+  const onLeave = hrVacations.filter(v=>{
+    const now = new Date().toISOString().split('T')[0];
+    return v.status==='approved' && v.start_date<=now && v.end_date>=now;
+  });
+  // ДР этой недели
+  const today = new Date();
+  const bdayThis = active.filter(e=>{
+    if(!e.birth_date) return false;
+    const bd = new Date(e.birth_date);
+    const thisYear = new Date(today.getFullYear(), bd.getMonth(), bd.getDate());
+    const diff = Math.round((thisYear-today)/86400000);
+    return diff>=0 && diff<=7;
+  });
+  // Уведомления
+  let alerts = '';
+  // Испытательный
+  probation.filter(e=>hrDaysUntil(e.probation_end_date)<=7).forEach(e=>{
+    const d = hrDaysUntil(e.probation_end_date);
+    alerts += `<div class="hr-alert hr-alert-red">⚠ <div><b>${hrFullName(e)}</b> — испытательный срок заканчивается через ${d} дн. (${e.probation_end_date})</div></div>`;
+  });
+  // Срочный ТД
+  hrEmployees.filter(e=>e.contract_type==='fixed' && e.contract_end_date).forEach(e=>{
+    const d = hrDaysUntil(e.contract_end_date);
+    if(d>=0 && d<=30) alerts += `<div class="hr-alert hr-alert-amber">📋 <div><b>${hrFullName(e)}</b> — срочный ТД заканчивается через ${d} дн. (${e.contract_end_date})</div></div>`;
+  });
+  // ДР сегодня
+  bdayThis.filter(e=>{
+    const bd = new Date(e.birth_date);
+    return bd.getMonth()===today.getMonth() && bd.getDate()===today.getDate();
+  }).forEach(e=>{
+    alerts += `<div class="hr-alert hr-alert-blue">🎂 <div>Сегодня ДР: <b>${hrFullName(e)}</b> <span onclick="hrOpenGiftForEmp('${e.id}')" style="cursor:pointer;color:#0C447C;margin-left:8px">→ выбрать подарок</span></div></div>`;
+  });
+  if(!alerts) alerts = '<div class="hr-alert hr-alert-green">✓ Нет срочных уведомлений</div>';
 
-  const content = document.getElementById('hr-content');
-  if(!content) return;
-
-  if(!list.length){
-    content.innerHTML='<div class="empty">Сотрудники не найдены</div>';
-    return;
-  }
-
-  let html=`<div class="hr-table-wrap"><table class="hr-table">
-    <thead><tr>
-      <th style="width:36px"></th>
-      <th>Имя</th>
-      <th>Отдел</th>
-      <th>Ставка ₽/ч</th>
-      <th>Роль</th>
-      <th style="width:80px"></th>
-    </tr></thead><tbody>`;
-
-  list.forEach((emp)=>{
-    const globalIdx = window.hrStaff.indexOf(emp);
-    const initials = emp.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    const av = HR_AV_COLORS[globalIdx % HR_AV_COLORS.length];
-    const roleCls = emp.role==='Ведущий'?'hr-role-lead':emp.role==='Главный Консьерж'?'hr-role-chief':emp.role==='Корп'?'hr-role-corp':emp.role==='Стажёр'?'hr-role-intern':'hr-role-exec';
-    html+=`<tr>
-      <td><div class="hr-av" style="background:${av.bg};color:${av.cl}">${initials}</div></td>
-      <td><span style="font-weight:500">${emp.name}</span></td>
-      <td style="color:var(--text2)">${emp.dept}</td>
-      <td>${emp.rate ? emp.rate+' ₽/ч' : '<span style="color:var(--text3)">—</span>'}</td>
-      <td><span class="hr-role ${roleCls}">${emp.role}</span></td>
-      <td style="text-align:right">
-        <button class="hr-edit-btn" onclick="hrOpenEdit(${globalIdx})" title="Редактировать">✏️</button>
-        <button class="hr-del-btn" onclick="hrDelete(${globalIdx})" title="Удалить">×</button>
-      </td>
-    </tr>`;
+  // Укомплектованность отделов
+  const deptPlan = {Lifestyle:24,Travel:26,Логистика:10,КБР:16,Корп:8,ЦПО:10,'ЦПО Ночь':5};
+  let staffBars = '';
+  Object.entries(deptPlan).forEach(([dept,plan])=>{
+    const fact = active.filter(e=>e.department===dept).length;
+    const pct = Math.round(fact/plan*100);
+    const color = pct>=95?'#1D9E75':pct>=80?'#EF9F27':'#E24B4A';
+    const bCls = pct>=95?'b-green':pct>=80?'b-amber':'b-red';
+    staffBars += `<div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:12px">
+        <span>${dept}</span>
+        <span>${fact}/${plan} <span style="font-size:10px;padding:2px 6px;border-radius:10px;background:${pct>=95?'#EAF3DE':pct>=80?'#FAEEDA':'#FCEBEB'};color:${color}">${pct}%</span></span>
+      </div>
+      <div class="hr-progress"><div class="hr-progress-bar" style="width:${Math.min(pct,100)}%;background:${color}"></div></div>
+    </div>`;
   });
 
-  html+='</tbody></table></div>';
-  content.innerHTML=html;
+  // В отпуске
+  let leaveList = onLeave.length ? onLeave.slice(0,5).map(v=>{
+    const emp = hrEmployees.find(e=>e.id===v.employee_id);
+    if(!emp) return '';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:12px">
+      <span>${hrFullName(emp)}</span>
+      <span style="color:var(--text2)">до ${v.end_date}</span>
+    </div>`;
+  }).join('') : '<div style="font-size:12px;color:var(--text3);padding:8px 0">Никто не в отпуске</div>';
+
+  el.innerHTML = `
+  <div class="hr-metric-grid">
+    <div class="hr-metric"><div class="hr-metric-lbl">Всего сотрудников</div><div class="hr-metric-val">${active.length}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">На испытательном</div><div class="hr-metric-val" style="color:#BA7517">${probation.length}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">В отпуске сейчас</div><div class="hr-metric-val" style="color:#185FA5">${onLeave.length}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">ДР на этой неделе</div><div class="hr-metric-val" style="color:#1D9E75">${bdayThis.length}</div></div>
+  </div>
+  <div class="section-label">Уведомления</div>
+  ${alerts}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:1rem">
+    <div class="kpi-card" style="padding:14px">
+      <div class="section-label" style="margin-top:0">Укомплектованность</div>
+      ${staffBars}
+    </div>
+    <div class="kpi-card" style="padding:14px">
+      <div class="section-label" style="margin-top:0">В отпуске</div>
+      ${leaveList}
+    </div>
+  </div>`;
+}
+
+// ---- EMPLOYEES ----
+window.hrEmpRender = function(){
+  const el = document.getElementById('hr-emp-content');
+  if(!el) return;
+  const q = (document.getElementById('hr-emp-search')?.value||'').toLowerCase();
+  const deptF = document.getElementById('hr-emp-dept-filter')?.value||'';
+  const statusF = document.getElementById('hr-emp-status-filter')?.value||'';
+  let list = hrEmployees.filter(e=>{
+    if(deptF && e.department!==deptF) return false;
+    if(statusF && e.status!==statusF) return false;
+    if(q && !hrFullName(e).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  document.getElementById('hr-emp-count').textContent = list.length+' сотрудников';
+  if(!list.length){ el.innerHTML='<div class="empty">Нет сотрудников</div>'; return; }
+  el.innerHTML = `<div class="kpi-card" style="padding:0;overflow:hidden">
+  <table class="hr-tbl">
+    <thead><tr><th>Сотрудник</th><th>Отдел</th><th>Роль</th><th>Ставка</th><th>Испытательный</th><th>Статус</th></tr></thead>
+    <tbody>
+    ${list.map((e,i)=>`<tr onclick="hrViewEmp('${e.id}')">
+      <td><div class="emp-cell">${hrAv(e,i)} <div><div>${hrFullName(e)}</div>${e.birth_date?'<div style="font-size:10px;color:var(--text3)">'+e.birth_date+'</div>':''}</div></div></td>
+      <td>${e.department||'—'}</td>
+      <td><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#E6F1FB;color:#0C447C">${e.role||e.position||'—'}</span></td>
+      <td>${e.rate?e.rate+' ₽/ч':'—'}</td>
+      <td>${hrProbBadge(e)}</td>
+      <td>${hrStatusBadge(e.status)}</td>
+    </tr>`).join('')}
+    </tbody>
+  </table></div>`;
 };
 
-window.hrSetDept = function(d){
-  hrCurrDept=d;
-  hrRender();
+// ---- VIEW EMP ----
+window.hrViewEmp = function(id){
+  hrViewEmpId = id;
+  const e = hrEmployees.find(x=>x.id===id);
+  if(!e) return;
+  const vacs = hrVacations.filter(v=>v.employee_id===id);
+  const gifts = hrGifts.filter(g=>g.employee_id===id);
+  document.getElementById('hr-view-content').innerHTML = `
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    ${hrAv(e,0)}
+    <div><div style="font-size:16px;font-weight:500">${hrFullName(e)}</div>
+    <div style="font-size:12px;color:var(--text2)">${e.department||''} · ${e.role||e.position||''} ${hrStatusBadge(e.status)}</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:14px">
+    ${e.phone?`<div><span style="color:var(--text3)">Телефон: </span>${e.phone}</div>`:''}
+    ${e.personal_email?`<div><span style="color:var(--text3)">Email: </span>${e.personal_email}</div>`:''}
+    ${e.birth_date?`<div><span style="color:var(--text3)">Дата рождения: </span>${e.birth_date}</div>`:''}
+    ${e.hire_date?`<div><span style="color:var(--text3)">Дата приёма: </span>${e.hire_date}</div>`:''}
+    ${e.rate?`<div><span style="color:var(--text3)">Ставка: </span>${e.rate} ₽/ч</div>`:''}
+    ${e.probation_end_date?`<div><span style="color:var(--text3)">Испытательный до: </span>${e.probation_end_date}</div>`:''}
+  </div>
+  ${e.note?`<div style="font-size:12px;color:var(--text2);margin-bottom:12px">${e.note}</div>`:''}
+  ${vacs.length?`<div style="font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;margin-bottom:6px">Отпуска</div>
+  ${vacs.slice(0,3).map(v=>`<div style="font-size:12px;padding:4px 0;border-bottom:0.5px solid var(--border)">${v.start_date} — ${v.end_date} (${v.days} дн.)</div>`).join('')}`:''}`;
+  document.getElementById('hr-view-edit-btn').onclick = ()=>{ document.getElementById('hr-view-modal').style.display='none'; hrOpenEditModal(id); };
+  document.getElementById('hr-view-modal').style.display='flex';
 };
 
-window.hrOpenAdd = function(){
-  hrEditingIdx=-1;
-  document.getElementById('hr-modal-title').textContent='Добавить сотрудника';
-  document.getElementById('hr-f-name').value='';
-  document.getElementById('hr-f-dept').value= hrCurrDept==='Все'?'Lifestyle':hrCurrDept;
-  document.getElementById('hr-f-rate').value='';
-  document.getElementById('hr-f-role').value='Исполнитель';
-  document.getElementById('hr-modal').style.display='flex';
-  setTimeout(()=>document.getElementById('hr-f-name').focus(),50);
+// ---- HIRE ----
+window.hrOpenHireModal = function(){
+  document.getElementById('hh-hire-date').value = new Date().toISOString().split('T')[0];
+  const pd = new Date(); pd.setMonth(pd.getMonth()+3);
+  document.getElementById('hh-probation').value = pd.toISOString().split('T')[0];
+  document.getElementById('hr-hire-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('hh-last').focus(),50);
 };
+window.hrCloseHireModal = function(){ document.getElementById('hr-hire-modal').style.display='none'; };
 
-window.hrOpenEdit = function(idx){
-  hrEditingIdx=idx;
-  const emp=window.hrStaff[idx];
-  document.getElementById('hr-modal-title').textContent='Редактировать сотрудника';
-  document.getElementById('hr-f-name').value=emp.name;
-  document.getElementById('hr-f-dept').value=emp.dept;
-  document.getElementById('hr-f-rate').value=emp.rate||'';
-  document.getElementById('hr-f-role').value=emp.role;
-  document.getElementById('hr-modal').style.display='flex';
-};
-
-window.hrCloseModal = function(){
-  document.getElementById('hr-modal').style.display='none';
-};
-
-window.hrSaveModal = function(){
-  const name=(document.getElementById('hr-f-name').value||'').trim();
-  const dept=document.getElementById('hr-f-dept').value;
-  const rate=parseFloat(document.getElementById('hr-f-rate').value)||0;
-  const role=document.getElementById('hr-f-role').value;
-  if(!name){alert('Введите имя');return;}
-  if(hrEditingIdx>=0){
-    window.hrStaff[hrEditingIdx]={...window.hrStaff[hrEditingIdx],name,dept,rate,role};
+window.hrSaveHire = async function(){
+  const last = document.getElementById('hh-last').value.trim();
+  const first = document.getElementById('hh-first').value.trim();
+  if(!last||!first){ alert('Введите фамилию и имя'); return; }
+  const data = {
+    last_name:last, first_name:first,
+    middle_name:document.getElementById('hh-mid').value.trim()||null,
+    birth_date:document.getElementById('hh-birth').value||null,
+    phone:document.getElementById('hh-phone').value.trim()||null,
+    personal_email:document.getElementById('hh-email').value.trim()||null,
+    department:document.getElementById('hh-dept').value,
+    position:document.getElementById('hh-role').value,
+    role:document.getElementById('hh-role').value,
+    rate:parseFloat(document.getElementById('hh-rate').value)||0,
+    hire_date:document.getElementById('hh-hire-date').value||null,
+    probation_end_date:document.getElementById('hh-probation').value||null,
+    probation_status:'active',
+    contract_type:document.getElementById('hh-contract').value,
+    note:document.getElementById('hh-note').value.trim()||null,
+    status:'active'
+  };
+  const client = getSB();
+  if(client){
+    const {data:emp,error} = await client.from('hr_employees').insert(data).select().single();
+    if(error){ alert('Ошибка: '+error.message); return; }
+    // Создаём приказ
+    await client.from('hr_documents').insert({
+      employee_id:emp.id, doc_type:'order_hire',
+      doc_number:'П-'+Date.now().toString().slice(-6),
+      doc_date:data.hire_date||new Date().toISOString().split('T')[0],
+      content:data
+    });
+    // Создаём баланс отпуска
+    await client.from('hr_vacation_balances').insert({employee_id:emp.id,main_days_total:28,main_days_used:0});
   } else {
-    window.hrStaff.push({name,dept,rate,role});
+    hrEmployees.push({...data, id:'local-'+Date.now()});
   }
-  hrSaveToStorage();
-  hrCloseModal();
-  hrRender();
-  showToast(hrEditingIdx>=0?'Сотрудник обновлён':'Сотрудник добавлен');
+  hrCloseHireModal();
+  showToast('✅ Сотрудник принят! Приказ создан.');
+  await hrLoadAll();
+  hrDownloadHireOrder(data);
 };
 
-window.hrDelete = function(idx){
-  if(!confirm('Удалить «'+window.hrStaff[idx].name+'»?')) return;
-  window.hrStaff.splice(idx,1);
-  hrSaveToStorage();
-  hrRender();
-  showToast('Удалён');
+// ---- EDIT EMP ----
+window.hrOpenEditModal = function(id){
+  const e = hrEmployees.find(x=>x.id===id);
+  if(!e) return;
+  document.getElementById('hr-edit-id').value = id;
+  document.getElementById('hr-edit-modal-title').textContent = hrFullName(e);
+  document.getElementById('he-last').value = e.last_name||'';
+  document.getElementById('he-first').value = e.first_name||'';
+  document.getElementById('he-mid').value = e.middle_name||'';
+  document.getElementById('he-birth').value = e.birth_date||'';
+  document.getElementById('he-phone').value = e.phone||'';
+  document.getElementById('he-email').value = e.personal_email||'';
+  document.getElementById('he-dept').value = e.department||'Lifestyle';
+  document.getElementById('he-role').value = e.role||'Исполнитель';
+  document.getElementById('he-rate').value = e.rate||'';
+  document.getElementById('he-status').value = e.status||'active';
+  document.getElementById('he-probation').value = e.probation_end_date||'';
+  document.getElementById('he-contract-end').value = e.contract_end_date||'';
+  document.getElementById('he-note').value = e.note||'';
+  document.getElementById('he-fire-block').style.display='none';
+  document.getElementById('hr-edit-modal').style.display='flex';
+};
+window.hrCloseEditModal = function(){ document.getElementById('hr-edit-modal').style.display='none'; };
+window.hrToggleFireBlock = function(){
+  const b = document.getElementById('he-fire-block');
+  b.style.display = b.style.display==='none'?'block':'none';
+  if(b.style.display==='block'){
+    document.getElementById('he-fire-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('he-status').value='fired';
+  }
 };
 
-// Закрыть модал по клику на фон
-document.getElementById('hr-modal')?.addEventListener('click',function(e){
-  if(e.target===this) hrCloseModal();
+window.hrSaveEdit = async function(){
+  const id = document.getElementById('hr-edit-id').value;
+  const fireDate = document.getElementById('he-fire-date').value;
+  const data = {
+    last_name:document.getElementById('he-last').value.trim(),
+    first_name:document.getElementById('he-first').value.trim(),
+    middle_name:document.getElementById('he-mid').value.trim()||null,
+    birth_date:document.getElementById('he-birth').value||null,
+    phone:document.getElementById('he-phone').value.trim()||null,
+    personal_email:document.getElementById('he-email').value.trim()||null,
+    department:document.getElementById('he-dept').value,
+    position:document.getElementById('he-role').value,
+    role:document.getElementById('he-role').value,
+    rate:parseFloat(document.getElementById('he-rate').value)||0,
+    status:document.getElementById('he-status').value,
+    probation_end_date:document.getElementById('he-probation').value||null,
+    contract_end_date:document.getElementById('he-contract-end').value||null,
+    note:document.getElementById('he-note').value.trim()||null,
+    updated_at:new Date().toISOString(),
+  };
+  if(fireDate && data.status==='fired'){
+    data.fired_date = fireDate;
+    data.fired_reason = document.getElementById('he-fire-reason').value.trim()||null;
+  }
+  const client = getSB();
+  if(client){
+    await client.from('hr_employees').update(data).eq('id',id);
+    if(data.status==='fired'){
+      await client.from('hr_documents').insert({
+        employee_id:id, doc_type:'order_fire',
+        doc_number:'У-'+Date.now().toString().slice(-6),
+        doc_date:data.fired_date||new Date().toISOString().split('T')[0],
+        content:data
+      });
+    }
+  } else {
+    const idx = hrEmployees.findIndex(e=>e.id===id);
+    if(idx>=0) hrEmployees[idx]={...hrEmployees[idx],...data};
+  }
+  hrCloseEditModal();
+  showToast('✅ Данные сохранены');
+  await hrLoadAll();
+};
+
+// ---- VACATIONS ----
+window.hrVacRender = function(){
+  const el = document.getElementById('hr-vac-content');
+  if(!el) return;
+  const empF = document.getElementById('hr-vac-emp-filter')?.value||'';
+  let list = empF ? hrVacations.filter(v=>v.employee_id===empF) : hrVacations;
+  list = list.slice(0,50);
+  if(!list.length){ el.innerHTML='<div class="empty">Отпуска не запланированы</div>'; return; }
+  el.innerHTML = `<div class="kpi-card" style="padding:0;overflow:hidden">
+  <table class="hr-tbl">
+    <thead><tr><th>Сотрудник</th><th>Начало</th><th>Конец</th><th>Дней</th><th>Тип</th><th>Статус</th></tr></thead>
+    <tbody>
+    ${list.map(v=>{
+      const emp = hrEmployees.find(e=>e.id===v.employee_id);
+      const typeMap={main:'Основной',additional:'Доп.',sick:'Больничный',unpaid:'Без содержания'};
+      const stMap={planned:'Запланирован',approved:'Одобрен',rejected:'Отклонён',actual:'Фактический'};
+      const stColor={planned:'#FAEEDA',approved:'#EAF3DE',rejected:'#FCEBEB',actual:'#E6F1FB'};
+      const stTxt={planned:'#633806',approved:'#27500A',rejected:'#791F1F',actual:'#0C447C'};
+      return `<tr>
+        <td>${emp?hrFullName(emp):'—'}</td>
+        <td>${v.start_date}</td><td>${v.end_date}</td><td>${v.days}</td>
+        <td>${typeMap[v.type]||v.type}</td>
+        <td><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:${stColor[v.status]||'#F1EFE8'};color:${stTxt[v.status]||'#444'}">${stMap[v.status]||v.status}</span></td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table></div>`;
+};
+
+window.hrOpenVacModal = function(){
+  const sel = document.getElementById('hv-emp');
+  sel.innerHTML = hrEmployees.filter(e=>e.status==='active').map(e=>`<option value="${e.id}">${hrFullName(e)}</option>`).join('');
+  document.getElementById('hv-start').value='';
+  document.getElementById('hv-end').value='';
+  document.getElementById('hv-days-info').textContent='';
+  document.getElementById('hr-vac-modal').style.display='flex';
+};
+
+window.hrCalcVacDays = function(){
+  const s = document.getElementById('hv-start').value;
+  const e = document.getElementById('hv-end').value;
+  if(!s||!e) return;
+  const days = Math.round((new Date(e)-new Date(s))/86400000)+1;
+  const info = document.getElementById('hv-days-info');
+  if(days<1){ info.textContent='❌ Конец раньше начала'; info.style.color='var(--red)'; return; }
+  info.textContent = '📅 '+days+' дней';
+  info.style.color = 'var(--text)';
+};
+
+window.hrSaveVac = async function(){
+  const empId = document.getElementById('hv-emp').value;
+  const s = document.getElementById('hv-start').value;
+  const e = document.getElementById('hv-end').value;
+  if(!s||!e){ alert('Укажите даты'); return; }
+  const days = Math.round((new Date(e)-new Date(s))/86400000)+1;
+  if(days<1){ alert('Конец раньше начала'); return; }
+  const data = {
+    employee_id:empId, start_date:s, end_date:e, days,
+    type:document.getElementById('hv-type').value,
+    status:document.getElementById('hv-status').value,
+    comment:document.getElementById('hv-comment').value.trim()||null
+  };
+  const client = getSB();
+  if(client){
+    const {error} = await client.from('hr_vacations').insert(data);
+    if(error){ alert('Ошибка: '+error.message); return; }
+  }
+  document.getElementById('hr-vac-modal').style.display='none';
+  showToast('✅ Отпуск добавлен');
+  await hrLoadAll();
+};
+
+// ---- GIFTS ----
+function hrGiftsRender(){
+  const el = document.getElementById('hr-gifts-content');
+  if(!el) return;
+  if(!hrGifts.length){ el.innerHTML='<div class="empty">Подарки не добавлены</div>'; return; }
+  const occasionMap={birthday:'ДР',newyear:'Новый год',march8:'8 марта',feb23:'23 февраля',other:'Другое'};
+  el.innerHTML = `<div class="kpi-card" style="padding:0;overflow:hidden">
+  <table class="hr-tbl">
+    <thead><tr><th>Сотрудник</th><th>Повод</th><th>Дата</th><th>Подарок</th><th>Сумма</th><th>Лимит</th><th>Статус</th></tr></thead>
+    <tbody>
+    ${hrGifts.map(g=>{
+      const emp = hrEmployees.find(e=>e.id===g.employee_id);
+      const over = g.amount>g.limit_amount;
+      const stColor = g.status==='handed'?'#EAF3DE':'#FAEEDA';
+      const stTxt = g.status==='handed'?'#27500A':'#633806';
+      return `<tr>
+        <td>${emp?hrFullName(emp):'—'}</td>
+        <td>${occasionMap[g.occasion]||g.occasion}</td>
+        <td>${g.gift_date}</td>
+        <td>${g.gift_name||'—'}</td>
+        <td style="color:${over?'#E24B4A':'var(--text)'}">${hrFmt(g.amount)} ₽</td>
+        <td style="color:var(--text2)">${hrFmt(g.limit_amount)} ₽</td>
+        <td><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:${stColor};color:${stTxt}">${g.status==='handed'?'Вручён':'Запланирован'}</span></td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table></div>`;
+}
+
+window.hrOpenGiftModal = function(empId){
+  const sel = document.getElementById('hg-emp');
+  sel.innerHTML = hrEmployees.filter(e=>e.status==='active').map(e=>`<option value="${e.id}"${e.id===empId?' selected':''}>${hrFullName(e)}</option>`).join('');
+  document.getElementById('hg-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('hg-amount').value='';
+  document.getElementById('hg-limit-warn').style.display='none';
+  document.getElementById('hr-gift-modal').style.display='flex';
+};
+
+window.hrOpenGiftForEmp = function(id){ hrOpenGiftModal(id); };
+
+window.hrCheckGiftLimit = function(){
+  const amt = parseFloat(document.getElementById('hg-amount').value)||0;
+  const lim = parseFloat(document.getElementById('hg-limit').value)||3000;
+  const warn = document.getElementById('hg-limit-warn');
+  if(amt>lim){ warn.style.display='block'; warn.textContent=`⚠ Превышен лимит ${hrFmt(lim)} ₽`; }
+  else { warn.style.display='none'; }
+};
+
+window.hrSaveGift = async function(){
+  const data = {
+    employee_id:document.getElementById('hg-emp').value,
+    gift_date:document.getElementById('hg-date').value,
+    occasion:document.getElementById('hg-occasion').value,
+    gift_name:document.getElementById('hg-name').value.trim()||null,
+    amount:parseFloat(document.getElementById('hg-amount').value)||0,
+    limit_amount:parseFloat(document.getElementById('hg-limit').value)||3000,
+    handed_by:document.getElementById('hg-by').value.trim()||null,
+    status:document.getElementById('hg-status').value,
+  };
+  const client = getSB();
+  if(client){
+    const {error} = await client.from('hr_gifts').insert(data);
+    if(error){ alert('Ошибка: '+error.message); return; }
+  }
+  document.getElementById('hr-gift-modal').style.display='none';
+  showToast('✅ Подарок добавлен');
+  await hrLoadAll();
+};
+
+// ---- EVENTS ----
+function hrEventsRender(){
+  const el = document.getElementById('hr-events-content');
+  if(!el) return;
+  if(!hrEvents.length){ el.innerHTML='<div class="empty">Мероприятия не добавлены</div>'; return; }
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+  ${hrEvents.map(ev=>`<div class="kpi-card" style="padding:14px">
+    <div style="font-size:14px;font-weight:500;margin-bottom:4px">${ev.event_name}</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:8px">${ev.event_date||'дата не указана'} · ${ev.location||''}</div>
+    ${ev.budget?`<div style="font-size:12px">Бюджет: <b>${hrFmt(ev.budget)} ₽</b></div>`:''}
+    ${ev.description?`<div style="font-size:12px;color:var(--text2);margin-top:6px">${ev.description}</div>`:''}
+  </div>`).join('')}
+  </div>`;
+}
+
+window.hrOpenEventModal = function(){
+  document.getElementById('hev-date').value = '';
+  document.getElementById('hev-name').value = '';
+  document.getElementById('hev-budget').value = '';
+  document.getElementById('hev-location').value = '';
+  document.getElementById('hev-desc').value = '';
+  document.getElementById('hr-event-modal').style.display='flex';
+};
+
+window.hrSaveEvent = async function(){
+  const name = document.getElementById('hev-name').value.trim();
+  if(!name){ alert('Введите название'); return; }
+  const data = {
+    event_name:name,
+    event_date:document.getElementById('hev-date').value||null,
+    budget:parseFloat(document.getElementById('hev-budget').value)||0,
+    location:document.getElementById('hev-location').value.trim()||null,
+    description:document.getElementById('hev-desc').value.trim()||null,
+  };
+  const client = getSB();
+  if(client){
+    const {error} = await client.from('hr_events').insert(data);
+    if(error){ alert('Ошибка: '+error.message); return; }
+  }
+  document.getElementById('hr-event-modal').style.display='none';
+  showToast('✅ Мероприятие добавлено');
+  await hrLoadAll();
+};
+
+// ---- PDF ORDERS ----
+window.hrDownloadOrder = function(){
+  const e = hrEmployees.find(x=>x.id===hrViewEmpId);
+  if(!e) return;
+  hrDownloadHireOrder(e);
+};
+
+window.hrDownloadHireOrder = function(e){
+  const name = hrFullName(e);
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>body{font-family:Arial,sans-serif;padding:40px;color:#000}h1{font-size:18px;text-align:center;margin-bottom:4px}
+  .sub{text-align:center;font-size:13px;margin-bottom:30px}.row{display:flex;margin-bottom:8px;font-size:13px}
+  .lbl{width:220px;color:#555}.val{font-weight:bold}
+  .sign{margin-top:60px;display:flex;justify-content:space-between;font-size:13px}
+  .sign-line{border-top:1px solid #000;width:200px;padding-top:4px;text-align:center}</style>
+  </head><body>
+  <h1>ПРИКАЗ О ПРИЁМЕ НА РАБОТУ</h1>
+  <div class="sub">First Concierge Service · ${new Date().toLocaleDateString('ru-RU')}</div>
+  <div class="row"><div class="lbl">ФИО:</div><div class="val">${name}</div></div>
+  <div class="row"><div class="lbl">Отдел:</div><div class="val">${e.department||'—'}</div></div>
+  <div class="row"><div class="lbl">Должность:</div><div class="val">${e.role||e.position||'—'}</div></div>
+  <div class="row"><div class="lbl">Ставка:</div><div class="val">${e.rate||'—'} ₽/час</div></div>
+  <div class="row"><div class="lbl">Дата приёма:</div><div class="val">${e.hire_date||'—'}</div></div>
+  <div class="row"><div class="lbl">Тип договора:</div><div class="val">${e.contract_type==='fixed'?'Срочный':'Бессрочный'}</div></div>
+  <div class="row"><div class="lbl">Испытательный срок до:</div><div class="val">${e.probation_end_date||'—'}</div></div>
+  <div class="sign">
+    <div><div class="sign-line">Руководитель</div></div>
+    <div><div class="sign-line">Сотрудник / Дата</div></div>
+  </div></body></html>`;
+  const blob = new Blob([html],{type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `Приказ_приём_${name.replace(/ /g,'_')}.html`;
+  a.click();
+  showToast('📄 Приказ скачан');
+};
+
+// ---- INIT ----
+// Populate vacation emp filter on load
+function hrPopulateVacFilter(){
+  const sel = document.getElementById('hr-vac-emp-filter');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">Все сотрудники</option>'+
+    hrEmployees.filter(e=>e.status==='active').map(e=>`<option value="${e.id}">${hrFullName(e)}</option>`).join('');
+}
+
+const _origLoad = hrLoadAll;
+async function hrLoadAllAndPopulate(){
+  await _origLoad();
+  hrPopulateVacFilter();
+}
+
+// Close modals on bg click
+['hr-hire-modal','hr-edit-modal','hr-vac-modal','hr-gift-modal','hr-event-modal','hr-view-modal'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('click',function(e){
+    if(e.target===this) this.style.display='none';
+  });
 });
 
+window.hrRender = hrLoadAllAndPopulate;
+
 })(); // end HR module
+
 
 // ============================================================
 // PARTNERS MODULE
