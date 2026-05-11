@@ -403,34 +403,10 @@ tr:hover td{background:var(--bg2)}
     <button class="rs-btn" onclick="switchViewRole('admin')" style="margin-left:auto">✕ Сбросить</button>
   </div>
 
-  <!-- Nav bar — все вкладки в меню -->
-  <div style="background:var(--bg2);border-bottom:0.5px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:42px;position:sticky;top:89px;z-index:98">
-    <!-- Текущая вкладка -->
-    <div id="current-tab-title" style="font-size:13px;font-weight:500;color:var(--text)">📋 Все заявки</div>
-    <!-- Кнопка меню -->
-    <div style="position:relative">
-      <button id="more-menu-btn" onclick="toggleMoreMenu()" style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);cursor:pointer;font-size:13px;font-weight:500">
-        <span>☰ Меню</span>
-      </button>
-      <div id="more-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius);box-shadow:0 12px 32px rgba(0,0,0,.4);z-index:300;min-width:220px;overflow:hidden">
-        <div style="padding:8px 12px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:0.5px solid var(--border)">Журнал</div>
-        <div onclick="switchTabMenu('main','📋 Все заявки')" class="more-menu-item" id="mmenu-main">📋 Все заявки</div>
-        <div onclick="switchTabMenu('treasury','💰 Казначей')" class="more-menu-item" id="mmenu-treasury">💰 Казначей</div>
-        <div onclick="switchTabMenu('loss','⚠ Потери')" class="more-menu-item" id="mmenu-loss">⚠ Потери</div>
-        <div onclick="switchTabMenu('expense','💼 Расходы')" class="more-menu-item" id="mmenu-expense">💼 Расходы</div>
-        <div onclick="switchTabMenu('corp','🏢 Корп карта')" class="more-menu-item" id="mmenu-corp">🏢 Корп карта</div>
-        <div onclick="switchTabMenu('invoice','📄 По счёту')" class="more-menu-item" id="mmenu-invoice">📄 По счёту</div>
-        <div style="padding:8px 12px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:0.5px solid var(--border);border-top:0.5px solid var(--border)">Аналитика</div>
-        <div onclick="switchTabMenu('dept','📊 По отделам')" class="more-menu-item" id="mmenu-dept">📊 По отделам</div>
-        <div onclick="switchTabMenu('days','📅 По дням')" class="more-menu-item" id="mmenu-days">📅 По дням</div>
-        <div onclick="switchTabMenu('clients','👤 Клиенты')" class="more-menu-item" id="mmenu-clients">👤 Клиенты</div>
-        <div style="padding:8px 12px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:0.5px solid var(--border);border-top:0.5px solid var(--border)">Управление</div>
-        <div onclick="switchTabMenu('kpi','🏆 KPI')" class="more-menu-item" id="mmenu-kpi">🏆 KPI</div>
-        <div onclick="switchTabMenu('hr','👥 НР — Сотрудники')" class="more-menu-item" id="mmenu-hr">👥 НР — Сотрудники</div>
-        <div onclick="switchTabMenu('partners','🤝 Партнёры')" class="more-menu-item" id="mmenu-partners">🤝 Партнёры</div>
-      </div>
-    </div>
-  </div>
+  <!-- Nav bar: горизонтальная полоса вкладок по роли (заменила старое выпадающее меню) -->
+  <div id="role-tab-bar" style="background:var(--bg2);border-bottom:0.5px solid var(--border);padding:0 16px;display:flex;align-items:center;gap:2px;height:42px;position:sticky;top:89px;z-index:98;overflow-x:auto"></div>
+  <!-- Скрытый блок-хранилище: старый dropdown больше не показывается, но buildRoleMenu продолжает в него писать -->
+  <div id="more-menu" style="display:none"></div>
   <!-- Скрытые tab-элементы для совместимости с switchTab -->
   <div style="display:none">
     <div id="tab-main"></div><div id="tab-treasury"></div><div id="tab-loss"></div>
@@ -2325,21 +2301,29 @@ function buildRoleMenu(role){
   };
 
   const items = MENUS[role] || MENUS.viewer;
-  let html = '';
+  let dropdownHtml = '';
+  let tabsHtml = '';
+  let groupIdx = 0;
   items.forEach(item=>{
     if(item.group){
-      html += `<div style="padding:8px 12px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:0.5px solid var(--border);border-top:0.5px solid var(--border);margin-top:2px">${item.group}</div>`;
+      dropdownHtml += `<div style="padding:8px 12px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:0.5px solid var(--border);border-top:0.5px solid var(--border);margin-top:2px">${item.group}</div>`;
+      // Между группами в табах добавляем тонкий вертикальный разделитель
+      if(groupIdx>0) tabsHtml += `<div style="width:1px;height:18px;background:var(--border);margin:0 6px"></div>`;
+      groupIdx++;
     } else if(item.url){
-      // Внешняя страница (sверка, кошелёк) — переходим, не переключаем вкладку
-      html += `<div onclick="document.getElementById('more-menu').style.display='none';window.location.href='${item.url}'" class="more-menu-item">${item.label}</div>`;
+      dropdownHtml += `<div onclick="window.location.href='${item.url}'" class="more-menu-item">${item.label}</div>`;
+      tabsHtml += `<div class="tab" onclick="window.location.href='${item.url}'">${item.label}</div>`;
     } else if(item.action){
-      // Произвольное действие (open modal, backup) — выполняется как JS
-      html += `<div onclick="document.getElementById('more-menu').style.display='none';${item.action}" class="more-menu-item">${item.label}</div>`;
+      dropdownHtml += `<div onclick="${item.action}" class="more-menu-item">${item.label}</div>`;
+      tabsHtml += `<div class="tab" onclick="${item.action}">${item.label}</div>`;
     } else {
-      html += `<div onclick="switchTabMenu('${item.id}','${item.label}')" class="more-menu-item" id="mmenu-${item.id}">${item.label}</div>`;
+      dropdownHtml += `<div onclick="switchTabMenu('${item.id}','${item.label}')" class="more-menu-item" id="mmenu-${item.id}">${item.label}</div>`;
+      tabsHtml += `<div class="tab" id="rtab-${item.id}" onclick="switchTabMenu('${item.id}','${item.label}')">${item.label}</div>`;
     }
   });
-  menu.innerHTML = html;
+  menu.innerHTML = dropdownHtml;
+  const bar = document.getElementById('role-tab-bar');
+  if(bar) bar.innerHTML = tabsHtml;
 }
 
 function toggleMoreMenu(){
@@ -2350,11 +2334,14 @@ function toggleMoreMenu(){
 function switchTabMenu(t, title){
   const m = document.getElementById('more-menu');
   if(m) m.style.display='none';
-  // Подсвечиваем активный пункт
+  // Подсвечиваем активный пункт в (скрытом) dropdown и в горизонтальной полосе вкладок
   document.querySelectorAll('.more-menu-item').forEach(el=>el.classList.remove('active-menu'));
-  const active = document.getElementById('mmenu-'+t);
-  if(active) active.classList.add('active-menu');
-  // Показываем название текущей вкладки
+  const activeDrop = document.getElementById('mmenu-'+t);
+  if(activeDrop) activeDrop.classList.add('active-menu');
+  document.querySelectorAll('#role-tab-bar .tab').forEach(el=>el.classList.remove('active'));
+  const activeTabEl = document.getElementById('rtab-'+t);
+  if(activeTabEl) activeTabEl.classList.add('active');
+  // Текущая вкладка (заголовок) удалена из DOM — оставляем null-safe запись
   const titleEl = document.getElementById('current-tab-title');
   if(titleEl && title) titleEl.textContent = title;
   switchTab(t);
@@ -2372,6 +2359,11 @@ document.addEventListener('click', function(e){
 function switchTab(t){
   activeTab = t;
   clearSelection();
+
+  // Подсветка активной вкладки в горизонтальной полосе ролей
+  document.querySelectorAll('#role-tab-bar .tab').forEach(el=>el.classList.remove('active'));
+  const rTabEl = document.getElementById('rtab-'+t);
+  if(rTabEl) rTabEl.classList.add('active');
 
   // Все возможные view-блоки
   const allTabs = ['main','loss','expense','corp','invoice','treasury','dept','days','clients',
@@ -3205,6 +3197,47 @@ function showNewEntryNotification(entry){
 
 init();
 setTimeout(startAutoRefresh, 5000);
+setTimeout(startRealtimeSync, 6000);
+
+// ===== РЕАЛВРЕМЕННАЯ СИНХРОНИЗАЦИЯ (Supabase Realtime) =====
+// Подписываемся на изменения таблиц — любая правка прилетает всем открытым клиентам сразу
+let realtimeSubscribed = false;
+let realtimeRefreshTimer = null;
+function scheduleRealtimeRefresh(){
+  // Дебаунс: если много событий подряд — обновляемся один раз
+  clearTimeout(realtimeRefreshTimer);
+  realtimeRefreshTimer = setTimeout(async ()=>{
+    try{ await loadEntries(); }catch(e){ console.log('[realtime] loadEntries error', e); }
+    // Перерисовываем активную вкладку (если это инбокс / журнал)
+    if(typeof switchTab === 'function' && typeof activeTab !== 'undefined'){
+      switchTab(activeTab);
+    }
+  }, 400);
+}
+function startRealtimeSync(){
+  if(realtimeSubscribed || !currentUser) return;
+  const client = (sb||window.sb);
+  if(!client?.channel){ console.log('[realtime] supabase channel API недоступно'); return; }
+  realtimeSubscribed = true;
+  client.channel('fcs-entries-changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'entries' }, p=>{
+      console.log('[realtime] entries change:', p.eventType, p.new?.id||p.old?.id);
+      scheduleRealtimeRefresh();
+    })
+    .subscribe(s=>console.log('[realtime] entries sub:', s));
+  client.channel('fcs-operations-changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'operations' }, p=>{
+      console.log('[realtime] operations change:', p.eventType, p.new?.id||p.old?.id);
+      scheduleRealtimeRefresh();
+    })
+    .subscribe(s=>console.log('[realtime] operations sub:', s));
+  client.channel('fcs-transactions-changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'transactions' }, p=>{
+      console.log('[realtime] transactions change:', p.eventType);
+      scheduleRealtimeRefresh();
+    })
+    .subscribe(s=>console.log('[realtime] transactions sub:', s));
+}
 
 // ============================================================
 // KPI MODULE
