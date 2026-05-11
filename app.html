@@ -359,12 +359,10 @@ tr:hover td{background:var(--bg2)}
   <div class="topbar">
     <div class="topbar-logo">🏢 FCS <span>Finance</span></div>
 
-    <button class="btn btn-sm" onclick="openAddEntry()" id="btn-add">+ Добавить</button>
-    <button class="btn btn-sm" onclick="exportExcel()">⬇ Excel</button>
-    <button class="btn btn-sm" onclick="backupData()">💾 Резерв</button>
-    <button class="btn btn-sm" onclick="syncNow()" title="Обновить из базы">🔄 <span id="sync-text">Обновить</span></button>
-    <button class="btn btn-sm" onclick="window.location.href='reconcile.html'" title="Сверка поступлений с банком">🏦 Сверка</button>
-    <button class="btn btn-sm" onclick="window.location.href='wallet.html'" title="Валютный кошелёк">💳 Кошелёк</button>
+    <!-- Кнопки топбара перенесены в меню ролей: Добавить/Excel/Обновить удалены;
+         Резерв и Пользователи — в «Настройки» (admin); Сверка и Кошелёк — в меню «Операционист».
+         Скрытый span sync-text оставлен для совместимости со старым кодом, который меняет его текст. -->
+    <span id="sync-text" style="display:none"></span>
 
     <div class="topbar-right">
       <span style="font-size:11px;color:var(--text3)" id="sync-status">
@@ -375,7 +373,6 @@ tr:hover td{background:var(--bg2)}
         <span id="user-name">...</span>
         <span id="user-role" style="color:var(--text3)"></span>
       </div>
-      <button class="btn btn-sm" onclick="openUsers()" id="btn-users" style="display:none">👥 Пользователи</button>
       <button class="btn btn-sm" onclick="doLogout()">Выйти</button>
     </div>
   </div>
@@ -1444,17 +1441,15 @@ async function init(){
   buildRoleMenu(role);
 
   if(role === 'admin'){
-    document.getElementById('btn-users').style.display = 'block';
     // Показываем переключатель ролей для админа
     document.getElementById('role-switcher-bar').classList.add('visible');
   }
-  if(role === 'viewer'){
-    document.getElementById('btn-add').style.display = 'none';
-  }
-  // Скрываем кнопку добавления для ролей которые не работают с журналом
-  if(['hr','financier'].includes(role)){
-    document.getElementById('btn-add').style.display = 'none';
-  }
+  // Кнопки btn-users и btn-add вынесены из топбара в меню ролей;
+  // оставляем безопасные защиты на случай, если старый код ещё ссылается.
+  const oldUsersBtn = document.getElementById('btn-users');
+  if(oldUsersBtn && role !== 'admin') oldUsersBtn.style.display = 'none';
+  const oldAddBtn = document.getElementById('btn-add');
+  if(oldAddBtn && (role === 'viewer' || ['hr','financier'].includes(role))) oldAddBtn.style.display = 'none';
 
   setSyncStatus('loading');
   await loadEntries();
@@ -2197,6 +2192,9 @@ function buildRoleMenu(role){
       {id:'financier-journal',label:'📊 Общий журнал'},
       {group:'Управление'},
       {id:'kpi',label:'🏆 KPI'},{id:'hr',label:'👥 НР — Сотрудники'},{id:'partners',label:'🤝 Партнёры'},
+      {group:'Настройки'},
+      {label:'👥 Пользователи', action:'openUsers()'},
+      {label:'💾 Резервная копия', action:'backupData()'},
     ],
     manager: [
       {group:'Журнал'},
@@ -2229,6 +2227,9 @@ function buildRoleMenu(role){
       {id:'operations-journal',label:'📋 Журнал операций'},
       {group:'Создать'},
       {id:'new-request',label:'⚡ Новая заявка'},
+      {group:'Инструменты'},
+      {label:'🏦 Сверка', url:'reconcile.html'},
+      {label:'💳 Кошелёк', url:'wallet.html'},
     ],
     financier: [
       {group:'Финансист'},
@@ -2274,6 +2275,12 @@ function buildRoleMenu(role){
   items.forEach(item=>{
     if(item.group){
       html += `<div style="padding:8px 12px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:0.5px solid var(--border);border-top:0.5px solid var(--border);margin-top:2px">${item.group}</div>`;
+    } else if(item.url){
+      // Внешняя страница (sверка, кошелёк) — переходим, не переключаем вкладку
+      html += `<div onclick="document.getElementById('more-menu').style.display='none';window.location.href='${item.url}'" class="more-menu-item">${item.label}</div>`;
+    } else if(item.action){
+      // Произвольное действие (open modal, backup) — выполняется как JS
+      html += `<div onclick="document.getElementById('more-menu').style.display='none';${item.action}" class="more-menu-item">${item.label}</div>`;
     } else {
       html += `<div onclick="switchTabMenu('${item.id}','${item.label}')" class="more-menu-item" id="mmenu-${item.id}">${item.label}</div>`;
     }
@@ -2330,8 +2337,12 @@ function switchTab(t){
   });
 
   // Скрываем/показываем фильтры — только для основного журнала
+  const journalTabs = ['main','loss','expense','corp','invoice','treasury','dept','days','clients'];
   const filters = document.getElementById('main-filters');
-  if(filters) filters.style.display = ['main','loss','expense','corp','invoice','treasury','dept','days','clients'].includes(t)?'':'none';
+  if(filters) filters.style.display = journalTabs.includes(t)?'':'none';
+  // Месячный бар нужен только на журнальных вкладках
+  const monthBar = document.getElementById('month-bar');
+  if(monthBar) monthBar.style.display = journalTabs.includes(t)?'':'none';
 
   // Рендерим нужный контент
   if(t==='treasury') renderTreasury();
@@ -5890,7 +5901,7 @@ async function renderAccountingInbox(){
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
   const {data, error} = await (sb||window.sb).from('operations').select('*')
-    .eq('routed_to','accounting').order('created_at',{ascending:false});
+    .in('operation_type', INBOX_TYPES_ACCOUNTING).order('created_at',{ascending:false});
   if(error){ console.error('[acc-inbox] supabase error:', error); el.innerHTML=`<div class="empty" style="color:var(--red)">Ошибка: ${error.message}</div>`; return; }
   const ops = data||[];
   console.log('[acc-inbox] rows:', ops.length, ops);
@@ -5977,7 +5988,7 @@ async function renderOperationsInbox(){
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
   const {data, error} = await (sb||window.sb).from('operations').select('*')
-    .eq('routed_to','operations').order('created_at',{ascending:false});
+    .in('operation_type', INBOX_TYPES_OPERATIONS).order('created_at',{ascending:false});
   if(error){ console.error('[ops-inbox] supabase error:', error); el.innerHTML=`<div class="empty" style="color:var(--red)">Ошибка: ${error.message}</div>`; return; }
   const ops = data||[];
   console.log('[ops-inbox] rows:', ops.length, ops);
@@ -6021,14 +6032,26 @@ function renderOperationsForm(){
 // ОБЪЕДИНЁННАЯ ФОРМА «НОВАЯ ЗАЯВКА» — Tab 1 (запрос клиенту) + Tab 2 (оплата контрагенту)
 // ============================================================
 
-const NR_ACQUIRING_RATES = { link: 0.03, qr: 0.01, none: 0 };
+const NR_ACQUIRING_RATES = { link: 0.03, qr: 0.01, account_in: 0, card_in: 0, none: 0 };
 const NR_PAYMENT_TYPES = {
   card_rf: 'Карта РФ',
-  corp_card: 'Корп карта',
   foreign_card: 'Иностранная карта',
+  corp_card: 'Корп карта',
   invoice: 'По счёту'
 };
+// Какие способы оплаты доступны для каждого способа получения
+const NR_PAYMENT_MATRIX = {
+  link:       ['corp_card','invoice'],
+  qr:         ['corp_card','invoice'],
+  account_in: ['corp_card','invoice'],
+  card_in:    ['card_rf','foreign_card'],
+  none:       ['card_rf','foreign_card','corp_card','invoice']
+};
+// routed_to нужен для совместимости со старым кодом (transactions/processed_by_role)
 const NR_ROUTING = { invoice:'accounting', corp_card:'accounting', card_rf:'operations', foreign_card:'operations' };
+// Какие operation_type видит каждая роль в инбоксе (корп-карта — и там, и там)
+const INBOX_TYPES_OPERATIONS = ['card_rf','foreign_card','corp_card'];
+const INBOX_TYPES_ACCOUNTING = ['corp_card','invoice'];
 
 window.cpActiveList = window.cpActiveList || [];
 
@@ -6065,9 +6088,35 @@ function nrUpdateCalc(){
   const feeEl = document.getElementById('nr-fee-preview');
   if(grossEl) grossEl.textContent = Math.round(gross).toLocaleString('ru-RU') + ' ₽';
   if(feeEl) feeEl.textContent = Math.round(fee).toLocaleString('ru-RU') + ' ₽ ('+(rate*100).toFixed(0)+'%)';
-  // если поменяли способ — старая ссылка больше не валидна
+  // если поменяли способ — старая ссылка больше не валидна, и обновляем матрицу типов оплаты
   const linkInp = document.getElementById('nr-payment-link');
-  if(linkInp && !linkInp.dataset.locked) linkInp.value='';
+  if(linkInp) linkInp.value='';
+  delete linkInp?.dataset.locked;
+  nrUpdatePaymentTypeOptions();
+  nrUpdateLinkBlock();
+}
+
+// Фильтрует доступные «Типы оплаты» по выбранному «Способу получения»
+function nrUpdatePaymentTypeOptions(){
+  const collection = document.querySelector('input[name=nr-collection]:checked')?.value || 'none';
+  const allowed = NR_PAYMENT_MATRIX[collection] || Object.keys(NR_PAYMENT_TYPES);
+  const sel = document.getElementById('nr-payment-type');
+  if(!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = allowed.map(k=>`<option value="${k}">${NR_PAYMENT_TYPES[k]}</option>`).join('');
+  // Если предыдущий выбор валиден — оставляем, иначе первый из доступных
+  sel.value = allowed.includes(prev) ? prev : allowed[0];
+  nrUpdatePaymentType();
+}
+
+// Показ/скрытие блока ссылки и канала отправки — нужен только при link / qr
+function nrUpdateLinkBlock(){
+  const collection = document.querySelector('input[name=nr-collection]:checked')?.value || 'none';
+  const linkable = (collection==='link' || collection==='qr');
+  const block = document.getElementById('nr-link-block');
+  if(block) block.style.display = linkable ? 'flex' : 'none';
+  const chBlock = document.getElementById('nr-channel-block');
+  if(chBlock) chBlock.style.display = linkable ? 'flex' : 'none';
 }
 
 function nrGeneratePaymentLink(){
@@ -6171,20 +6220,22 @@ function renderNewRequest(){
         <div style="display:flex;gap:14px;font-size:12px;margin-bottom:10px;flex-wrap:wrap">
           <label><input type="radio" name="nr-collection" value="link" checked onchange="nrUpdateCalc()"> 🔗 Ссылка (3%)</label>
           <label><input type="radio" name="nr-collection" value="qr" onchange="nrUpdateCalc()"> 📱 QR (1%)</label>
+          <label><input type="radio" name="nr-collection" value="card_in" onchange="nrUpdateCalc()"> 💳 Карта РФ</label>
+          <label><input type="radio" name="nr-collection" value="account_in" onchange="nrUpdateCalc()"> 🏦 Счёт</label>
           <label><input type="radio" name="nr-collection" value="none" onchange="nrUpdateCalc()"> Не требуется</label>
         </div>
         <div class="grid2">
           <div class="field" style="margin-bottom:8px"><label>Сумма к получению (₽)</label><input type="number" id="nr-net" placeholder="0" oninput="nrUpdateCalc()"></div>
           <div style="font-size:12px;padding-top:18px">
             <div><span style="color:var(--text3)">Клиент платит: </span><b id="nr-gross-preview">0 ₽</b></div>
-            <div style="margin-top:2px"><span style="color:var(--text3)">Эквайринг: </span><span id="nr-fee-preview">0 ₽ (3%)</span></div>
+            <div style="margin-top:2px"><span style="color:var(--text3)">Комиссия: </span><span id="nr-fee-preview">0 ₽ (3%)</span></div>
           </div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+        <div id="nr-link-block" style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
           <button class="btn btn-sm btn-primary" onclick="nrGeneratePaymentLink()">✨ Сгенерировать ссылку</button>
           <input id="nr-payment-link" readonly placeholder="ссылка появится здесь..." style="flex:1;min-width:200px;background:var(--bg2)">
         </div>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+        <div id="nr-channel-block" style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
           <select id="nr-channel" style="max-width:160px">
             <option value="sms">📩 СМС</option>
             <option value="email">✉️ Email</option>
@@ -6213,10 +6264,7 @@ function renderNewRequest(){
       <div class="grid2">
         <div class="field"><label>Тип оплаты *</label>
           <select id="nr-payment-type" onchange="nrUpdatePaymentType()">
-            <option value="card_rf">Карта РФ</option>
-            <option value="corp_card">Корп карта</option>
-            <option value="foreign_card">Иностранная карта</option>
-            <option value="invoice">По счёту (бухгалтерия)</option>
+            <!-- опции заполняются динамически из NR_PAYMENT_MATRIX по выбранному способу получения -->
           </select>
         </div>
         <div class="field"><label>Дата</label><input type="date" id="nr-date" value="${today}"></div>
