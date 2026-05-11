@@ -64,6 +64,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .more-menu-item:last-child{border-bottom:none}
 .more-menu-item:hover{background:var(--bg3)}
 .more-menu-item.active-menu{background:var(--bg3);color:var(--accent);font-weight:500}
+/* Role switcher */
+.role-switcher-bar{background:var(--bg2);border-bottom:0.5px solid var(--border);padding:6px 16px;display:none;align-items:center;gap:8px;flex-wrap:wrap}
+.role-switcher-bar.visible{display:flex}
+.rs-label{font-size:11px;color:var(--text3);white-space:nowrap}
+.rs-btn{padding:4px 12px;border-radius:20px;border:0.5px solid var(--border2);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+.rs-btn:hover{background:var(--bg3);color:var(--text)}
+.rs-btn.rs-active{background:var(--text);color:var(--bg2);border-color:var(--text)}
 .tab{padding:10px 14px;font-size:12px;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;white-space:nowrap}
 .tab:hover{color:var(--text2)}
 .tab.active{color:var(--text);border-bottom-color:var(--accent)}
@@ -363,6 +370,17 @@ tr:hover td{background:var(--bg2)}
 
   <!-- Month switcher -->
   <div class="month-bar" id="month-bar"></div>
+
+  <!-- Role switcher (только для admin) -->
+  <div class="role-switcher-bar" id="role-switcher-bar">
+    <span class="rs-label">Просмотр панели:</span>
+    <button class="rs-btn" onclick="switchViewRole('executor')">👤 Исполнитель</button>
+    <button class="rs-btn" onclick="switchViewRole('accounting')">📒 Бухгалтерия</button>
+    <button class="rs-btn" onclick="switchViewRole('operations')">⚙️ Операционист</button>
+    <button class="rs-btn" onclick="switchViewRole('financier')">📊 Финансист</button>
+    <button class="rs-btn" onclick="switchViewRole('hr')">👥 НР</button>
+    <button class="rs-btn" onclick="switchViewRole('admin')" style="margin-left:auto">✕ Сбросить</button>
+  </div>
 
   <!-- Nav bar — все вкладки в меню -->
   <div style="background:var(--bg2);border-bottom:0.5px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:42px;position:sticky;top:89px;z-index:98">
@@ -1415,6 +1433,8 @@ async function init(){
 
   if(role === 'admin'){
     document.getElementById('btn-users').style.display = 'block';
+    // Показываем переключатель ролей для админа
+    document.getElementById('role-switcher-bar').classList.add('visible');
   }
   if(role === 'viewer'){
     document.getElementById('btn-add').style.display = 'none';
@@ -2104,6 +2124,54 @@ function renderTable(){
 }
 
 // ===== TABS =====
+// ===== ROLE VIEW SWITCHER (только для admin) =====
+let viewingAsRole = 'admin'; // текущая просматриваемая роль
+
+window.switchViewRole = function(role){
+  viewingAsRole = role;
+
+  // Подсвечиваем активную кнопку
+  document.querySelectorAll('.rs-btn').forEach(b=>b.classList.remove('rs-active'));
+  document.querySelectorAll('.rs-btn').forEach(b=>{
+    if(b.textContent.includes(role==='admin'?'Сбросить':
+      role==='executor'?'Исполнитель':
+      role==='accounting'?'Бухгалтерия':
+      role==='operations'?'Операционист':
+      role==='financier'?'Финансист':'НР'
+    )) b.classList.add('rs-active');
+  });
+
+  // Перестраиваем меню под выбранную роль
+  const targetRole = role === 'admin' ? 'admin' : role;
+  buildRoleMenu(targetRole);
+
+  // Обновляем заголовок текущей вкладки
+  const titleEl = document.getElementById('current-tab-title');
+  if(role === 'admin'){
+    if(titleEl) titleEl.textContent = '📋 Все заявки';
+    switchTab('main');
+    showToast('Панель администратора');
+  } else {
+    const roleNames = {
+      executor:'👤 Исполнитель / Ведущий / ГК',
+      accounting:'📒 Бухгалтерия',
+      operations:'⚙️ Операционист',
+      financier:'📊 Финансист',
+      hr:'👥 НР'
+    };
+    const defaultTabs = {
+      executor:'operations-form',
+      accounting:'accounting-inbox',
+      operations:'operations-inbox',
+      financier:'financier-journal',
+      hr:'hr'
+    };
+    if(titleEl) titleEl.textContent = roleNames[role]||'';
+    switchTab(defaultTabs[role]||'main');
+    showToast('Просмотр: '+roleNames[role]);
+  }
+};
+
 // ===== ROLE-BASED MENU =====
 function buildRoleMenu(role){
   const menu = document.getElementById('more-menu');
@@ -2136,7 +2204,11 @@ function buildRoleMenu(role){
       {group:'Управление'},
       {id:'kpi',label:'🏆 KPI'},{id:'partners',label:'🤝 Партнёры'},
     ],
-    accounting: [
+    executor: [
+      {group:'Мои действия'},
+      {id:'operations-request',label:'💸 Запрос денег от клиента'},
+      {id:'operations-form',label:'📝 Форма на проведение операции'},
+    ],
       {group:'Бухгалтерия'},
       {id:'accounting-inbox',label:'📥 Входящие операции'},
       {id:'accounting-requests',label:'🔗 Поступления (ссылка/QR)'},
