@@ -71,6 +71,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .rs-btn{padding:4px 12px;border-radius:20px;border:0.5px solid var(--border2);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
 .rs-btn:hover{background:var(--bg3);color:var(--text)}
 .rs-btn.rs-active{background:var(--text);color:var(--bg2);border-color:var(--text)}
+/* Autocomplete */
+.ac-wrap{position:relative}
+.ac-list{position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:500;max-height:200px;overflow-y:auto;display:none}
+.ac-list.open{display:block}
+.ac-item{padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:0.5px solid var(--border)}
+.ac-item:last-child{border-bottom:none}
+.ac-item:hover{background:var(--bg3)}
+.ac-item-name{font-weight:500}
+.ac-item-meta{font-size:11px;color:var(--text3);margin-top:1px}
+/* Partner card inline */
+.partner-inline-card{background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;margin-top:4px;font-size:12px;display:none}
+.partner-inline-card.show{display:block}
 .tab{padding:10px 14px;font-size:12px;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;white-space:nowrap}
 .tab:hover{color:var(--text2)}
 .tab.active{color:var(--text);border-bottom-color:var(--accent)}
@@ -379,6 +391,7 @@ tr:hover td{background:var(--bg2)}
     <button class="rs-btn" onclick="switchViewRole('operations')">⚙️ Операционист</button>
     <button class="rs-btn" onclick="switchViewRole('financier')">📊 Финансист</button>
     <button class="rs-btn" onclick="switchViewRole('hr')">👥 НР</button>
+    <button class="rs-btn" onclick="switchViewRole('partner_manager')">🤝 Партнёры</button>
     <button class="rs-btn" onclick="switchViewRole('admin')" style="margin-left:auto">✕ Сбросить</button>
   </div>
 
@@ -1040,6 +1053,8 @@ tr:hover td{background:var(--bg2)}
     <div id="view-operations-request" style="display:none"><div class="content"><div id="ops-req-content"></div></div></div>
     <div id="view-operations-form" style="display:none"><div class="content"><div id="ops-form-content"></div></div></div>
     <div id="view-executor-journal" style="display:none"><div class="content"><div id="exec-journal-content"></div></div></div>
+    <div id="view-partner-operations" style="display:none"><div class="content"><div id="partner-ops-content"></div></div></div>
+    <div id="view-partner-deposits" style="display:none"><div class="content"><div id="partner-dep-content"></div></div></div>
     <!-- Финансист -->
     <div id="view-financier-journal" style="display:none"><div class="content"><div id="fin-journal-content"></div></div></div>
     <div id="view-financier-kpi" style="display:none"><div class="content"><div id="fin-kpi-content"></div></div></div>
@@ -2138,14 +2153,16 @@ window.switchViewRole = function(role){
     accounting:'📒 Бухгалтерия',
     operations:'⚙️ Операционист',
     financier:'📊 Финансист',
-    hr:'👥 НР'
+    hr:'👥 НР',
+    partner_manager:'🤝 Партнёрский менеджер'
   };
   const defaultTabs = {
     executor:'operations-form',
     accounting:'accounting-inbox',
     operations:'operations-inbox',
     financier:'financier-journal',
-    hr:'hr'
+    hr:'hr',
+    partner_manager:'partners'
   };
 
   if(titleEl) titleEl.textContent = roleNames[role]||'';
@@ -2222,6 +2239,12 @@ function buildRoleMenu(role){
       {group:'НР'},
       {id:'hr',label:'👥 HR — Сотрудники'},
     ],
+    partner_manager: [
+      {group:'Партнёры'},
+      {id:'partners',label:'🤝 База партнёров'},
+      {id:'partner-operations',label:'📋 Операции по партнёрам'},
+      {id:'partner-deposits',label:'💰 Депозиты'},
+    ],
     viewer: [
       {group:'Журнал'},
       {id:'main',label:'📋 Все заявки'},
@@ -2278,7 +2301,7 @@ function switchTab(t){
     'accounting-inbox','accounting-requests','accounting-corp','accounting-journal',
     'operations-inbox','operations-journal','operations-request','operations-form',
     'financier-journal','financier-kpi','financier-commission','financier-cost','financier-analytics','financier-deposits',
-    'executor-journal'
+    'executor-journal','partner-operations','partner-deposits'
   ];
 
   allTabs.forEach(tab=>{
@@ -2309,6 +2332,8 @@ function switchTab(t){
   else if(t==='operations-request') renderOperationsRequest();
   else if(t==='operations-form') renderOperationsForm();
   else if(t==='executor-journal') renderExecutorJournal();
+  else if(t==='partner-operations') renderPartnerOperations();
+  else if(t==='partner-deposits') renderPartnerDeposits();
   else if(t==='financier-journal') renderFinancierJournal();
   else if(t==='financier-kpi') renderFinancierKPI();
   else if(t==='financier-commission') renderFinancierCommission();
@@ -5933,6 +5958,7 @@ function renderOperationsRequest(){
 
 function renderOperationsForm(){
   renderNewOperationForm('ops-form-content');
+  setTimeout(initOpFormAutocomplete, 100);
 }
 
 async function renderExecutorJournal(){
@@ -6152,13 +6178,221 @@ async function renderFinancierDeposits(){
   )):''}`;
 }
 
-// Добавляем также в меню метку роли пользователя
+// ============================================================
+// PARTNER MANAGER MODULE
+// ============================================================
+
+// ---- AUTOCOMPLETE контрагента из базы партнёров ----
+function initAgentAutocomplete(inputId, cardId){
+  const inp = document.getElementById(inputId);
+  if(!inp) return;
+
+  // Создаём выпадающий список
+  let wrap = inp.parentElement;
+  if(!wrap.classList.contains('ac-wrap')){
+    inp.parentElement.style.position = 'relative';
+  }
+
+  let acList = document.getElementById('ac-list-'+inputId);
+  if(!acList){
+    acList = document.createElement('div');
+    acList.id = 'ac-list-'+inputId;
+    acList.className = 'ac-list';
+    inp.parentElement.appendChild(acList);
+  }
+
+  inp.addEventListener('input', ()=>{
+    const q = inp.value.toLowerCase().trim();
+    if(!q){ acList.classList.remove('open'); hidePartnerCard(cardId); return; }
+    const matches = (window.ptnList||[]).filter(p=>p.name.toLowerCase().includes(q));
+    if(!matches.length){ acList.classList.remove('open'); return; }
+    acList.innerHTML = matches.slice(0,6).map(p=>{
+      const bal = ptnBalanceByName(p.name);
+      return `<div class="ac-item" onclick="selectPartner('${inputId}','${cardId}',${JSON.stringify(p.name)})">
+        <div class="ac-item-name">${p.name}</div>
+        <div class="ac-item-meta">${p.contact||''} · Депозит: ${bal.toLocaleString('ru-RU')} ₽</div>
+      </div>`;
+    }).join('');
+    acList.classList.add('open');
+  });
+
+  inp.addEventListener('blur', ()=>setTimeout(()=>acList.classList.remove('open'),200));
+}
+
+function ptnBalanceByName(name){
+  const p = (window.ptnList||[]).find(x=>x.name===name);
+  if(!p) return 0;
+  const topupSum = (p.topups||[]).reduce((s,t)=>s+(+t.amount||0),0);
+  return topupSum; // упрощённо без списаний
+}
+
+window.selectPartner = function(inputId, cardId, name){
+  const inp = document.getElementById(inputId);
+  if(inp) inp.value = name;
+  document.getElementById('ac-list-'+inputId)?.classList.remove('open');
+  showPartnerCard(cardId, name);
+};
+
+function showPartnerCard(cardId, name){
+  const card = document.getElementById(cardId);
+  if(!card) return;
+  const p = (window.ptnList||[]).find(x=>x.name===name);
+  if(!p){ card.classList.remove('show'); return; }
+  const bal = ptnBalanceByName(name);
+  card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <span style="font-weight:500">🤝 ${p.name}</span>
+      ${p.contact?`<span style="color:var(--text3);margin-left:8px">${p.contact}</span>`:''}
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:11px;color:var(--text3)">Депозит</div>
+      <div style="font-weight:500;color:${bal>0?'var(--green)':'var(--red)'}">${bal.toLocaleString('ru-RU')} ₽</div>
+    </div>
+  </div>`;
+  card.classList.add('show');
+}
+
+function hidePartnerCard(cardId){
+  const card = document.getElementById(cardId);
+  if(card) card.classList.remove('show');
+}
+
+// Инициализируем автодополнение в основном модале добавления заявки
+document.addEventListener('DOMContentLoaded', ()=>{
+  // Добавляем карточку партнёра под поле контрагента в модале заявки
+  const agentField = document.getElementById('m-agent')?.parentElement;
+  if(agentField){
+    const card = document.createElement('div');
+    card.id = 'partner-card-modal';
+    card.className = 'partner-inline-card';
+    agentField.appendChild(card);
+    setTimeout(()=>initAgentAutocomplete('m-agent','partner-card-modal'), 500);
+  }
+  // Автодополнение в форме операции
+  setTimeout(()=>{
+    initAgentAutocomplete('nop-agent','partner-card-nop');
+  }, 1000);
+});
+
+// Инициализируем автодополнение в форме операции (вызывается после рендера)
+function initOpFormAutocomplete(){
+  const agentInp = document.getElementById('nop-agent');
+  if(agentInp && !document.getElementById('partner-card-nop')){
+    const card = document.createElement('div');
+    card.id = 'partner-card-nop';
+    card.className = 'partner-inline-card';
+    agentInp.parentElement.appendChild(card);
+    initAgentAutocomplete('nop-agent','partner-card-nop');
+  }
+}
+
+// ---- PARTNER MANAGER VIEWS ----
+async function renderPartnerOperations(){
+  const el = document.getElementById('partner-ops-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+
+  const partners = window.ptnList||[];
+  if(!partners.length){
+    el.innerHTML='<div class="empty">Партнёры не добавлены. Сначала добавьте партнёра в разделе «База партнёров».</div>';
+    return;
+  }
+
+  // Загружаем все операции
+  const {data:ops} = await (sb||window.sb).from('operations').select('*').order('created_at',{ascending:false});
+  const {data:entries} = await (sb||window.sb).from('entries').select('*').order('date',{ascending:false}).limit(500);
+
+  const allOps = ops||[];
+  const allEntries = entries||[];
+
+  el.innerHTML = partners.map(p=>{
+    // Операции из таблицы operations
+    const pOps = allOps.filter(o=>(o.agent||'').toLowerCase()===p.name.toLowerCase());
+    // Заявки из основного журнала
+    const pEntries = allEntries.filter(e=>(e.agent||'').toLowerCase()===p.name.toLowerCase());
+    const totalOps = pOps.reduce((s,o)=>s+(+o.amount||0),0);
+    const totalEntries = pEntries.reduce((s,e)=>s+(+e.agent_amount||0),0);
+    const total = totalOps + totalEntries;
+
+    return `<div class="kpi-card" style="padding:14px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <div style="font-size:14px;font-weight:500">🤝 ${p.name}</div>
+          <div style="font-size:11px;color:var(--text3)">${p.contact||''} ${p.email?'· '+p.email:''}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:18px;font-weight:500">${total.toLocaleString('ru-RU')} ₽</div>
+          <div style="font-size:11px;color:var(--text3)">оборот</div>
+        </div>
+      </div>
+      ${pOps.length||pEntries.length?`
+      <div style="display:flex;gap:16px;font-size:12px;color:var(--text2);border-top:0.5px solid var(--border);padding-top:8px">
+        <span>${pOps.length} операций · ${totalOps.toLocaleString('ru-RU')} ₽</span>
+        <span>${pEntries.length} заявок · ${totalEntries.toLocaleString('ru-RU')} ₽</span>
+      </div>`:'<div style="font-size:12px;color:var(--text3)">Операций нет</div>'}
+    </div>`;
+  }).join('');
+}
+
+async function renderPartnerDeposits(){
+  const el = document.getElementById('partner-dep-content');
+  if(!el) return;
+
+  const partners = window.ptnList||[];
+  if(!partners.length){
+    el.innerHTML='<div class="empty">Партнёры не добавлены.</div>';
+    return;
+  }
+
+  // Загружаем списания с депозита из entries
+  const {data:entries} = await (sb||window.sb).from('entries')
+    .select('agent,agent_amount,agent_pay_type,date,service')
+    .eq('agent_pay_type','partner_deposit')
+    .order('date',{ascending:false});
+  const allEntries = entries||[];
+
+  const totalDeposits = partners.reduce((s,p)=>{
+    const topups = (p.topups||[]).reduce((ts,t)=>ts+(+t.amount||0),0);
+    return s+topups;
+  },0);
+  const totalSpent = allEntries.reduce((s,e)=>s+(+e.agent_amount||0),0);
+
+  el.innerHTML=`
+  <div class="hr-metric-grid" style="margin-bottom:1rem">
+    <div class="hr-metric"><div class="hr-metric-lbl">Партнёров</div><div class="hr-metric-val">${partners.length}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Пополнено всего</div><div class="hr-metric-val" style="color:var(--green)">${totalDeposits.toLocaleString('ru-RU')} ₽</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Списано с депозитов</div><div class="hr-metric-val" style="color:var(--red)">${totalSpent.toLocaleString('ru-RU')} ₽</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Остаток</div><div class="hr-metric-val" style="color:var(--accent)">${(totalDeposits-totalSpent).toLocaleString('ru-RU')} ₽</div></div>
+  </div>
+
+  <div class="kpi-card" style="padding:0;overflow:hidden">
+  <table class="hr-tbl">
+    <thead><tr><th>Партнёр</th><th>Пополнено</th><th>Списано</th><th>Остаток</th><th>Контакт</th></tr></thead>
+    <tbody>
+    ${partners.map(p=>{
+      const topups = (p.topups||[]).reduce((s,t)=>s+(+t.amount||0),0);
+      const spent = allEntries.filter(e=>(e.agent||'').toLowerCase()===p.name.toLowerCase())
+        .reduce((s,e)=>s+(+e.agent_amount||0),0);
+      const bal = topups-spent;
+      return `<tr>
+        <td style="font-weight:500">🤝 ${p.name}</td>
+        <td style="color:var(--green)">${topups.toLocaleString('ru-RU')} ₽</td>
+        <td style="color:var(--red)">${spent.toLocaleString('ru-RU')} ₽</td>
+        <td style="font-weight:500;color:${bal>=0?'var(--accent)':'var(--red)'}">${bal.toLocaleString('ru-RU')} ₽</td>
+        <td style="color:var(--text2)">${p.contact||'—'}</td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table></div>`;
+}
+
+// Обновляем метку роли партнёрского менеджера
 document.addEventListener('DOMContentLoaded',()=>{
-  // Обновляем лейблы ролей в профилях
   const roleMap = {
     admin:'👑 Админ', manager:'✏️ Менеджер', viewer:'👁 Просмотр',
     executor:'👤 Исполнитель', accounting:'📒 Бухгалтерия',
-    operations:'⚙️ Операционист', financier:'📊 Финансист', hr:'👥 НР'
+    operations:'⚙️ Операционист', financier:'📊 Финансист',
+    hr:'👥 НР', partner_manager:'🤝 Партнёрский менеджер'
   };
   const el = document.getElementById('user-role');
   if(el && currentProfile?.role) el.textContent = roleMap[currentProfile.role]||currentProfile.role;
