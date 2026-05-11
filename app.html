@@ -1009,6 +1009,39 @@ tr:hover td{background:var(--bg2)}
         </div>
       </div>
     </div>
+
+    <!-- ROLE VIEWS -->
+    <!-- Бухгалтерия -->
+    <div id="view-accounting-inbox" style="display:none"><div class="content"><div id="acc-inbox-content"></div></div></div>
+    <div id="view-accounting-requests" style="display:none"><div class="content"><div id="acc-req-content"></div></div></div>
+    <div id="view-accounting-corp" style="display:none"><div class="content"><div id="acc-corp-content"></div></div></div>
+    <div id="view-accounting-journal" style="display:none"><div class="content"><div id="acc-journal-content"></div></div></div>
+    <!-- Операционист -->
+    <div id="view-operations-inbox" style="display:none"><div class="content"><div id="ops-inbox-content"></div></div></div>
+    <div id="view-operations-journal" style="display:none"><div class="content"><div id="ops-journal-content"></div></div></div>
+    <div id="view-operations-request" style="display:none"><div class="content"><div id="ops-req-content"></div></div></div>
+    <div id="view-operations-form" style="display:none"><div class="content"><div id="ops-form-content"></div></div></div>
+    <!-- Финансист -->
+    <div id="view-financier-journal" style="display:none"><div class="content"><div id="fin-journal-content"></div></div></div>
+    <div id="view-financier-kpi" style="display:none"><div class="content"><div id="fin-kpi-content"></div></div></div>
+    <div id="view-financier-commission" style="display:none"><div class="content"><div id="fin-comm-content"></div></div></div>
+    <div id="view-financier-cost" style="display:none"><div class="content"><div id="fin-cost-content"></div></div></div>
+    <div id="view-financier-analytics" style="display:none"><div class="content"><div id="fin-analytics-content"></div></div></div>
+    <div id="view-financier-deposits" style="display:none"><div class="content"><div id="fin-dep-content"></div></div></div>
+      <div class="ptn-modal">
+        <h3 id="ptn-modal-title">Добавить партнёра</h3>
+        <input type="hidden" id="ptn-edit-idx">
+        <div class="ptn-field"><label>Название партнёра</label><input type="text" id="ptn-f-name" placeholder="ООО Ресторан..."></div>
+        <div class="ptn-field"><label>Контакт / телефон</label><input type="text" id="ptn-f-contact" placeholder="+7 999 ..."></div>
+        <div class="ptn-field"><label>Email</label><input type="text" id="ptn-f-email" placeholder="partner@email.com"></div>
+        <div class="ptn-field"><label>Начальный депозит ₽</label><input type="number" id="ptn-f-deposit" placeholder="0"></div>
+        <div class="ptn-field"><label>Заметки</label><textarea id="ptn-f-note" rows="2" placeholder="Условия работы..."></textarea></div>
+        <div class="ptn-modal-actions">
+          <button class="btn" onclick="ptnCloseModal()">Отмена</button>
+          <button class="btn btn-primary" onclick="ptnSaveModal()">Сохранить</button>
+        </div>
+      </div>
+    </div>
     <div class="hr-modal-bg" id="hr-modal" style="display:none">
       <div class="hr-modal">
         <h3 id="hr-modal-title">Сотрудник</h3>
@@ -1360,19 +1393,34 @@ async function init(){
   const {data:profile} = await sb.from('profiles').select('*').eq('id',currentUser.id).single();
   currentProfile = profile;
 
-  if(profile?.role === 'executor'){
+  const role = profile?.role || 'viewer';
+
+  // Настраиваем UI по роли
+  const roleLabels = {
+    admin:'👑 Админ', manager:'✏️ Менеджер', viewer:'👁 Просмотр',
+    executor:'👤 Исполнитель', accounting:'📒 Бухгалтерия',
+    operations:'⚙️ Операционист', financier:'📊 Финансист', hr:'👥 НР'
+  };
+  document.getElementById('user-name').textContent = profile?.full_name || currentUser.email;
+  document.getElementById('user-role').textContent = roleLabels[role] || role;
+
+  // Перенаправляем исполнителя на form.html
+  if(role === 'executor'){
     window.location.href = 'form.html';
     return;
   }
 
-  // Настраиваем UI по роли
-  document.getElementById('user-name').textContent = profile?.full_name || currentUser.email;
-  document.getElementById('user-role').textContent = {admin:'👑 Админ',manager:'✏️ Менеджер',viewer:'👁 Просмотр'}[profile?.role]||'';
+  // Строим меню по роли
+  buildRoleMenu(role);
 
-  if(profile?.role === 'admin'){
+  if(role === 'admin'){
     document.getElementById('btn-users').style.display = 'block';
   }
-  if(profile?.role === 'viewer'){
+  if(role === 'viewer'){
+    document.getElementById('btn-add').style.display = 'none';
+  }
+  // Скрываем кнопку добавления для ролей которые не работают с журналом
+  if(['hr','financier'].includes(role)){
     document.getElementById('btn-add').style.display = 'none';
   }
 
@@ -1381,6 +1429,15 @@ async function init(){
   setSyncStatus('ok');
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+
+  // Открываем нужную вкладку по умолчанию для роли
+  const defaultTab = {
+    accounting: 'accounting-inbox',
+    operations: 'operations-inbox',
+    financier: 'financier-journal',
+    hr: 'hr'
+  }[role];
+  if(defaultTab) switchTabMenu(defaultTab, roleLabels[role]||'');
 }
 
 // ===== DATA LOADING =====
@@ -2047,6 +2104,88 @@ function renderTable(){
 }
 
 // ===== TABS =====
+// ===== ROLE-BASED MENU =====
+function buildRoleMenu(role){
+  const menu = document.getElementById('more-menu');
+  if(!menu) return;
+
+  // Полный список пунктов по ролям
+  const MENUS = {
+    // Полный доступ
+    admin: [
+      {group:'Журнал'},
+      {id:'main',label:'📋 Все заявки'},{id:'treasury',label:'💰 Казначей'},
+      {id:'loss',label:'⚠ Потери'},{id:'expense',label:'💼 Расходы'},
+      {id:'corp',label:'🏢 Корп карта'},{id:'invoice',label:'📄 По счёту'},
+      {group:'Аналитика'},
+      {id:'dept',label:'📊 По отделам'},{id:'days',label:'📅 По дням'},{id:'clients',label:'👤 Клиенты'},
+      {group:'Операции'},
+      {id:'accounting-inbox',label:'📥 Входящие (бухгалтерия)'},
+      {id:'operations-inbox',label:'📥 Входящие (операционист)'},
+      {id:'financier-journal',label:'📊 Общий журнал'},
+      {group:'Управление'},
+      {id:'kpi',label:'🏆 KPI'},{id:'hr',label:'👥 НР — Сотрудники'},{id:'partners',label:'🤝 Партнёры'},
+    ],
+    manager: [
+      {group:'Журнал'},
+      {id:'main',label:'📋 Все заявки'},{id:'treasury',label:'💰 Казначей'},
+      {id:'loss',label:'⚠ Потери'},{id:'expense',label:'💼 Расходы'},
+      {id:'corp',label:'🏢 Корп карта'},{id:'invoice',label:'📄 По счёту'},
+      {group:'Аналитика'},
+      {id:'dept',label:'📊 По отделам'},{id:'days',label:'📅 По дням'},{id:'clients',label:'👤 Клиенты'},
+      {group:'Управление'},
+      {id:'kpi',label:'🏆 KPI'},{id:'partners',label:'🤝 Партнёры'},
+    ],
+    accounting: [
+      {group:'Бухгалтерия'},
+      {id:'accounting-inbox',label:'📥 Входящие операции'},
+      {id:'accounting-requests',label:'🔗 Поступления (ссылка/QR)'},
+      {id:'accounting-corp',label:'💳 Корп карта'},
+      {id:'accounting-journal',label:'📒 Журнал бухгалтерии'},
+      {group:'Общее'},
+      {id:'main',label:'📋 Все заявки'},
+    ],
+    operations: [
+      {group:'Операционист'},
+      {id:'operations-inbox',label:'📥 Входящие формы'},
+      {id:'operations-journal',label:'📋 Журнал операций'},
+      {group:'Создать'},
+      {id:'operations-request',label:'💸 Запрос денег от клиента'},
+      {id:'operations-form',label:'📝 Форма на операцию'},
+    ],
+    financier: [
+      {group:'Финансист'},
+      {id:'financier-journal',label:'📊 Общий журнал'},
+      {id:'financier-kpi',label:'🏆 KPI отделов'},
+      {id:'financier-commission',label:'💰 Комиссии по месяцам'},
+      {id:'financier-cost',label:'📉 Себестоимость'},
+      {id:'financier-analytics',label:'📈 Аналитика'},
+      {id:'partners',label:'🤝 Партнёры'},
+      {id:'financier-deposits',label:'🏦 Депозиты клиентов'},
+    ],
+    hr: [
+      {group:'НР'},
+      {id:'hr',label:'👥 HR — Сотрудники'},
+    ],
+    viewer: [
+      {group:'Журнал'},
+      {id:'main',label:'📋 Все заявки'},
+      {id:'dept',label:'📊 По отделам'},{id:'days',label:'📅 По дням'},
+    ],
+  };
+
+  const items = MENUS[role] || MENUS.viewer;
+  let html = '';
+  items.forEach(item=>{
+    if(item.group){
+      html += `<div style="padding:8px 12px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:0.5px solid var(--border);border-top:0.5px solid var(--border);margin-top:2px">${item.group}</div>`;
+    } else {
+      html += `<div onclick="switchTabMenu('${item.id}','${item.label}')" class="more-menu-item" id="mmenu-${item.id}">${item.label}</div>`;
+    }
+  });
+  menu.innerHTML = html;
+}
+
 function toggleMoreMenu(){
   const m = document.getElementById('more-menu');
   if(m) m.style.display = m.style.display==='none'?'block':'none';
@@ -2077,21 +2216,50 @@ document.addEventListener('click', function(e){
 function switchTab(t){
   activeTab = t;
   clearSelection();
-  ['main','loss','expense','corp','invoice','treasury','dept','days','clients','kpi','hr','partners'].forEach(tab=>{
+
+  // Все возможные view-блоки
+  const allTabs = ['main','loss','expense','corp','invoice','treasury','dept','days','clients',
+    'kpi','hr','partners',
+    'accounting-inbox','accounting-requests','accounting-corp','accounting-journal',
+    'operations-inbox','operations-journal','operations-request','operations-form',
+    'financier-journal','financier-kpi','financier-commission','financier-cost','financier-analytics','financier-deposits'
+  ];
+
+  allTabs.forEach(tab=>{
     const v = document.getElementById('view-'+tab);
     const b = document.getElementById('tab-'+tab);
     if(v) v.style.display = tab===t?'block':'none';
     if(b) b.classList.toggle('active', tab===t);
   });
+
+  // Скрываем/показываем фильтры — только для основного журнала
+  const filters = document.getElementById('main-filters');
+  if(filters) filters.style.display = ['main','loss','expense','corp','invoice','treasury','dept','days','clients'].includes(t)?'':'none';
+
+  // Рендерим нужный контент
   if(t==='treasury') renderTreasury();
   else if(t==='dept') renderDeptView();
   else if(t==='days') renderDays();
   else if(t==='clients') renderClients();
-  else if(t==='kpi'){ if(typeof kpiSyncFromHR==='function') kpiSyncFromHR(); kpiRenderYearBar(); kpiShowScreen('upload'); }
+  else if(t==='kpi'){ if(typeof kpiSyncFromHR==='function') kpiSyncFromHR(); kpiRenderYearBar(); kpiShowScreen('dept'); }
   else if(t==='hr'){ hrRender(); }
   else if(t==='partners'){ ptnRender(); }
+  else if(t==='accounting-inbox') renderAccountingInbox();
+  else if(t==='accounting-requests') renderAccountingRequests();
+  else if(t==='accounting-corp') renderAccountingCorp();
+  else if(t==='accounting-journal') renderAccountingJournal();
+  else if(t==='operations-inbox') renderOperationsInbox();
+  else if(t==='operations-journal') renderOperationsJournal();
+  else if(t==='operations-request') renderOperationsRequest();
+  else if(t==='operations-form') renderOperationsForm();
+  else if(t==='financier-journal') renderFinancierJournal();
+  else if(t==='financier-kpi') renderFinancierKPI();
+  else if(t==='financier-commission') renderFinancierCommission();
+  else if(t==='financier-cost') renderFinancierCost();
+  else if(t==='financier-analytics') renderFinancierAnalytics();
+  else if(t==='financier-deposits') renderFinancierDeposits();
   else renderTable();
-  // Скрываем/показываем статистику в зависимости от вкладки
+
   renderStats();
 }
 
@@ -5341,6 +5509,520 @@ document.getElementById('ptn-modal')?.addEventListener('click',function(e){
 ptnLoad();
 
 })(); // end Partners module
+
+// ============================================================
+// ROUTING MODULE — Маршрутизация по ролям
+// ============================================================
+
+// ---- HELPERS ----
+function roleCard(html){ return `<div class="kpi-card" style="padding:0;overflow:hidden">${html}</div>`; }
+function roleTbl(cols, rows){
+  return `<table class="hr-tbl"><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+function opStatusBadge(s){
+  const map={pending:'⏳ Ожидает',processing:'🔄 В работе',confirmed:'✅ Подтверждено',rejected:'❌ Отклонено',completed:'✓ Завершено'};
+  const col={pending:'#FAEEDA',processing:'#E6F1FB',confirmed:'#EAF3DE',rejected:'#FCEBEB',completed:'#F1EFE8'};
+  const txt={pending:'#633806',processing:'#0C447C',confirmed:'#27500A',rejected:'#791F1F',completed:'#444441'};
+  return `<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${col[s]||'#F1EFE8'};color:${txt[s]||'#444'}">${map[s]||s}</span>`;
+}
+function opTypeBadge(t){
+  const map={invoice:'📄 По счёту',foreign_card:'💳 Иностр. карта',card_rf:'💳 Карта РФ',corp_card:'🏢 Корп карта'};
+  return map[t]||t;
+}
+
+// ---- ОПЕРАЦИЯ MODAL ----
+let currentOpId = null;
+
+function showOpModal(op, role){
+  currentOpId = op.id;
+  const canConfirm = ['accounting','operations','admin','manager'].includes(role);
+  const html = `
+  <div style="font-size:16px;font-weight:600;margin-bottom:14px">${opTypeBadge(op.operation_type)}</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:14px">
+    <div><span style="color:var(--text3)">Клиент: </span>${op.client_name||'—'}</div>
+    <div><span style="color:var(--text3)">Сумма: </span><b>${(+op.amount||0).toLocaleString('ru-RU')} ${op.currency||'₽'}</b></div>
+    <div><span style="color:var(--text3)">Контрагент: </span>${op.agent||'—'}</div>
+    <div><span style="color:var(--text3)">Дата: </span>${op.operation_date||'—'}</div>
+    <div><span style="color:var(--text3)">Отдел: </span>${op.dept||'—'}</div>
+    <div><span style="color:var(--text3)">Статус: </span>${opStatusBadge(op.status)}</div>
+  </div>
+  ${op.service?`<div style="font-size:12px;margin-bottom:8px"><span style="color:var(--text3)">Услуга: </span>${op.service}</div>`:''}
+  ${op.note?`<div style="font-size:12px;margin-bottom:8px"><span style="color:var(--text3)">Заметка: </span>${op.note}</div>`:''}
+  ${canConfirm && op.status==='pending'?`
+  <div style="border-top:0.5px solid var(--border);padding-top:12px;margin-top:12px">
+    <div class="field"><label>Комментарий (необязательно)</label><input type="text" id="op-modal-comment" placeholder="..."></div>
+  </div>`:``}`;
+
+  // Простой alert-стиль через динамический модал
+  const existing = document.getElementById('op-modal-bg');
+  if(existing) existing.remove();
+  const bg = document.createElement('div');
+  bg.id='op-modal-bg';
+  bg.className='modal-bg';
+  bg.style.display='flex';
+  bg.innerHTML=`<div class="modal" style="max-width:500px">
+    <h3>Детали операции</h3>
+    ${html}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)">
+      <button class="btn" onclick="document.getElementById('op-modal-bg').remove()">Закрыть</button>
+      ${canConfirm && op.status==='pending'?`
+      <button class="btn" style="color:var(--red)" onclick="confirmOp('${op.id}','rejected')">❌ Отклонить</button>
+      <button class="btn btn-primary" onclick="confirmOp('${op.id}','confirmed')">✅ Подтвердить</button>`:''}
+    </div>
+  </div>`;
+  bg.addEventListener('click',e=>{ if(e.target===bg) bg.remove(); });
+  document.body.appendChild(bg);
+}
+
+async function confirmOp(id, newStatus){
+  const comment = document.getElementById('op-modal-comment')?.value||'';
+  const {error} = await sb.from('operations').update({
+    status: newStatus,
+    confirmed_by: currentUser.id,
+    confirmed_at: new Date().toISOString(),
+    reject_reason: newStatus==='rejected'?comment:null,
+    updated_at: new Date().toISOString()
+  }).eq('id',id);
+  if(error){ alert('Ошибка: '+error.message); return; }
+
+  // Если подтверждено — создаём транзакцию
+  if(newStatus==='confirmed'){
+    const {data:op} = await sb.from('operations').select('*').eq('id',id).single();
+    if(op){
+      await sb.from('transactions').insert({
+        source_type:'operation', source_id:id,
+        client_name:op.client_name, agent:op.agent,
+        service:op.service, amount:op.amount, currency:op.currency,
+        dept:op.dept, operation_type:op.operation_type,
+        transaction_date:op.operation_date,
+        processed_by_role:op.routed_to,
+        processed_by:currentUser.id,
+        status:'completed', note:comment,
+        commission:op.commission||0
+      });
+      // Обновляем статус на completed
+      await sb.from('operations').update({status:'completed'}).eq('id',id);
+    }
+  }
+
+  document.getElementById('op-modal-bg')?.remove();
+  showToast(newStatus==='confirmed'?'✅ Операция подтверждена':'❌ Операция отклонена');
+  // Перерендерим текущую вкладку
+  switchTab(activeTab);
+}
+
+// ---- ФОРМА СОЗДАНИЯ ОПЕРАЦИИ ----
+function renderNewOperationForm(containerId){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  el.innerHTML=`
+  <div class="kpi-card" style="padding:20px;max-width:600px">
+    <div style="font-size:14px;font-weight:600;margin-bottom:14px">📝 Форма на проведение операции</div>
+    <div class="grid2">
+      <div class="field"><label>Клиент</label><input id="nop-client" placeholder="ФИО / название"></div>
+      <div class="field"><label>Контрагент</label><input id="nop-agent" placeholder="Поставщик..."></div>
+    </div>
+    <div class="field" style="margin-bottom:10px"><label>Услуга</label><input id="nop-service" placeholder="Описание услуги..."></div>
+    <div class="grid2">
+      <div class="field"><label>Сумма</label><input type="number" id="nop-amount" placeholder="0"></div>
+      <div class="field"><label>Валюта</label>
+        <select id="nop-currency">
+          <option value="RUB">RUB ₽</option><option value="USD">USD $</option>
+          <option value="EUR">EUR €</option><option value="AED">AED</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Тип операции</label>
+        <select id="nop-type" onchange="updateNopRoute()">
+          <option value="invoice">По счёту → Бухгалтерия</option>
+          <option value="corp_card">Корп карта → Бухгалтерия</option>
+          <option value="card_rf">Карта РФ → Операционист</option>
+          <option value="foreign_card">Иностр. карта → Операционист</option>
+        </select>
+      </div>
+      <div class="field"><label>Дата</label><input type="date" id="nop-date" value="${new Date().toISOString().split('T')[0]}"></div>
+    </div>
+    <div class="field" style="margin-bottom:10px"><label>Отдел</label>
+      <select id="nop-dept">
+        <option>Lifestyle</option><option>Travel</option><option>Логистика</option>
+        <option>КБР</option><option>Корп</option>
+      </select>
+    </div>
+    <div class="field" style="margin-bottom:10px"><label>Заметка</label><textarea id="nop-note" rows="2" placeholder="Комментарий..."></textarea></div>
+    <div id="nop-route-info" style="font-size:12px;color:var(--accent);margin-bottom:12px;padding:8px;background:var(--bg3);border-radius:var(--radius-sm)">
+      📤 Будет отправлено в: <b>Бухгалтерию</b>
+    </div>
+    <button class="btn btn-primary" onclick="submitOperation()">Отправить операцию</button>
+  </div>`;
+}
+
+function updateNopRoute(){
+  const t = document.getElementById('nop-type')?.value;
+  const info = document.getElementById('nop-route-info');
+  if(!info) return;
+  const toAccounting = ['invoice','corp_card'].includes(t);
+  info.innerHTML = `📤 Будет отправлено в: <b>${toAccounting?'Бухгалтерию':'Операционисту'}</b>`;
+}
+
+async function submitOperation(){
+  const t = document.getElementById('nop-type')?.value;
+  const amount = parseFloat(document.getElementById('nop-amount')?.value)||0;
+  const client = document.getElementById('nop-client')?.value.trim();
+  if(!client||!amount){ alert('Заполните клиента и сумму'); return; }
+  const toAccounting = ['invoice','corp_card'].includes(t);
+  const data = {
+    created_by: currentUser.id,
+    client_name: client,
+    agent: document.getElementById('nop-agent')?.value.trim()||null,
+    service: document.getElementById('nop-service')?.value.trim()||null,
+    amount, currency: document.getElementById('nop-currency')?.value||'RUB',
+    operation_type: t,
+    routed_to: toAccounting?'accounting':'operations',
+    operation_date: document.getElementById('nop-date')?.value,
+    dept: document.getElementById('nop-dept')?.value,
+    note: document.getElementById('nop-note')?.value.trim()||null,
+    status:'pending'
+  };
+  const {error} = await sb.from('operations').insert(data);
+  if(error){ alert('Ошибка: '+error.message); return; }
+  showToast(`✅ Отправлено в ${toAccounting?'бухгалтерию':'операционисту'}!`);
+  switchTab(activeTab);
+}
+
+// ---- ФОРМА ЗАПРОСА ДЕНЕГ ----
+function renderNewRequestForm(containerId){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  el.innerHTML=`
+  <div class="kpi-card" style="padding:20px;max-width:600px">
+    <div style="font-size:14px;font-weight:600;margin-bottom:14px">💸 Запрос денежных средств от клиента</div>
+    <div class="grid2">
+      <div class="field"><label>Клиент</label><input id="nrq-client" placeholder="ФИО / название"></div>
+      <div class="field"><label>Сумма</label><input type="number" id="nrq-amount" placeholder="0"></div>
+    </div>
+    <div class="field" style="margin-bottom:10px"><label>Услуга</label><input id="nrq-service" placeholder="Описание..."></div>
+    <div class="grid2">
+      <div class="field"><label>Способ оплаты</label>
+        <select id="nrq-type">
+          <option value="link">По ссылке</option>
+          <option value="qr">По QR-коду</option>
+          <option value="invoice">По счёту</option>
+          <option value="corp_card">Корп карта</option>
+        </select>
+      </div>
+      <div class="field"><label>Отдел</label>
+        <select id="nrq-dept">
+          <option>Lifestyle</option><option>Travel</option><option>Логистика</option>
+          <option>КБР</option><option>Корп</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:14px"><label>Заметка</label><input id="nrq-note" placeholder="Комментарий..."></div>
+    <button class="btn btn-primary" onclick="submitRequest()">Создать запрос</button>
+  </div>`;
+}
+
+async function submitRequest(){
+  const client = document.getElementById('nrq-client')?.value.trim();
+  const amount = parseFloat(document.getElementById('nrq-amount')?.value)||0;
+  if(!client||!amount){ alert('Заполните клиента и сумму'); return; }
+  const data = {
+    created_by: currentUser.id,
+    client_name: client,
+    amount, currency:'RUB',
+    service: document.getElementById('nrq-service')?.value.trim()||null,
+    request_type: document.getElementById('nrq-type')?.value,
+    dept: document.getElementById('nrq-dept')?.value,
+    note: document.getElementById('nrq-note')?.value.trim()||null,
+    status:'pending',
+    assigned_to_role:'accounting'
+  };
+  const {error} = await sb.from('requests').insert(data);
+  if(error){ alert('Ошибка: '+error.message); return; }
+  showToast('✅ Запрос создан!');
+  switchTab(activeTab);
+}
+
+// ---- БУХГАЛТЕРИЯ ----
+async function renderAccountingInbox(){
+  const el = document.getElementById('acc-inbox-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data} = await sb.from('operations').select('*')
+    .eq('routed_to','accounting').order('created_at',{ascending:false});
+  const ops = data||[];
+  if(!ops.length){ el.innerHTML='<div class="empty">Нет входящих операций</div>'; return; }
+  const role = currentProfile?.role||'admin';
+  el.innerHTML=roleCard(roleTbl(
+    ['Дата','Клиент','Тип','Сумма','Отдел','Статус',''],
+    ops.map(op=>`<tr>
+      <td>${op.operation_date||'—'}</td>
+      <td>${op.client_name||'—'}</td>
+      <td>${opTypeBadge(op.operation_type)}</td>
+      <td><b>${(+op.amount||0).toLocaleString('ru-RU')} ${op.currency||'₽'}</b></td>
+      <td>${op.dept||'—'}</td>
+      <td>${opStatusBadge(op.status)}</td>
+      <td><button class="btn btn-sm" onclick="showOpModal(${JSON.stringify(op).replace(/"/g,"'")}, '${role}')">Открыть</button></td>
+    </tr>`).join('')
+  ));
+}
+
+async function renderAccountingRequests(){
+  const el = document.getElementById('acc-req-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data} = await sb.from('requests').select('*')
+    .in('request_type',['link','qr']).order('created_at',{ascending:false});
+  const reqs = data||[];
+  if(!reqs.length){ el.innerHTML='<div class="empty">Нет поступлений по ссылке/QR</div>'; return; }
+  el.innerHTML=roleCard(roleTbl(
+    ['Дата','Клиент','Тип','Сумма','Отдел','Статус',''],
+    reqs.map(r=>`<tr>
+      <td>${r.created_at?.split('T')[0]||'—'}</td>
+      <td>${r.client_name||'—'}</td>
+      <td>${r.request_type==='link'?'🔗 По ссылке':'📱 По QR'}</td>
+      <td><b>${(+r.amount||0).toLocaleString('ru-RU')} ₽</b></td>
+      <td>${r.dept||'—'}</td>
+      <td>${opStatusBadge(r.status)}</td>
+      <td><button class="btn btn-sm" onclick="confirmRequest('${r.id}')">✅ Получено</button></td>
+    </tr>`).join('')
+  ));
+}
+
+async function confirmRequest(id){
+  await sb.from('requests').update({status:'paid'}).eq('id',id);
+  showToast('✅ Поступление подтверждено');
+  renderAccountingRequests();
+}
+
+async function renderAccountingCorp(){
+  const el = document.getElementById('acc-corp-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data} = await sb.from('operations').select('*')
+    .eq('operation_type','corp_card').order('created_at',{ascending:false});
+  const ops = data||[];
+  if(!ops.length){ el.innerHTML='<div class="empty">Нет операций по корп карте</div>'; return; }
+  const role = currentProfile?.role||'admin';
+  el.innerHTML=roleCard(roleTbl(
+    ['Дата','Клиент','Сумма','Отдел','Статус',''],
+    ops.map(op=>`<tr>
+      <td>${op.operation_date||'—'}</td>
+      <td>${op.client_name||'—'}</td>
+      <td><b>${(+op.amount||0).toLocaleString('ru-RU')} ${op.currency||'₽'}</b></td>
+      <td>${op.dept||'—'}</td>
+      <td>${opStatusBadge(op.status)}</td>
+      <td><button class="btn btn-sm" onclick="showOpModal(${JSON.stringify(op).replace(/"/g,"'")}, '${role}')">Открыть</button></td>
+    </tr>`).join('')
+  ));
+}
+
+async function renderAccountingJournal(){
+  const el = document.getElementById('acc-journal-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data} = await sb.from('transactions').select('*')
+    .eq('processed_by_role','accounting').order('created_at',{ascending:false});
+  renderTransactionTable(el, data||[]);
+}
+
+// ---- ОПЕРАЦИОНИСТ ----
+async function renderOperationsInbox(){
+  const el = document.getElementById('ops-inbox-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data} = await sb.from('operations').select('*')
+    .eq('routed_to','operations').order('created_at',{ascending:false});
+  const ops = data||[];
+  if(!ops.length){ el.innerHTML='<div class="empty">Нет входящих форм</div>'; return; }
+  const role = currentProfile?.role||'admin';
+  el.innerHTML=roleCard(roleTbl(
+    ['Дата','Клиент','Тип','Сумма','Отдел','Статус',''],
+    ops.map(op=>`<tr>
+      <td>${op.operation_date||'—'}</td>
+      <td>${op.client_name||'—'}</td>
+      <td>${opTypeBadge(op.operation_type)}</td>
+      <td><b>${(+op.amount||0).toLocaleString('ru-RU')} ${op.currency||'₽'}</b></td>
+      <td>${op.dept||'—'}</td>
+      <td>${opStatusBadge(op.status)}</td>
+      <td><button class="btn btn-sm" onclick="showOpModal(${JSON.stringify(op).replace(/"/g,"'")}, '${role}')">Открыть</button></td>
+    </tr>`).join('')
+  ));
+}
+
+async function renderOperationsJournal(){
+  const el = document.getElementById('ops-journal-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data} = await sb.from('transactions').select('*')
+    .eq('processed_by_role','operations').order('created_at',{ascending:false});
+  renderTransactionTable(el, data||[]);
+}
+
+function renderOperationsRequest(){
+  renderNewRequestForm('ops-req-content');
+}
+
+function renderOperationsForm(){
+  renderNewOperationForm('ops-form-content');
+}
+
+// ---- ФИНАНСИСТ ----
+async function renderFinancierJournal(){
+  const el = document.getElementById('fin-journal-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data} = await sb.from('transactions').select('*').order('created_at',{ascending:false});
+  renderTransactionTable(el, data||[]);
+}
+
+function renderTransactionTable(el, txns){
+  if(!txns.length){ el.innerHTML='<div class="empty">Нет транзакций</div>'; return; }
+  const totalAmt = txns.reduce((s,t)=>s+(+t.amount||0),0);
+  el.innerHTML=`
+  <div class="hr-metric-grid" style="margin-bottom:1rem">
+    <div class="hr-metric"><div class="hr-metric-lbl">Транзакций</div><div class="hr-metric-val">${txns.length}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Общая сумма</div><div class="hr-metric-val" style="font-size:16px;color:var(--accent)">${totalAmt.toLocaleString('ru-RU')} ₽</div></div>
+  </div>
+  ${roleCard(roleTbl(
+    ['Дата','Клиент','Тип','Сумма','Отдел','Провёл'],
+    txns.map(t=>`<tr>
+      <td>${t.transaction_date||t.created_at?.split('T')[0]||'—'}</td>
+      <td>${t.client_name||'—'}</td>
+      <td>${opTypeBadge(t.operation_type)}</td>
+      <td><b>${(+t.amount||0).toLocaleString('ru-RU')} ${t.currency||'₽'}</b></td>
+      <td>${t.dept||'—'}</td>
+      <td><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#EAF3DE;color:#27500A">${t.processed_by_role==='accounting'?'Бухгалтерия':'Операционист'}</span></td>
+    </tr>`).join('')
+  ))}`;
+}
+
+async function renderFinancierKPI(){
+  const el = document.getElementById('fin-kpi-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data:txns} = await sb.from('transactions').select('*');
+  const list = txns||[];
+  const depts=['Lifestyle','Travel','Логистика','КБР','Корп'];
+  el.innerHTML=`
+  <div class="hr-metric-grid">
+    ${depts.map(d=>{
+      const dt=list.filter(t=>t.dept===d);
+      const sum=dt.reduce((s,t)=>s+(+t.amount||0),0);
+      return `<div class="hr-metric">
+        <div class="hr-metric-lbl">${d}</div>
+        <div class="hr-metric-val" style="font-size:16px">${sum.toLocaleString('ru-RU')} ₽</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">${dt.length} операций</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+async function renderFinancierCommission(){
+  const el = document.getElementById('fin-comm-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  // Комиссии из основного журнала entries
+  const month = activeMonth || new Date().toISOString().substring(0,7);
+  const {data} = await sb.from('entries').select('dept,commission,date').gte('date',month+'-01').lte('date',month+'-31');
+  const list = data||[];
+  const depts=['Lifestyle','Travel','Логистика','КБР','Корп'];
+  const totalComm = list.reduce((s,e)=>s+(+e.commission||0),0);
+  el.innerHTML=`
+  <div style="font-size:13px;font-weight:500;margin-bottom:1rem">Комиссии за ${month}</div>
+  <div class="hr-metric-grid">
+    <div class="hr-metric"><div class="hr-metric-lbl">Итого комиссия</div><div class="hr-metric-val" style="color:var(--green)">${totalComm.toLocaleString('ru-RU')} ₽</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Записей</div><div class="hr-metric-val">${list.length}</div></div>
+  </div>
+  ${roleCard(roleTbl(
+    ['Отдел','Кол-во заявок','Комиссия'],
+    depts.map(d=>{
+      const dt=list.filter(e=>e.dept===d);
+      const comm=dt.reduce((s,e)=>s+(+e.commission||0),0);
+      return `<tr><td>${d}</td><td>${dt.length}</td><td style="color:var(--green);font-weight:500">${comm.toLocaleString('ru-RU')} ₽</td></tr>`;
+    }).join('')
+  ))}`;
+}
+
+async function renderFinancierCost(){
+  const el = document.getElementById('fin-cost-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data} = await sb.from('transactions').select('amount,commission,dept');
+  const list = data||[];
+  const total = list.reduce((s,t)=>s+(+t.amount||0),0);
+  const totalComm = list.reduce((s,t)=>s+(+t.commission||0),0);
+  const costPerOp = list.length ? Math.round(totalComm/list.length) : 0;
+  el.innerHTML=`
+  <div class="hr-metric-grid">
+    <div class="hr-metric"><div class="hr-metric-lbl">Оборот</div><div class="hr-metric-val" style="font-size:16px">${total.toLocaleString('ru-RU')} ₽</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Комиссия итого</div><div class="hr-metric-val" style="font-size:16px;color:var(--green)">${totalComm.toLocaleString('ru-RU')} ₽</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Себестоимость / операция</div><div class="hr-metric-val" style="font-size:16px">${costPerOp.toLocaleString('ru-RU')} ₽</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Операций всего</div><div class="hr-metric-val">${list.length}</div></div>
+  </div>`;
+}
+
+async function renderFinancierAnalytics(){
+  const el = document.getElementById('fin-analytics-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data} = await sb.from('transactions').select('*');
+  const list = data||[];
+  const byType={};
+  list.forEach(t=>{ byType[t.operation_type]=(byType[t.operation_type]||0)+1; });
+  const typeLabels={invoice:'По счёту',foreign_card:'Иностр. карта',card_rf:'Карта РФ',corp_card:'Корп карта'};
+  el.innerHTML=`
+  <div style="font-size:13px;font-weight:500;margin-bottom:1rem">Структура операций</div>
+  ${roleCard(roleTbl(
+    ['Тип операции','Количество','Доля'],
+    Object.entries(byType).map(([type,cnt])=>`<tr>
+      <td>${typeLabels[type]||type}</td>
+      <td>${cnt}</td>
+      <td>${list.length?Math.round(cnt/list.length*100):0}%</td>
+    </tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:var(--text3)">Нет данных</td></tr>'
+  ))}`;
+}
+
+async function renderFinancierDeposits(){
+  const el = document.getElementById('fin-dep-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  // Запросы от клиентов по типам ссылка/QR/счёт
+  const {data} = await sb.from('requests').select('*').order('created_at',{ascending:false});
+  const list = data||[];
+  const totalPaid = list.filter(r=>r.status==='paid').reduce((s,r)=>s+(+r.amount||0),0);
+  const totalPending = list.filter(r=>r.status==='pending').reduce((s,r)=>s+(+r.amount||0),0);
+  el.innerHTML=`
+  <div class="hr-metric-grid" style="margin-bottom:1rem">
+    <div class="hr-metric"><div class="hr-metric-lbl">Получено</div><div class="hr-metric-val" style="color:var(--green)">${totalPaid.toLocaleString('ru-RU')} ₽</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Ожидает</div><div class="hr-metric-val" style="color:var(--amber)">${totalPending.toLocaleString('ru-RU')} ₽</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Запросов всего</div><div class="hr-metric-val">${list.length}</div></div>
+  </div>
+  ${list.length?roleCard(roleTbl(
+    ['Дата','Клиент','Тип','Сумма','Отдел','Статус'],
+    list.map(r=>`<tr>
+      <td>${r.created_at?.split('T')[0]||'—'}</td>
+      <td>${r.client_name||'—'}</td>
+      <td>${{link:'🔗 Ссылка',qr:'📱 QR',invoice:'📄 Счёт',corp_card:'💳 Корп'}[r.request_type]||r.request_type}</td>
+      <td><b>${(+r.amount||0).toLocaleString('ru-RU')} ₽</b></td>
+      <td>${r.dept||'—'}</td>
+      <td>${opStatusBadge(r.status)}</td>
+    </tr>`).join('')
+  )):''}`;
+}
+
+// Добавляем также в меню метку роли пользователя
+document.addEventListener('DOMContentLoaded',()=>{
+  // Обновляем лейблы ролей в профилях
+  const roleMap = {
+    admin:'👑 Админ', manager:'✏️ Менеджер', viewer:'👁 Просмотр',
+    executor:'👤 Исполнитель', accounting:'📒 Бухгалтерия',
+    operations:'⚙️ Операционист', financier:'📊 Финансист', hr:'👥 НР'
+  };
+  const el = document.getElementById('user-role');
+  if(el && currentProfile?.role) el.textContent = roleMap[currentProfile.role]||currentProfile.role;
+});
 </script>
 </body>
 </html>
