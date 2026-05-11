@@ -1408,7 +1408,7 @@ async function init(){
   currentUser = session.user;
 
   // Получаем профиль
-  const {data:profile} = await sb.from('profiles').select('*').eq('id',currentUser.id).single();
+  const {data:profile} = await (sb||window.sb).from('profiles').select('*').eq('id',currentUser.id).single();
   currentProfile = profile;
 
   const role = profile?.role || 'viewer';
@@ -1598,13 +1598,13 @@ function renderTreasury(){
 }
 
 async function payEntry(id){
-  const {error} = await sb.from('entries').update({status:'paid'}).eq('id',id);
+  const {error} = await (sb||window.sb).from('entries').update({status:'paid'}).eq('id',id);
   if(!error){ entries.find(e=>e.id===id).status='paid'; renderTreasury(); updateTabCounts(); showToast('✓ Отмечено как оплачено'); }
 }
 
 async function rejectEntry(id){
   if(!confirm('Отклонить заявку?')) return;
-  const {error} = await sb.from('entries').update({status:'cancelled'}).eq('id',id);
+  const {error} = await (sb||window.sb).from('entries').update({status:'cancelled'}).eq('id',id);
   if(!error){ entries.find(e=>e.id===id).status='cancelled'; renderTreasury(); updateTabCounts(); showToast('Заявка отклонена'); }
 }
 
@@ -2130,46 +2130,38 @@ let viewingAsRole = 'admin'; // текущая просматриваемая р
 window.switchViewRole = function(role){
   viewingAsRole = role;
 
-  // Подсвечиваем активную кнопку
+  // Подсвечиваем кнопку
   document.querySelectorAll('.rs-btn').forEach(b=>b.classList.remove('rs-active'));
-  document.querySelectorAll('.rs-btn').forEach(b=>{
-    if(b.textContent.includes(role==='admin'?'Сбросить':
-      role==='executor'?'Исполнитель':
-      role==='accounting'?'Бухгалтерия':
-      role==='operations'?'Операционист':
-      role==='financier'?'Финансист':'НР'
-    )) b.classList.add('rs-active');
-  });
+  event?.target?.classList.add('rs-active');
 
-  // Перестраиваем меню под выбранную роль
-  const targetRole = role === 'admin' ? 'admin' : role;
-  buildRoleMenu(targetRole);
+  // Перестраиваем меню
+  buildRoleMenu(role === 'admin' ? 'admin' : role);
 
-  // Обновляем заголовок текущей вкладки
   const titleEl = document.getElementById('current-tab-title');
+
   if(role === 'admin'){
     if(titleEl) titleEl.textContent = '📋 Все заявки';
     switchTab('main');
-    showToast('Панель администратора');
-  } else {
-    const roleNames = {
-      executor:'👤 Исполнитель / Ведущий / ГК',
-      accounting:'📒 Бухгалтерия',
-      operations:'⚙️ Операционист',
-      financier:'📊 Финансист',
-      hr:'👥 НР'
-    };
-    const defaultTabs = {
-      executor:'operations-form',
-      accounting:'accounting-inbox',
-      operations:'operations-inbox',
-      financier:'financier-journal',
-      hr:'hr'
-    };
-    if(titleEl) titleEl.textContent = roleNames[role]||'';
-    switchTab(defaultTabs[role]||'main');
-    showToast('Просмотр: '+roleNames[role]);
+    return;
   }
+
+  const roleNames = {
+    executor:'👤 Исполнитель',
+    accounting:'📒 Бухгалтерия',
+    operations:'⚙️ Операционист',
+    financier:'📊 Финансист',
+    hr:'👥 НР'
+  };
+  const defaultTabs = {
+    executor:'operations-form',
+    accounting:'accounting-inbox',
+    operations:'operations-inbox',
+    financier:'financier-journal',
+    hr:'hr'
+  };
+
+  if(titleEl) titleEl.textContent = roleNames[role]||'';
+  switchTab(defaultTabs[role]||'main');
 };
 
 // ===== ROLE-BASED MENU =====
@@ -2472,7 +2464,7 @@ async function onCurrencyChange(){
 async function getRateFromWallet(currency, date){
   try{
     // Берём последнее пополнение по данной валюте на дату или раньше
-    const {data} = await sb.from('currency_topups')
+    const {data} = await (sb||window.sb).from('currency_topups')
       .select('amount_rub,amount_currency,date')
       .eq('currency', currency)
       .lte('date', date||new Date().toISOString().split('T')[0])
@@ -2739,9 +2731,9 @@ async function saveEntry(){
 
   let error;
   if(editId){
-    ({error} = await sb.from('entries').update(payload).eq('id',editId));
+    ({error} = await (sb||window.sb).from('entries').update(payload).eq('id',editId));
   } else {
-    ({error} = await sb.from('entries').insert(payload));
+    ({error} = await (sb||window.sb).from('entries').insert(payload));
   }
 
   if(error){ showToast('Ошибка: '+error.message); return; }
@@ -2755,14 +2747,14 @@ async function cycleStatus(id){
   const e = entries.find(x=>x.id===id);
   if(!e) return;
   const next = {pending:'paid',paid:'cancelled',cancelled:'pending'};
-  const {error} = await sb.from('entries').update({status:next[e.status]||'pending'}).eq('id',id);
+  const {error} = await (sb||window.sb).from('entries').update({status:next[e.status]||'pending'}).eq('id',id);
   if(!error){ e.status = next[e.status]||'pending'; renderTable(); }
 }
 
 async function deleteEntry(id){
   if(currentProfile?.role !== 'admin'){ showToast('Нет прав'); return; }
   if(!confirm('Удалить запись?')) return;
-  const {error} = await sb.from('entries').delete().eq('id',id);
+  const {error} = await (sb||window.sb).from('entries').delete().eq('id',id);
   if(error){ showToast('Ошибка: '+error.message); return; }
   entries = entries.filter(e=>e.id!==id);
   renderAll();
@@ -2790,7 +2782,7 @@ async function bulkDelete(){
   if(currentProfile?.role !== 'admin'){ showToast('Нет прав'); return; }
   if(!confirm(`Удалить ${selectedIds.size} записей?`)) return;
   const ids = [...selectedIds];
-  const {error} = await sb.from('entries').delete().in('id', ids);
+  const {error} = await (sb||window.sb).from('entries').delete().in('id', ids);
   if(error){ showToast('Ошибка: '+error.message); return; }
   entries = entries.filter(e=>!ids.includes(e.id));
   selectedIds.clear();
@@ -2800,7 +2792,7 @@ async function bulkDelete(){
 async function bulkStatus(status){
   if(currentProfile?.role === 'viewer'){ showToast('Нет прав'); return; }
   const ids = [...selectedIds];
-  const {error} = await sb.from('entries').update({status}).in('id',ids);
+  const {error} = await (sb||window.sb).from('entries').update({status}).in('id',ids);
   if(error){ showToast('Ошибка'); return; }
   entries.forEach(e=>{ if(ids.includes(e.id)) e.status=status; });
   renderAll();
@@ -2810,7 +2802,7 @@ async function bulkStatus(status){
 // ===== USERS =====
 async function openUsers(){
   document.getElementById('users-modal').style.display = 'flex';
-  const {data:users, error} = await sb.from('profiles').select('*').order('created_at');
+  const {data:users, error} = await (sb||window.sb).from('profiles').select('*').order('created_at');
   if(error){ showToast('Ошибка загрузки'); return; }
   const roleClass = {admin:'role-admin',manager:'role-manager',viewer:'role-viewer',executor:'role-executor'};
   const roleLabel = {admin:'👑 Админ',manager:'✏️ Менеджер',viewer:'👁 Просмотр',executor:'👤 Исполнитель'};
@@ -2831,7 +2823,7 @@ async function openUsers(){
 }
 
 async function changeRole(userId, role){
-  const {error} = await sb.from('profiles').update({role}).eq('id',userId);
+  const {error} = await (sb||window.sb).from('profiles').update({role}).eq('id',userId);
   if(error) showToast('Ошибка: '+error.message);
   else showToast('✓ Роль изменена');
 }
@@ -2929,7 +2921,7 @@ function setSyncStatus(state){
 let toastTimer;
 async function togglePaymentReceived(id, currentState, btn){
   const newState = !currentState;
-  const {error} = await sb.from('entries').update({
+  const {error} = await (sb||window.sb).from('entries').update({
     payment_received: newState,
     payment_received_at: newState ? new Date().toISOString().split('T')[0] : null
   }).eq('id', id);
@@ -3069,7 +3061,7 @@ function startAutoRefresh(){
   autoRefreshTimer = setInterval(async ()=>{
     if(!currentUser) return;
     try{
-      const {data} = await sb.from('entries')
+      const {data} = await (sb||window.sb).from('entries')
         .select('id,service,dept,from_form,submitted_by')
         .eq('status','pending')
         .eq('from_form',true)
@@ -5648,7 +5640,7 @@ function showOpModal(op, role){
 
 async function confirmOp(id, newStatus){
   const comment = document.getElementById('op-modal-comment')?.value||'';
-  const {error} = await sb.from('operations').update({
+  const {error} = await (sb||window.sb).from('operations').update({
     status: newStatus,
     confirmed_by: currentUser.id,
     confirmed_at: new Date().toISOString(),
@@ -5659,9 +5651,9 @@ async function confirmOp(id, newStatus){
 
   // Если подтверждено — создаём транзакцию
   if(newStatus==='confirmed'){
-    const {data:op} = await sb.from('operations').select('*').eq('id',id).single();
+    const {data:op} = await (sb||window.sb).from('operations').select('*').eq('id',id).single();
     if(op){
-      await sb.from('transactions').insert({
+      await (sb||window.sb).from('transactions').insert({
         source_type:'operation', source_id:id,
         client_name:op.client_name, agent:op.agent,
         service:op.service, amount:op.amount, currency:op.currency,
@@ -5673,7 +5665,7 @@ async function confirmOp(id, newStatus){
         commission:op.commission||0
       });
       // Обновляем статус на completed
-      await sb.from('operations').update({status:'completed'}).eq('id',id);
+      await (sb||window.sb).from('operations').update({status:'completed'}).eq('id',id);
     }
   }
 
@@ -5756,7 +5748,7 @@ async function submitOperation(){
     note: document.getElementById('nop-note')?.value.trim()||null,
     status:'pending'
   };
-  const {error} = await sb.from('operations').insert(data);
+  const {error} = await (sb||window.sb).from('operations').insert(data);
   if(error){ alert('Ошибка: '+error.message); return; }
   showToast(`✅ Отправлено в ${toAccounting?'бухгалтерию':'операционисту'}!`);
   switchTab(activeTab);
@@ -5810,7 +5802,7 @@ async function submitRequest(){
     status:'pending',
     assigned_to_role:'accounting'
   };
-  const {error} = await sb.from('requests').insert(data);
+  const {error} = await (sb||window.sb).from('requests').insert(data);
   if(error){ alert('Ошибка: '+error.message); return; }
   showToast('✅ Запрос создан!');
   switchTab(activeTab);
@@ -5821,7 +5813,7 @@ async function renderAccountingInbox(){
   const el = document.getElementById('acc-inbox-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data} = await sb.from('operations').select('*')
+  const {data} = await (sb||window.sb).from('operations').select('*')
     .eq('routed_to','accounting').order('created_at',{ascending:false});
   const ops = data||[];
   if(!ops.length){ el.innerHTML='<div class="empty">Нет входящих операций</div>'; return; }
@@ -5844,7 +5836,7 @@ async function renderAccountingRequests(){
   const el = document.getElementById('acc-req-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data} = await sb.from('requests').select('*')
+  const {data} = await (sb||window.sb).from('requests').select('*')
     .in('request_type',['link','qr']).order('created_at',{ascending:false});
   const reqs = data||[];
   if(!reqs.length){ el.innerHTML='<div class="empty">Нет поступлений по ссылке/QR</div>'; return; }
@@ -5863,7 +5855,7 @@ async function renderAccountingRequests(){
 }
 
 async function confirmRequest(id){
-  await sb.from('requests').update({status:'paid'}).eq('id',id);
+  await (sb||window.sb).from('requests').update({status:'paid'}).eq('id',id);
   showToast('✅ Поступление подтверждено');
   renderAccountingRequests();
 }
@@ -5872,7 +5864,7 @@ async function renderAccountingCorp(){
   const el = document.getElementById('acc-corp-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data} = await sb.from('operations').select('*')
+  const {data} = await (sb||window.sb).from('operations').select('*')
     .eq('operation_type','corp_card').order('created_at',{ascending:false});
   const ops = data||[];
   if(!ops.length){ el.innerHTML='<div class="empty">Нет операций по корп карте</div>'; return; }
@@ -5894,7 +5886,7 @@ async function renderAccountingJournal(){
   const el = document.getElementById('acc-journal-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data} = await sb.from('transactions').select('*')
+  const {data} = await (sb||window.sb).from('transactions').select('*')
     .eq('processed_by_role','accounting').order('created_at',{ascending:false});
   renderTransactionTable(el, data||[]);
 }
@@ -5904,7 +5896,7 @@ async function renderOperationsInbox(){
   const el = document.getElementById('ops-inbox-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data} = await sb.from('operations').select('*')
+  const {data} = await (sb||window.sb).from('operations').select('*')
     .eq('routed_to','operations').order('created_at',{ascending:false});
   const ops = data||[];
   if(!ops.length){ el.innerHTML='<div class="empty">Нет входящих форм</div>'; return; }
@@ -5927,7 +5919,7 @@ async function renderOperationsJournal(){
   const el = document.getElementById('ops-journal-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data} = await sb.from('transactions').select('*')
+  const {data} = await (sb||window.sb).from('transactions').select('*')
     .eq('processed_by_role','operations').order('created_at',{ascending:false});
   renderTransactionTable(el, data||[]);
 }
@@ -5945,7 +5937,7 @@ async function renderFinancierJournal(){
   const el = document.getElementById('fin-journal-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data} = await sb.from('transactions').select('*').order('created_at',{ascending:false});
+  const {data} = await (sb||window.sb).from('transactions').select('*').order('created_at',{ascending:false});
   renderTransactionTable(el, data||[]);
 }
 
@@ -5974,7 +5966,7 @@ async function renderFinancierKPI(){
   const el = document.getElementById('fin-kpi-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data:txns} = await sb.from('transactions').select('*');
+  const {data:txns} = await (sb||window.sb).from('transactions').select('*');
   const list = txns||[];
   const depts=['Lifestyle','Travel','Логистика','КБР','Корп'];
   el.innerHTML=`
@@ -5997,7 +5989,7 @@ async function renderFinancierCommission(){
   el.innerHTML='<div class="empty">Загрузка...</div>';
   // Комиссии из основного журнала entries
   const month = activeMonth || new Date().toISOString().substring(0,7);
-  const {data} = await sb.from('entries').select('dept,commission,date').gte('date',month+'-01').lte('date',month+'-31');
+  const {data} = await (sb||window.sb).from('entries').select('dept,commission,date').gte('date',month+'-01').lte('date',month+'-31');
   const list = data||[];
   const depts=['Lifestyle','Travel','Логистика','КБР','Корп'];
   const totalComm = list.reduce((s,e)=>s+(+e.commission||0),0);
@@ -6021,7 +6013,7 @@ async function renderFinancierCost(){
   const el = document.getElementById('fin-cost-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data} = await sb.from('transactions').select('amount,commission,dept');
+  const {data} = await (sb||window.sb).from('transactions').select('amount,commission,dept');
   const list = data||[];
   const total = list.reduce((s,t)=>s+(+t.amount||0),0);
   const totalComm = list.reduce((s,t)=>s+(+t.commission||0),0);
@@ -6039,7 +6031,7 @@ async function renderFinancierAnalytics(){
   const el = document.getElementById('fin-analytics-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data} = await sb.from('transactions').select('*');
+  const {data} = await (sb||window.sb).from('transactions').select('*');
   const list = data||[];
   const byType={};
   list.forEach(t=>{ byType[t.operation_type]=(byType[t.operation_type]||0)+1; });
@@ -6061,7 +6053,7 @@ async function renderFinancierDeposits(){
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
   // Запросы от клиентов по типам ссылка/QR/счёт
-  const {data} = await sb.from('requests').select('*').order('created_at',{ascending:false});
+  const {data} = await (sb||window.sb).from('requests').select('*').order('created_at',{ascending:false});
   const list = data||[];
   const totalPaid = list.filter(r=>r.status==='paid').reduce((s,r)=>s+(+r.amount||0),0);
   const totalPending = list.filter(r=>r.status==='pending').reduce((s,r)=>s+(+r.amount||0),0);
