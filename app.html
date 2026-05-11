@@ -1039,6 +1039,7 @@ tr:hover td{background:var(--bg2)}
     <div id="view-operations-journal" style="display:none"><div class="content"><div id="ops-journal-content"></div></div></div>
     <div id="view-operations-request" style="display:none"><div class="content"><div id="ops-req-content"></div></div></div>
     <div id="view-operations-form" style="display:none"><div class="content"><div id="ops-form-content"></div></div></div>
+    <div id="view-executor-journal" style="display:none"><div class="content"><div id="exec-journal-content"></div></div></div>
     <!-- Финансист -->
     <div id="view-financier-journal" style="display:none"><div class="content"><div id="fin-journal-content"></div></div></div>
     <div id="view-financier-kpi" style="display:none"><div class="content"><div id="fin-kpi-content"></div></div></div>
@@ -2187,6 +2188,8 @@ function buildRoleMenu(role){
       {group:'Мои действия'},
       {id:'operations-request',label:'💸 Запрос денег от клиента'},
       {id:'operations-form',label:'📝 Форма на проведение операции'},
+      {group:'Мои заявки'},
+      {id:'executor-journal',label:'📋 Мой журнал'},
     ],
     accounting: [
       {group:'Бухгалтерия'},
@@ -2274,7 +2277,8 @@ function switchTab(t){
     'kpi','hr','partners',
     'accounting-inbox','accounting-requests','accounting-corp','accounting-journal',
     'operations-inbox','operations-journal','operations-request','operations-form',
-    'financier-journal','financier-kpi','financier-commission','financier-cost','financier-analytics','financier-deposits'
+    'financier-journal','financier-kpi','financier-commission','financier-cost','financier-analytics','financier-deposits',
+    'executor-journal'
   ];
 
   allTabs.forEach(tab=>{
@@ -2304,6 +2308,7 @@ function switchTab(t){
   else if(t==='operations-journal') renderOperationsJournal();
   else if(t==='operations-request') renderOperationsRequest();
   else if(t==='operations-form') renderOperationsForm();
+  else if(t==='executor-journal') renderExecutorJournal();
   else if(t==='financier-journal') renderFinancierJournal();
   else if(t==='financier-kpi') renderFinancierKPI();
   else if(t==='financier-commission') renderFinancierCommission();
@@ -5572,9 +5577,9 @@ function roleTbl(cols, rows){
   return `<table class="hr-tbl"><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 function opStatusBadge(s){
-  const map={pending:'⏳ Ожидает',processing:'🔄 В работе',confirmed:'✅ Подтверждено',rejected:'❌ Отклонено',completed:'✓ Завершено'};
-  const col={pending:'#FAEEDA',processing:'#E6F1FB',confirmed:'#EAF3DE',rejected:'#FCEBEB',completed:'#F1EFE8'};
-  const txt={pending:'#633806',processing:'#0C447C',confirmed:'#27500A',rejected:'#791F1F',completed:'#444441'};
+  const map={pending:'⏳ Ожидает',processing:'🔄 В работе',confirmed:'✅ Проведено',rejected:'❌ Отклонено',completed:'✓ Завершено',revision:'↩ На доработку'};
+  const col={pending:'#FAEEDA',processing:'#E6F1FB',confirmed:'#EAF3DE',rejected:'#FCEBEB',completed:'#F1EFE8',revision:'#EEEDFE'};
+  const txt={pending:'#633806',processing:'#0C447C',confirmed:'#27500A',rejected:'#791F1F',completed:'#444441',revision:'#3C3489'};
   return `<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${col[s]||'#F1EFE8'};color:${txt[s]||'#444'}">${map[s]||s}</span>`;
 }
 function opTypeBadge(t){
@@ -5588,6 +5593,7 @@ let currentOpId = null;
 function showOpModal(op, role){
   currentOpId = op.id;
   const canConfirm = ['accounting','operations','admin','manager'].includes(role);
+  const isPending = op.status==='pending' || op.status==='revision';
   const html = `
   <div style="font-size:16px;font-weight:600;margin-bottom:14px">${opTypeBadge(op.operation_type)}</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:14px">
@@ -5600,12 +5606,14 @@ function showOpModal(op, role){
   </div>
   ${op.service?`<div style="font-size:12px;margin-bottom:8px"><span style="color:var(--text3)">Услуга: </span>${op.service}</div>`:''}
   ${op.note?`<div style="font-size:12px;margin-bottom:8px"><span style="color:var(--text3)">Заметка: </span>${op.note}</div>`:''}
-  ${canConfirm && op.status==='pending'?`
+  ${op.reject_reason?`<div style="font-size:12px;margin-bottom:8px;padding:8px 10px;background:#FAEEDA;border-radius:6px;color:#633806">
+    <b>Комментарий:</b> ${op.reject_reason}
+  </div>`:''}
+  ${canConfirm && isPending?`
   <div style="border-top:0.5px solid var(--border);padding-top:12px;margin-top:12px">
-    <div class="field"><label>Комментарий (необязательно)</label><input type="text" id="op-modal-comment" placeholder="..."></div>
+    <div class="field"><label>Комментарий</label><input type="text" id="op-modal-comment" placeholder="Причина отклонения или что исправить..."></div>
   </div>`:``}`;
 
-  // Простой alert-стиль через динамический модал
   const existing = document.getElementById('op-modal-bg');
   if(existing) existing.remove();
   const bg = document.createElement('div');
@@ -5615,11 +5623,12 @@ function showOpModal(op, role){
   bg.innerHTML=`<div class="modal" style="max-width:500px">
     <h3>Детали операции</h3>
     ${html}
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border);flex-wrap:wrap">
       <button class="btn" onclick="document.getElementById('op-modal-bg').remove()">Закрыть</button>
-      ${canConfirm && op.status==='pending'?`
+      ${canConfirm && isPending?`
       <button class="btn" style="color:var(--red)" onclick="confirmOp('${op.id}','rejected')">❌ Отклонить</button>
-      <button class="btn btn-primary" onclick="confirmOp('${op.id}','confirmed')">✅ Подтвердить</button>`:''}
+      <button class="btn" style="color:var(--purple)" onclick="confirmOp('${op.id}','revision')">↩ На доработку</button>
+      <button class="btn btn-primary" onclick="confirmOp('${op.id}','confirmed')">✅ Провести</button>`:''}
     </div>
   </div>`;
   bg.addEventListener('click',e=>{ if(e.target===bg) bg.remove(); });
@@ -5628,13 +5637,20 @@ function showOpModal(op, role){
 
 async function confirmOp(id, newStatus){
   const comment = document.getElementById('op-modal-comment')?.value||'';
-  const {error} = await (sb||window.sb).from('operations').update({
+  const updateData = {
     status: newStatus,
-    confirmed_by: currentUser.id,
-    confirmed_at: new Date().toISOString(),
-    reject_reason: newStatus==='rejected'?comment:null,
     updated_at: new Date().toISOString()
-  }).eq('id',id);
+  };
+  // Сохраняем комментарий для отклонения и доработки
+  if(['rejected','revision'].includes(newStatus)){
+    updateData.reject_reason = comment || (newStatus==='revision'?'Требует доработки':'Отклонено');
+  } else {
+    updateData.reject_reason = null;
+    updateData.confirmed_by = currentUser.id;
+    updateData.confirmed_at = new Date().toISOString();
+  }
+
+  const {error} = await (sb||window.sb).from('operations').update(updateData).eq('id',id);
   if(error){ alert('Ошибка: '+error.message); return; }
 
   // Если подтверждено — создаём транзакцию
@@ -5652,14 +5668,13 @@ async function confirmOp(id, newStatus){
         status:'completed', note:comment,
         commission:op.commission||0
       });
-      // Обновляем статус на completed
       await (sb||window.sb).from('operations').update({status:'completed'}).eq('id',id);
     }
   }
 
   document.getElementById('op-modal-bg')?.remove();
-  showToast(newStatus==='confirmed'?'✅ Операция подтверждена':'❌ Операция отклонена');
-  // Перерендерим текущую вкладку
+  const msgs = {confirmed:'✅ Операция проведена',rejected:'❌ Операция отклонена',revision:'↩ Отправлено на доработку'};
+  showToast(msgs[newStatus]||'Готово');
   switchTab(activeTab);
 }
 
@@ -5918,6 +5933,79 @@ function renderOperationsRequest(){
 
 function renderOperationsForm(){
   renderNewOperationForm('ops-form-content');
+}
+
+async function renderExecutorJournal(){
+  const el = document.getElementById('exec-journal-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+
+  // Загружаем операции созданные этим пользователем
+  const {data:ops} = await (sb||window.sb).from('operations')
+    .select('*')
+    .eq('created_by', currentUser.id)
+    .order('created_at',{ascending:false});
+
+  const {data:reqs} = await (sb||window.sb).from('requests')
+    .select('*')
+    .eq('created_by', currentUser.id)
+    .order('created_at',{ascending:false});
+
+  const allOps = ops||[];
+  const allReqs = reqs||[];
+
+  if(!allOps.length && !allReqs.length){
+    el.innerHTML='<div class="empty">Вы ещё не создавали операций</div>';
+    return;
+  }
+
+  // Статистика
+  const pending = allOps.filter(o=>o.status==='pending').length;
+  const completed = allOps.filter(o=>o.status==='completed').length;
+  const rejected = allOps.filter(o=>o.status==='rejected').length;
+  const revision = allOps.filter(o=>o.status==='revision').length;
+
+  el.innerHTML=`
+  <div class="hr-metric-grid" style="margin-bottom:1rem">
+    <div class="hr-metric"><div class="hr-metric-lbl">Всего операций</div><div class="hr-metric-val">${allOps.length}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Проведено</div><div class="hr-metric-val" style="color:var(--green)">${completed}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Ожидает</div><div class="hr-metric-val" style="color:var(--amber)">${pending}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">На доработку</div><div class="hr-metric-val" style="color:var(--purple)">${revision}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Отклонено</div><div class="hr-metric-val" style="color:var(--red)">${rejected}</div></div>
+  </div>
+
+  ${allOps.length?`
+  <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Мои операции</div>
+  <div class="kpi-card" style="padding:0;overflow:hidden;margin-bottom:14px">
+  <table class="hr-tbl">
+    <thead><tr><th>Дата</th><th>Клиент</th><th>Тип</th><th>Сумма</th><th>Статус</th><th>Комментарий</th></tr></thead>
+    <tbody>
+    ${allOps.map(op=>`<tr>
+      <td>${op.operation_date||op.created_at?.split('T')[0]||'—'}</td>
+      <td>${op.client_name||'—'}</td>
+      <td style="font-size:11px">${opTypeBadge(op.operation_type)}</td>
+      <td><b>${(+op.amount||0).toLocaleString('ru-RU')} ${op.currency||'₽'}</b></td>
+      <td>${opStatusBadge(op.status)}</td>
+      <td style="font-size:11px;color:${op.status==='revision'?'var(--purple)':op.status==='rejected'?'var(--red)':'var(--text3)'}">${op.reject_reason||'—'}</td>
+    </tr>`).join('')}
+    </tbody>
+  </table></div>`:''}
+
+  ${allReqs.length?`
+  <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Мои запросы денег</div>
+  <div class="kpi-card" style="padding:0;overflow:hidden">
+  <table class="hr-tbl">
+    <thead><tr><th>Дата</th><th>Клиент</th><th>Способ</th><th>Сумма</th><th>Статус</th></tr></thead>
+    <tbody>
+    ${allReqs.map(r=>`<tr>
+      <td>${r.created_at?.split('T')[0]||'—'}</td>
+      <td>${r.client_name||'—'}</td>
+      <td style="font-size:11px">${{link:'🔗 Ссылка',qr:'📱 QR',invoice:'📄 Счёт',corp_card:'💳 Корп'}[r.request_type]||r.request_type}</td>
+      <td><b>${(+r.amount||0).toLocaleString('ru-RU')} ₽</b></td>
+      <td>${opStatusBadge(r.status)}</td>
+    </tr>`).join('')}
+    </tbody>
+  </table></div>`:''}`;
 }
 
 // ---- ФИНАНСИСТ ----
