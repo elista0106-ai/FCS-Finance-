@@ -2840,6 +2840,13 @@ async function saveEntry(){
   closeModal();
   await loadEntries();
   showToast(editId ? '✓ Запись обновлена' : '✓ Запись добавлена');
+  // Если создавали с вкладки «⚡ Новая заявка» — переходим в журнал исполнителя
+  if(!editId && activeTab === 'new-request'){
+    switchTabMenu('executor-journal', '📋 Мой журнал');
+  } else {
+    // Иначе перерисуем активную вкладку чтобы данные обновились в инбоксах/журнале
+    if(typeof switchTab==='function' && typeof activeTab!=='undefined') switchTab(activeTab);
+  }
 }
 
 async function cycleStatus(id){
@@ -5991,7 +5998,6 @@ async function renderAccountingInbox(){
   el.innerHTML='<div class="empty">Загрузка...</div>';
   // Читаем входящие заявки из entries (единственный источник правды)
   const inbox = (entries||[]).filter(e=>
-    e.from_form===true &&
     (e.status==='pending' || e.status==='revision') &&
     INBOX_TYPES_ACCOUNTING.includes(e.agent_pay_type)
   ).sort((a,b)=>(b.created_at||b.date||'').localeCompare(a.created_at||a.date||''));
@@ -6071,7 +6077,6 @@ async function renderOperationsInbox(){
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
   const inbox = (entries||[]).filter(e=>
-    e.from_form===true &&
     (e.status==='pending' || e.status==='revision') &&
     INBOX_TYPES_OPERATIONS.includes(e.agent_pay_type)
   ).sort((a,b)=>(b.created_at||b.date||'').localeCompare(a.created_at||a.date||''));
@@ -6266,6 +6271,20 @@ window.selectCounterparty = function(id, name){
 };
 
 function renderNewRequest(){
+  const el = document.getElementById('new-req-content');
+  if(el){
+    el.innerHTML = `<div class="kpi-card" style="padding:24px;max-width:520px;text-align:center">
+      <div style="font-size:14px;font-weight:600;margin-bottom:8px">⚡ Новая заявка</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:16px">Открыто окно создания заявки.<br>Заполните и нажмите «Сохранить» — заявка появится в вашем журнале и в инбоксе у бухгалтера/операциониста.</div>
+      <button class="btn btn-primary" onclick="openAddEntry()">Открыть форму заявки</button>
+    </div>`;
+  }
+  // Сразу открываем стандартный модал заявки (как admin/manager при «Добавить»)
+  setTimeout(()=>{ if(typeof openAddEntry==='function') openAddEntry(); }, 50);
+}
+
+// LEGACY: старая двух-табная форма (renderNewRequest_v1) — оставлена для hot-revert
+function renderNewRequest_v1_legacy(){
   const el = document.getElementById('new-req-content');
   if(!el) return;
   const today = new Date().toISOString().split('T')[0];
