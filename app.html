@@ -2334,13 +2334,14 @@ function switchTab(t){
     if(b) b.classList.toggle('active', tab===t);
   });
 
-  // Скрываем/показываем фильтры — только для основного журнала
-  const journalTabs = ['main','loss','expense','corp','invoice','treasury','dept','days','clients'];
+  // Фильтры (поиск/статус/etc.) только для основного журнала «main и его подвкладки»
+  const mainJournalTabs = ['main','loss','expense','corp','invoice','treasury','dept','days','clients'];
   const filters = document.getElementById('main-filters');
-  if(filters) filters.style.display = journalTabs.includes(t)?'':'none';
-  // Месячный бар нужен только на журнальных вкладках
+  if(filters) filters.style.display = mainJournalTabs.includes(t)?'':'none';
+  // Месячный бар — на главном журнале и на ролевых журналах (operations/accounting/financier)
+  const tabsWithMonths = [...mainJournalTabs,'operations-journal','accounting-journal','financier-journal'];
   const monthBar = document.getElementById('month-bar');
-  if(monthBar) monthBar.style.display = journalTabs.includes(t)?'':'none';
+  if(monthBar) monthBar.style.display = tabsWithMonths.includes(t)?'':'none';
 
   // Рендерим нужный контент
   if(t==='treasury') renderTreasury();
@@ -2382,6 +2383,10 @@ function switchMonth(m){
   clearSelection();
   renderMonthBar([...new Set(entries.map(e=>getMonth(e.date)).filter(Boolean))].sort().reverse());
   renderAll();
+  // Если открыт ролевой журнал — перерисуем его под новый месяц
+  if(activeTab==='operations-journal') renderOperationsJournal();
+  else if(activeTab==='accounting-journal') renderAccountingJournal();
+  else if(activeTab==='financier-journal') renderFinancierJournal();
 }
 
 function addMonth(){
@@ -5971,13 +5976,8 @@ async function renderAccountingCorp(){
   ));
 }
 
-async function renderAccountingJournal(){
-  const el = document.getElementById('acc-journal-content');
-  if(!el) return;
-  el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data} = await (sb||window.sb).from('transactions').select('*')
-    .eq('processed_by_role','accounting').order('created_at',{ascending:false});
-  renderTransactionTable(el, data||[]);
+function renderAccountingJournal(){
+  renderRoleJournal('acc-journal-content', ['corp_card','invoice']);
 }
 
 // ---- ОПЕРАЦИОНИСТ ----
@@ -6008,13 +6008,8 @@ async function renderOperationsInbox(){
   ));
 }
 
-async function renderOperationsJournal(){
-  const el = document.getElementById('ops-journal-content');
-  if(!el) return;
-  el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data} = await (sb||window.sb).from('transactions').select('*')
-    .eq('processed_by_role','operations').order('created_at',{ascending:false});
-  renderTransactionTable(el, data||[]);
+function renderOperationsJournal(){
+  renderRoleJournal('ops-journal-content', ['card_rf','foreign_card','corp_card']);
 }
 
 // LEGACY: больше не маршрутизируется, оставлено для hot-revert
@@ -6526,12 +6521,46 @@ async function renderExecutorJournal(){
 }
 
 // ---- ФИНАНСИСТ ----
-async function renderFinancierJournal(){
-  const el = document.getElementById('fin-journal-content');
+function renderFinancierJournal(){
+  renderRoleJournal('fin-journal-content', null); // без фильтра — все заявки
+}
+
+// Универсальный рендер ролевого журнала: legacy таблица entries + фильтр по agent_pay_type
+function renderRoleJournal(containerId, payTypes){
+  const el = document.getElementById(containerId);
   if(!el) return;
-  el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data} = await (sb||window.sb).from('transactions').select('*').order('created_at',{ascending:false});
-  renderTransactionTable(el, data||[]);
+  let data = (entries||[]).filter(e=>getMonth(e.date)===activeMonth);
+  if(payTypes && payTypes.length){
+    data = data.filter(e=>payTypes.includes(e.agent_pay_type));
+  }
+  if(!data.length){
+    el.innerHTML=`<div class="empty">Нет заявок за ${activeMonth||'выбранный месяц'}</div>`;
+    return;
+  }
+  const totalAmt = data.reduce((s,e)=>s+(+e.amount||0),0);
+  const totalComm = data.reduce((s,e)=>s+(+e.commission||0),0);
+  const paid = data.filter(e=>e.status==='paid').length;
+  el.innerHTML = `
+  <div class="hr-metric-grid" style="margin-bottom:1rem">
+    <div class="hr-metric"><div class="hr-metric-lbl">Записей</div><div class="hr-metric-val">${data.length}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Оплачено</div><div class="hr-metric-val" style="color:var(--green)">${paid}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Сумма FCS</div><div class="hr-metric-val" style="font-size:16px;color:var(--accent)">${totalAmt.toLocaleString('ru-RU')} ₽</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Комиссия</div><div class="hr-metric-val" style="font-size:16px;color:var(--green)">${totalComm.toLocaleString('ru-RU')} ₽</div></div>
+  </div>
+  ${roleCard(roleTbl(
+    ['№ заявки','Дата','Отдел','Наименование','Сумма','Тип оплаты','Контрагент','Клиент','Статус'],
+    data.map(e=>`<tr>
+      <td>${e.link?`#${e.link}`:'—'}</td>
+      <td>${e.date||'—'}</td>
+      <td>${e.dept||'—'}</td>
+      <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.service||'—'}</td>
+      <td><b>${(+e.amount||0).toLocaleString('ru-RU')} ${e.currency||'₽'}</b></td>
+      <td style="font-size:11px">${AGENT_PAY[e.agent_pay_type]||e.agent_pay_type||'—'}</td>
+      <td>${e.agent||'—'}</td>
+      <td>${e.client_name||'—'}</td>
+      <td>${opStatusBadge(e.status==='paid'?'completed':e.status==='pending'?'pending':e.status)}</td>
+    </tr>`).join('')
+  ))}`;
 }
 
 function renderTransactionTable(el, txns){
