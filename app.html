@@ -1081,6 +1081,23 @@ tr:hover td{background:var(--bg2)}
         </div>
       </div>
     </div>
+<!-- Модал «Создать заявку из текста» — распознаёт пасту в поля -->
+<div class="modal-bg" id="text-import-modal" style="display:none" onclick="if(event.target===this)closeTextImportModal()">
+  <div class="modal" style="max-width:560px">
+    <h3>📋 Создать заявку из текста</h3>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px">
+      Вставьте сообщение или описание заявки — система попробует разобрать ФИО клиента, сумму, ссылку АМО, тип оплаты, отдел и наименование.
+    </div>
+    <textarea id="text-import-input" rows="9" placeholder="Пример:&#10;Иванов Иван — оформление визы в США 30 000 ₽ карта РФ&#10;https://conciergecom.amocrm.ru/leads/detail/27467042&#10;контрагент: ООО Виза-Сервис" style="width:100%;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);padding:10px;font-size:13px;font-family:inherit;resize:vertical;outline:none"></textarea>
+    <div id="text-import-preview" style="margin-top:10px;font-size:12px;color:var(--text3)"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)">
+      <button class="btn" onclick="closeTextImportModal()">Отмена</button>
+      <button class="btn" onclick="textImportPreview()">👁 Предпросмотр</button>
+      <button class="btn btn-primary" onclick="parseAndOpenEntry()">✨ Распознать и заполнить</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="modal" style="display:none">
 <div class="modal">
   <h3 id="modal-title">Новая заявка</h3>
@@ -6273,15 +6290,158 @@ window.selectCounterparty = function(id, name){
 function renderNewRequest(){
   const el = document.getElementById('new-req-content');
   if(el){
-    el.innerHTML = `<div class="kpi-card" style="padding:24px;max-width:520px;text-align:center">
+    el.innerHTML = `<div class="kpi-card" style="padding:24px;max-width:560px;text-align:center">
       <div style="font-size:14px;font-weight:600;margin-bottom:8px">⚡ Новая заявка</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:16px">Открыто окно создания заявки.<br>Заполните и нажмите «Сохранить» — заявка появится в вашем журнале и в инбоксе у бухгалтера/операциониста.</div>
-      <button class="btn btn-primary" onclick="openAddEntry()">Открыть форму заявки</button>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:16px">Два способа создать заявку:</div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="openAddEntry()">📝 Заполнить вручную</button>
+        <button class="btn" onclick="openTextImportModal()">📋 Создать из текста</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:14px">«Из текста» — вставьте описание из мессенджера / АМО, система разберёт его в поля.</div>
     </div>`;
   }
-  // Сразу открываем стандартный модал заявки (как admin/manager при «Добавить»)
+  // По умолчанию сразу открываем форму ручного ввода — самый частый сценарий
   setTimeout(()=>{ if(typeof openAddEntry==='function') openAddEntry(); }, 50);
 }
+
+// ===== «СОЗДАТЬ ЗАЯВКУ ИЗ ТЕКСТА» =====
+window.openTextImportModal = function(){
+  document.getElementById('text-import-input').value = '';
+  document.getElementById('text-import-preview').innerHTML = '';
+  document.getElementById('text-import-modal').style.display = 'flex';
+  setTimeout(()=>document.getElementById('text-import-input').focus(), 50);
+};
+window.closeTextImportModal = function(){
+  document.getElementById('text-import-modal').style.display = 'none';
+};
+
+// Парсер свободного текста → структура заявки (regex-эвристики)
+function parseTextToEntry(text){
+  const r = {};
+  if(!text) return r;
+  const tt = text.toLowerCase();
+
+  // Ссылка АМО (или просто число лида 7-12 цифр)
+  const amoMatch = text.match(/https?:\/\/[^\s]*amocrm\.ru\/leads\/(?:detail\/)?(\d+)/i);
+  if(amoMatch){ r.link = amoMatch[0]; r.lead_id = amoMatch[1]; }
+  else {
+    const idMatch = text.match(/\b(\d{7,12})\b/);
+    if(idMatch){ r.lead_id = idMatch[1]; r.link = 'https://conciergecom.amocrm.ru/leads/detail/'+idMatch[1]; }
+  }
+
+  // Суммы и валюта — первое совпадение
+  const amountRe = /(\d[\d\s .,]*)\s*(₽|руб(?:лей|ля)?|RUB|USD|EUR|AED|KZT|CNY|\$|€)/gi;
+  const amounts = [...text.matchAll(amountRe)];
+  if(amounts.length){
+    const raw = amounts[0][1].replace(/[\s ]/g,'').replace(/\.(?=\d{3}\b)/g,'').replace(',','.');
+    r.amount = parseFloat(raw);
+    const u = amounts[0][2].toUpperCase();
+    if(/USD|\$/.test(u)) r.currency='USD';
+    else if(/EUR|€/.test(u)) r.currency='EUR';
+    else if(/AED/.test(u)) r.currency='AED';
+    else if(/KZT/.test(u)) r.currency='KZT';
+    else if(/CNY/.test(u)) r.currency='CNY';
+    else r.currency='RUB';
+  }
+
+  // ФИО клиента
+  const fioMatch = text.match(/[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+(?:\s+[А-ЯЁ][а-яё]+)?/);
+  if(fioMatch) r.client_name = fioMatch[0];
+
+  // Контрагент: ищем «контрагент: …» или «поставщик: …»
+  const agentMatch = text.match(/(?:контрагент|поставщик|оплатить\s+в?|кому платим)\s*[:\-—]\s*([^\n]+)/i);
+  if(agentMatch) r.agent = agentMatch[1].trim().replace(/[.,;]+$/,'');
+
+  // Тип оплаты контрагенту (agent_pay_type)
+  if(/по\s*счёт|счет\s|счёт\s|по\s*счету|invoice/i.test(text)) r.agent_pay_type = 'invoice';
+  else if(/корп(?:о|ор)?\s*кар|corp/i.test(text)) r.agent_pay_type = 'corp_card';
+  else if(/иностр|зарубеж|foreign|за\s*рубеж/i.test(text)) r.agent_pay_type = 'foreign_card';
+  else if(/карт(?:а|у|ой|е)\s*р[фf]|карт\s*рос|card_rf|перевод\s*на\s*карт/i.test(text)) r.agent_pay_type = 'card_rf';
+  else if(/налич|cash/i.test(text)) r.agent_pay_type = 'cash';
+
+  // Отдел (dept)
+  if(/travel|путешеств|авиа|отель|hotel|перел[её]т|виза/i.test(tt)) r.dept = 'travel';
+  else if(/logistic|логист|доставк|покупк|курьер/i.test(tt)) r.dept = 'logistic';
+  else if(/lifestyle|лайфстайл|концерт|театр|ресторан|шоу/i.test(tt)) r.dept = 'lifestyle';
+  else if(/kbr|кбр|косметол|медицин|клиник/i.test(tt)) r.dept = 'kbr';
+  else if(/корп|company|компани/i.test(tt)) r.dept = 'corp';
+
+  // Способ оплаты от клиента (pay)
+  if(/ссылк[ауеи]|по\s*ссылк|payment\s*link/i.test(tt)) r.pay = 'link';
+  else if(/\bqr\b|кьюар|qr-код|qr\s*код/i.test(tt)) r.pay = 'qr';
+
+  // Наименование/услуга — берём первую длинную строку без ссылки и без явных меток
+  let svc = text
+    .replace(/https?:\/\/\S+/g,'')
+    .split('\n').map(s=>s.trim()).filter(Boolean)[0] || '';
+  // Удалим начальную ФИО + тире, если она есть в начале
+  if(r.client_name && svc.startsWith(r.client_name)){
+    svc = svc.slice(r.client_name.length).replace(/^[\s\-—:,]+/,'').trim();
+  }
+  // Удалим суммы из текста сервиса
+  if(amounts.length){
+    amounts.forEach(m=>{ svc = svc.replace(m[0],'').trim(); });
+  }
+  svc = svc.replace(/\s{2,}/g,' ');
+  if(svc.length>140) svc = svc.slice(0,140).trim()+'…';
+  if(svc) r.service = svc;
+
+  return r;
+}
+
+window.textImportPreview = function(){
+  const text = document.getElementById('text-import-input').value;
+  const parsed = parseTextToEntry(text);
+  const previewEl = document.getElementById('text-import-preview');
+  if(!Object.keys(parsed).length){
+    previewEl.innerHTML = '<span style="color:var(--red)">Не удалось ничего распознать. Попробуйте добавить деталей: ФИО, сумма, ссылка АМО, тип оплаты.</span>';
+    return;
+  }
+  const rows = [];
+  if(parsed.service)        rows.push(['Наименование', parsed.service]);
+  if(parsed.client_name)    rows.push(['Клиент', parsed.client_name]);
+  if(parsed.agent)          rows.push(['Контрагент', parsed.agent]);
+  if(parsed.amount)         rows.push(['Сумма', parsed.amount.toLocaleString('ru-RU')+' '+(parsed.currency||'RUB')]);
+  if(parsed.agent_pay_type) rows.push(['Тип оплаты', AGENT_PAY[parsed.agent_pay_type]||parsed.agent_pay_type]);
+  if(parsed.dept)           rows.push(['Отдел', parsed.dept]);
+  if(parsed.pay)            rows.push(['Получение', parsed.pay]);
+  if(parsed.lead_id)        rows.push(['Лид АМО', parsed.lead_id]);
+  previewEl.innerHTML = `<div style="background:var(--bg3);padding:10px;border-radius:var(--radius-sm)">
+    <div style="font-weight:500;color:var(--text);margin-bottom:6px">Распознано:</div>
+    ${rows.map(([k,v])=>`<div style="margin:2px 0"><span style="color:var(--text3)">${k}: </span>${v}</div>`).join('')}
+  </div>`;
+};
+
+window.parseAndOpenEntry = function(){
+  const text = document.getElementById('text-import-input').value;
+  const parsed = parseTextToEntry(text);
+  closeTextImportModal();
+  // Открываем стандартный модал и заполняем поля распознанным
+  openAddEntry();
+  setTimeout(()=>{
+    if(parsed.service)        document.getElementById('m-service').value = parsed.service;
+    if(parsed.client_name)    document.getElementById('m-client-name').value = parsed.client_name;
+    if(parsed.agent)          document.getElementById('m-agent').value = parsed.agent;
+    if(parsed.amount)         document.getElementById('m-amount').value = parsed.amount;
+    if(parsed.currency && parsed.currency!=='RUB'){
+      const cs = document.getElementById('m-agent-currency');
+      if(cs){ cs.value = parsed.currency; if(typeof onCurrencyChange==='function') onCurrencyChange(); }
+    }
+    if(parsed.amount){
+      // если сумма указана — это сумма FCS, скорее всего она же расход (можно поправить вручную)
+      const aa = document.getElementById('m-agent-amount');
+      if(aa && !aa.value) aa.value = parsed.amount;
+    }
+    if(parsed.agent_pay_type)  document.getElementById('m-agent-pay-type').value = parsed.agent_pay_type;
+    if(parsed.dept)            document.getElementById('m-dept').value = parsed.dept;
+    if(parsed.pay)             document.getElementById('m-pay').value = parsed.pay;
+    if(parsed.link)            document.getElementById('m-link').value = parsed.link;
+    // Триггерим перерасчёт калькулятора
+    if(typeof calcModal==='function') calcModal();
+    if(typeof onAgentPayChange==='function') onAgentPayChange();
+    showToast('✨ Поля заполнены из текста — проверьте и сохраните');
+  }, 100);
+};
 
 // LEGACY: старая двух-табная форма (renderNewRequest_v1) — оставлена для hot-revert
 function renderNewRequest_v1_legacy(){
