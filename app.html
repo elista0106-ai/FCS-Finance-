@@ -392,6 +392,8 @@ tr:hover td{background:var(--bg2)}
     <button class="rs-btn" onclick="switchViewRole('financier')">📊 Финансист</button>
     <button class="rs-btn" onclick="switchViewRole('hr')">👥 НР</button>
     <button class="rs-btn" onclick="switchViewRole('partner_manager')">🤝 Партнёры</button>
+    <button class="rs-btn" onclick="switchViewRole('account_manager')">💼 Аккаунт</button>
+    <button class="rs-btn" onclick="switchViewRole('contract_manager')">📄 Договорной</button>
     <button class="rs-btn" onclick="switchViewRole('admin')" style="margin-left:auto">✕ Сбросить</button>
   </div>
 
@@ -1055,6 +1057,14 @@ tr:hover td{background:var(--bg2)}
     <div id="view-executor-journal" style="display:none"><div class="content"><div id="exec-journal-content"></div></div></div>
     <div id="view-partner-operations" style="display:none"><div class="content"><div id="partner-ops-content"></div></div></div>
     <div id="view-partner-deposits" style="display:none"><div class="content"><div id="partner-dep-content"></div></div></div>
+    <!-- Аккаунт-менеджер -->
+    <div id="view-cp-new-request" style="display:none"><div class="content"><div id="cp-new-req-content"></div></div></div>
+    <div id="view-cp-my-requests" style="display:none"><div class="content"><div id="cp-my-req-content"></div></div></div>
+    <!-- Договорной отдел -->
+    <div id="view-cp-inbox" style="display:none"><div class="content"><div id="cp-inbox-content"></div></div></div>
+    <div id="view-cp-list" style="display:none"><div class="content"><div id="cp-list-content"></div></div></div>
+    <div id="view-cp-contracts" style="display:none"><div class="content"><div id="cp-contracts-content"></div></div></div>
+    <div id="view-cp-history" style="display:none"><div class="content"><div id="cp-history-content"></div></div></div>
     <!-- Финансист -->
     <div id="view-financier-journal" style="display:none"><div class="content"><div id="fin-journal-content"></div></div></div>
     <div id="view-financier-kpi" style="display:none"><div class="content"><div id="fin-kpi-content"></div></div></div>
@@ -2149,20 +2159,18 @@ window.switchViewRole = function(role){
   }
 
   const roleNames = {
-    executor:'👤 Исполнитель',
-    accounting:'📒 Бухгалтерия',
-    operations:'⚙️ Операционист',
-    financier:'📊 Финансист',
-    hr:'👥 НР',
-    partner_manager:'🤝 Партнёрский менеджер'
+    executor:'👤 Исполнитель', accounting:'📒 Бухгалтерия',
+    operations:'⚙️ Операционист', financier:'📊 Финансист',
+    hr:'👥 НР', partner_manager:'🤝 Партнёрский менеджер',
+    account_manager:'💼 Аккаунт-менеджер',
+    contract_manager:'📄 Договорной отдел'
   };
   const defaultTabs = {
-    executor:'operations-form',
-    accounting:'accounting-inbox',
-    operations:'operations-inbox',
-    financier:'financier-journal',
-    hr:'hr',
-    partner_manager:'partners'
+    executor:'operations-form', accounting:'accounting-inbox',
+    operations:'operations-inbox', financier:'financier-journal',
+    hr:'hr', partner_manager:'partners',
+    account_manager:'cp-new-request',
+    contract_manager:'cp-inbox'
   };
 
   if(titleEl) titleEl.textContent = roleNames[role]||'';
@@ -2245,6 +2253,18 @@ function buildRoleMenu(role){
       {id:'partner-operations',label:'📋 Операции по партнёрам'},
       {id:'partner-deposits',label:'💰 Депозиты'},
     ],
+    account_manager: [
+      {group:'Контрагенты'},
+      {id:'cp-new-request',label:'➕ Новая заявка на контрагента'},
+      {id:'cp-my-requests',label:'📋 Мои заявки'},
+    ],
+    contract_manager: [
+      {group:'Договорной отдел'},
+      {id:'cp-inbox',label:'📥 Входящие заявки'},
+      {id:'cp-list',label:'📋 Все контрагенты'},
+      {id:'cp-contracts',label:'📄 Договоры'},
+      {id:'cp-history',label:'🕐 История изменений'},
+    ],
     viewer: [
       {group:'Журнал'},
       {id:'main',label:'📋 Все заявки'},
@@ -2301,7 +2321,8 @@ function switchTab(t){
     'accounting-inbox','accounting-requests','accounting-corp','accounting-journal',
     'operations-inbox','operations-journal','operations-request','operations-form',
     'financier-journal','financier-kpi','financier-commission','financier-cost','financier-analytics','financier-deposits',
-    'executor-journal','partner-operations','partner-deposits'
+    'executor-journal','partner-operations','partner-deposits',
+    'cp-new-request','cp-my-requests','cp-inbox','cp-list','cp-contracts','cp-history'
   ];
 
   allTabs.forEach(tab=>{
@@ -2334,6 +2355,12 @@ function switchTab(t){
   else if(t==='executor-journal') renderExecutorJournal();
   else if(t==='partner-operations') renderPartnerOperations();
   else if(t==='partner-deposits') renderPartnerDeposits();
+  else if(t==='cp-new-request') renderCPNewRequest();
+  else if(t==='cp-my-requests') renderCPMyRequests();
+  else if(t==='cp-inbox') renderCPInbox();
+  else if(t==='cp-list') renderCPList();
+  else if(t==='cp-contracts') renderCPContracts();
+  else if(t==='cp-history') renderCPHistory();
   else if(t==='financier-journal') renderFinancierJournal();
   else if(t==='financier-kpi') renderFinancierKPI();
   else if(t==='financier-commission') renderFinancierCommission();
@@ -6385,17 +6412,464 @@ async function renderPartnerDeposits(){
   </table></div>`;
 }
 
-// Обновляем метку роли партнёрского менеджера
+// Обновляем метку роли
+const _cpRoleMap = {
+  admin:'👑 Админ', manager:'✏️ Менеджер', viewer:'👁 Просмотр',
+  executor:'👤 Исполнитель', accounting:'📒 Бухгалтерия',
+  operations:'⚙️ Операционист', financier:'📊 Финансист',
+  hr:'👥 НР', partner_manager:'🤝 Партнёрский менеджер',
+  account_manager:'💼 Аккаунт-менеджер',
+  contract_manager:'📄 Договорной отдел'
+};
 document.addEventListener('DOMContentLoaded',()=>{
-  const roleMap = {
-    admin:'👑 Админ', manager:'✏️ Менеджер', viewer:'👁 Просмотр',
-    executor:'👤 Исполнитель', accounting:'📒 Бухгалтерия',
-    operations:'⚙️ Операционист', financier:'📊 Финансист',
-    hr:'👥 НР', partner_manager:'🤝 Партнёрский менеджер'
-  };
   const el = document.getElementById('user-role');
-  if(el && currentProfile?.role) el.textContent = roleMap[currentProfile.role]||currentProfile.role;
+  if(el && currentProfile?.role) el.textContent = _cpRoleMap[currentProfile.role]||currentProfile.role;
 });
+
+// ============================================================
+// COUNTERPARTY MODULE
+// ============================================================
+
+const CP_PARTNER_TYPES = {client:'Клиент',agent:'Агент',supplier:'Поставщик',subcontractor:'Субподрядчик'};
+const CP_STATUS_MAP = {pending:'⏳ На проверке',active:'✅ Активен',blocked:'🚫 Заблокирован',rejected:'❌ Отклонён'};
+const CP_STATUS_COL = {
+  pending:{bg:'#FAEEDA',cl:'#633806'},active:{bg:'#EAF3DE',cl:'#27500A'},
+  blocked:{bg:'#FCEBEB',cl:'#791F1F'},rejected:{bg:'#F1EFE8',cl:'#444441'}
+};
+const CP_REQ_STATUS = {pending:'⏳ Ожидает',approved:'✅ Одобрено',rejected:'❌ Отклонено',revision:'↩ На доработку'};
+
+function cpStatusBadge(s){
+  const c=CP_STATUS_COL[s]||{bg:'#F1EFE8',cl:'#444'};
+  return `<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${c.bg};color:${c.cl}">${CP_STATUS_MAP[s]||s}</span>`;
+}
+function cpReqBadge(s){
+  const col={pending:'#FAEEDA',approved:'#EAF3DE',rejected:'#FCEBEB',revision:'#EEEDFE'};
+  const txt={pending:'#633806',approved:'#27500A',rejected:'#791F1F',revision:'#3C3489'};
+  return `<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${col[s]||'#F1EFE8'};color:${txt[s]||'#444'}">${CP_REQ_STATUS[s]||s}</span>`;
+}
+
+// ---- ФОРМА ЗАЯВКИ (Аккаунт-менеджер) ----
+function renderCPNewRequest(){
+  const el=document.getElementById('cp-new-req-content');
+  if(!el) return;
+  el.innerHTML=`<div style="max-width:680px">
+    <div style="font-size:15px;font-weight:500;margin-bottom:16px">➕ Заявка на добавление контрагента</div>
+    <div class="kpi-card" style="padding:16px;margin-bottom:12px">
+      <div class="kpi-sec" style="margin-top:0">Юридические данные</div>
+      <div class="grid2">
+        <div class="field"><label>Полное наименование *</label><input id="cp-full-name" placeholder="ООО «Ромашка»"></div>
+        <div class="field"><label>Краткое наименование *</label><input id="cp-short-name" placeholder="«Ромашка»"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>ИНН *</label><input id="cp-inn" placeholder="10-12 цифр" maxlength="12"></div>
+        <div class="field"><label>КПП</label><input id="cp-kpp" placeholder="9 цифр" maxlength="9"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>ОГРН / ОГРНИП *</label><input id="cp-ogrn" placeholder="13 или 15 цифр"></div>
+        <div class="field"><label>Тип партнёра *</label>
+          <select id="cp-type"><option value="">— выбрать —</option>
+            <option value="client">Клиент</option><option value="agent">Агент</option>
+            <option value="supplier">Поставщик</option><option value="subcontractor">Субподрядчик</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Юридический адрес *</label><input id="cp-legal-addr" placeholder="Индекс, город, улица, дом"></div>
+      <div class="field"><label>Фактический адрес</label><input id="cp-fact-addr" placeholder="Если отличается от юридического"></div>
+    </div>
+    <div class="kpi-card" style="padding:16px;margin-bottom:12px">
+      <div class="kpi-sec" style="margin-top:0">Банковские реквизиты</div>
+      <div class="grid2">
+        <div class="field"><label>Расчётный счёт *</label><input id="cp-bank-acc" placeholder="20 цифр" maxlength="20"></div>
+        <div class="field"><label>БИК *</label><input id="cp-bik" placeholder="9 цифр" maxlength="9"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Банк *</label><input id="cp-bank-name" placeholder="Наименование банка"></div>
+        <div class="field"><label>Корр. счёт *</label><input id="cp-corr-acc" placeholder="20 цифр" maxlength="20"></div>
+      </div>
+    </div>
+    <div class="kpi-card" style="padding:16px;margin-bottom:12px">
+      <div class="kpi-sec" style="margin-top:0">Контактные данные</div>
+      <div class="grid2">
+        <div class="field"><label>Контактное лицо *</label><input id="cp-contact-name" placeholder="ФИО"></div>
+        <div class="field"><label>Должность</label><input id="cp-contact-pos" placeholder="Генеральный директор"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Телефон *</label><input id="cp-contact-phone" placeholder="+7 ..."></div>
+        <div class="field"><label>Email *</label><input id="cp-contact-email" placeholder="email@example.com"></div>
+      </div>
+    </div>
+    <div class="kpi-card" style="padding:16px;margin-bottom:12px">
+      <div class="kpi-sec" style="margin-top:0">Договорная информация</div>
+      <div class="grid2">
+        <div class="field"><label>Ставка комиссии</label>
+          <div style="display:flex;gap:6px">
+            <input type="number" id="cp-commission" placeholder="0" style="flex:1">
+            <select id="cp-commission-type" style="width:80px"><option value="percent">%</option><option value="fixed">₽ фикс</option></select>
+          </div>
+        </div>
+        <div class="field"><label>Валюта</label>
+          <select id="cp-currency"><option value="RUB">RUB</option><option value="USD">USD</option><option value="EUR">EUR</option><option value="CNY">CNY</option></select>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Дата начала</label><input type="date" id="cp-coop-start"></div>
+        <div class="field"><label>Дата окончания</label><input type="date" id="cp-coop-end"></div>
+      </div>
+      <div class="field"><label>Примечание</label><textarea id="cp-note" rows="2"></textarea></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="submitCPRequest()">📤 Отправить в Договорной отдел</button>
+      <button class="btn" onclick="resetCPForm()">Очистить</button>
+    </div>
+  </div>`;
+}
+
+function resetCPForm(){
+  ['cp-full-name','cp-short-name','cp-inn','cp-kpp','cp-ogrn','cp-legal-addr','cp-fact-addr',
+   'cp-bank-acc','cp-bik','cp-bank-name','cp-corr-acc','cp-contact-name','cp-contact-pos',
+   'cp-contact-phone','cp-contact-email','cp-commission','cp-note','cp-coop-start','cp-coop-end'
+  ].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const t=document.getElementById('cp-type'); if(t) t.value='';
+  const c=document.getElementById('cp-currency'); if(c) c.value='RUB';
+}
+
+async function submitCPRequest(){
+  const required={'cp-full-name':'Полное наименование','cp-short-name':'Краткое наименование',
+    'cp-inn':'ИНН','cp-ogrn':'ОГРН','cp-legal-addr':'Юридический адрес',
+    'cp-bank-acc':'Расчётный счёт','cp-bik':'БИК','cp-bank-name':'Банк',
+    'cp-corr-acc':'Корр. счёт','cp-contact-name':'Контактное лицо',
+    'cp-contact-phone':'Телефон','cp-contact-email':'Email'};
+  for(const [id,label] of Object.entries(required)){
+    if(!document.getElementById(id)?.value.trim()){alert(`Заполните: ${label}`);return;}
+  }
+  if(!document.getElementById('cp-type')?.value){alert('Выберите тип партнёра');return;}
+  const data={
+    created_by:currentUser.id,
+    full_name:document.getElementById('cp-full-name').value.trim(),
+    short_name:document.getElementById('cp-short-name').value.trim(),
+    inn:document.getElementById('cp-inn').value.trim(),
+    kpp:document.getElementById('cp-kpp').value.trim()||null,
+    ogrn:document.getElementById('cp-ogrn').value.trim(),
+    legal_address:document.getElementById('cp-legal-addr').value.trim(),
+    fact_address:document.getElementById('cp-fact-addr').value.trim()||null,
+    bank_account:document.getElementById('cp-bank-acc').value.trim(),
+    bik:document.getElementById('cp-bik').value.trim(),
+    bank_name:document.getElementById('cp-bank-name').value.trim(),
+    corr_account:document.getElementById('cp-corr-acc').value.trim(),
+    contact_name:document.getElementById('cp-contact-name').value.trim(),
+    contact_position:document.getElementById('cp-contact-pos').value.trim()||null,
+    contact_phone:document.getElementById('cp-contact-phone').value.trim(),
+    contact_email:document.getElementById('cp-contact-email').value.trim(),
+    partner_type:document.getElementById('cp-type').value,
+    commission_rate:parseFloat(document.getElementById('cp-commission').value)||0,
+    commission_type:document.getElementById('cp-commission-type').value,
+    currency:document.getElementById('cp-currency').value,
+    cooperation_start:document.getElementById('cp-coop-start').value||null,
+    cooperation_end:document.getElementById('cp-coop-end').value||null,
+    note:document.getElementById('cp-note').value.trim()||null,
+    status:'pending'
+  };
+  const {error}=await (sb||window.sb).from('counterparty_requests').insert(data);
+  if(error){alert('Ошибка: '+error.message);return;}
+  showToast('✅ Заявка отправлена в Договорной отдел!');
+  resetCPForm();
+  switchTabMenu('cp-my-requests','📋 Мои заявки');
+}
+
+// ---- МОИ ЗАЯВКИ ----
+async function renderCPMyRequests(){
+  const el=document.getElementById('cp-my-req-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data}=await (sb||window.sb).from('counterparty_requests')
+    .select('*').eq('created_by',currentUser.id).order('created_at',{ascending:false});
+  if(!data?.length){el.innerHTML='<div class="empty">Заявок нет. Создайте первую.</div>';return;}
+  el.innerHTML=`<div class="kpi-card" style="padding:0;overflow:hidden">
+  <table class="hr-tbl">
+    <thead><tr><th>Дата</th><th>Контрагент</th><th>ИНН</th><th>Тип</th><th>Статус</th><th>Комментарий</th></tr></thead>
+    <tbody>${data.map(r=>`<tr>
+      <td>${r.created_at?.split('T')[0]||'—'}</td>
+      <td style="font-weight:500">${r.full_name}</td>
+      <td>${r.inn||'—'}</td>
+      <td style="font-size:11px">${CP_PARTNER_TYPES[r.partner_type]||'—'}</td>
+      <td>${cpReqBadge(r.status)}</td>
+      <td style="font-size:11px;color:${r.status==='revision'?'var(--purple)':r.status==='rejected'?'var(--red)':'var(--text3)'}">${r.reject_reason||'—'}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+// ---- ВХОДЯЩИЕ (Договорной отдел) ----
+async function renderCPInbox(){
+  const el=document.getElementById('cp-inbox-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data}=await (sb||window.sb).from('counterparty_requests')
+    .select('*').in('status',['pending','revision']).order('created_at',{ascending:false});
+  const list=data||[];
+  if(!list.length){el.innerHTML='<div class="empty">Новых заявок нет</div>';return;}
+  el.innerHTML=`<div class="kpi-card" style="padding:0;overflow:hidden">
+  <table class="hr-tbl">
+    <thead><tr><th>Дата</th><th>Контрагент</th><th>ИНН</th><th>ОГРН</th><th>Тип</th><th>Статус</th><th></th></tr></thead>
+    <tbody>${list.map(r=>`<tr>
+      <td>${r.created_at?.split('T')[0]||'—'}</td>
+      <td style="font-weight:500">${r.full_name}</td>
+      <td>${r.inn||'—'}</td>
+      <td style="color:var(--text2)">${r.ogrn||'—'}</td>
+      <td style="font-size:11px">${CP_PARTNER_TYPES[r.partner_type]||'—'}</td>
+      <td>${cpReqBadge(r.status)}</td>
+      <td><button class="btn btn-sm" onclick="cpOpenReview('${r.id}')">Рассмотреть</button></td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+window.cpOpenReview=async function(id){
+  const {data:r}=await (sb||window.sb).from('counterparty_requests').select('*').eq('id',id).single();
+  if(!r) return;
+  const ex=document.getElementById('cp-review-modal');if(ex)ex.remove();
+  const bg=document.createElement('div');
+  bg.id='cp-review-modal';bg.className='modal-bg';bg.style.display='flex';
+  bg.innerHTML=`<div class="modal" style="max-width:640px;max-height:90vh;overflow-y:auto">
+    <h3>${r.full_name}</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:14px">
+      <div><span style="color:var(--text3)">ИНН: </span><b>${r.inn||'—'}</b></div>
+      <div><span style="color:var(--text3)">ОГРН: </span><b>${r.ogrn||'—'}</b></div>
+      <div><span style="color:var(--text3)">КПП: </span>${r.kpp||'—'}</div>
+      <div><span style="color:var(--text3)">Тип: </span>${CP_PARTNER_TYPES[r.partner_type]||'—'}</div>
+      <div><span style="color:var(--text3)">Юр. адрес: </span>${r.legal_address||'—'}</div>
+      <div><span style="color:var(--text3)">Банк: </span>${r.bank_name||'—'}</div>
+      <div><span style="color:var(--text3)">БИК: </span>${r.bik||'—'}</div>
+      <div><span style="color:var(--text3)">Р/с: </span>${r.bank_account||'—'}</div>
+      <div><span style="color:var(--text3)">К/с: </span>${r.corr_account||'—'}</div>
+      <div><span style="color:var(--text3)">Контакт: </span>${r.contact_name||'—'}</div>
+      <div><span style="color:var(--text3)">Тел: </span>${r.contact_phone||'—'}</div>
+      <div><span style="color:var(--text3)">Email: </span>${r.contact_email||'—'}</div>
+      <div><span style="color:var(--text3)">Комиссия: </span>${r.commission_rate||0}${r.commission_type==='percent'?'%':' ₽'}</div>
+      <div><span style="color:var(--text3)">Валюта: </span>${r.currency||'RUB'}</div>
+    </div>
+    ${r.note?`<div style="font-size:12px;padding:8px;background:var(--bg3);border-radius:6px;margin-bottom:12px">${r.note}</div>`:''}
+    <div class="field" style="margin-bottom:12px">
+      <label>Комментарий (при отклонении / доработке)</label>
+      <textarea id="cp-review-comment" rows="2" placeholder="Укажите причину или что исправить..."></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;border-top:0.5px solid var(--border);padding-top:12px">
+      <button class="btn" onclick="document.getElementById('cp-review-modal').remove()">Закрыть</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="color:var(--red)" onclick="cpDecideRequest('${id}','rejected')">❌ Отклонить</button>
+        <button class="btn" style="color:var(--purple)" onclick="cpDecideRequest('${id}','revision')">↩ На доработку</button>
+        <button class="btn btn-primary" onclick="cpDecideRequest('${id}','approved')">✅ Одобрить</button>
+      </div>
+    </div>
+  </div>`;
+  bg.addEventListener('click',e=>{if(e.target===bg)bg.remove();});
+  document.body.appendChild(bg);
+};
+
+window.cpDecideRequest=async function(id,decision){
+  const comment=document.getElementById('cp-review-comment')?.value.trim()||'';
+  if(['rejected','revision'].includes(decision)&&!comment){alert('Укажите комментарий');return;}
+  const sbC=sb||window.sb;
+  await sbC.from('counterparty_requests').update({
+    status:decision,
+    reject_reason:['rejected','revision'].includes(decision)?comment:null,
+    reviewed_by:currentUser.id,reviewed_at:new Date().toISOString()
+  }).eq('id',id);
+  if(decision==='approved'){
+    const {data:req}=await sbC.from('counterparty_requests').select('*').eq('id',id).single();
+    if(req){
+      const {data:cp}=await sbC.from('counterparties').insert({
+        full_name:req.full_name,short_name:req.short_name,inn:req.inn,kpp:req.kpp,ogrn:req.ogrn,
+        legal_address:req.legal_address,fact_address:req.fact_address,
+        bank_account:req.bank_account,bank_name:req.bank_name,bik:req.bik,corr_account:req.corr_account,
+        contact_name:req.contact_name,contact_position:req.contact_position,
+        contact_phone:req.contact_phone,contact_email:req.contact_email,
+        partner_type:req.partner_type,commission_rate:req.commission_rate,
+        commission_type:req.commission_type,currency:req.currency,
+        cooperation_start:req.cooperation_start,cooperation_end:req.cooperation_end,
+        note:req.note,status:'active',created_by:req.created_by,
+        activated_by:currentUser.id,activated_at:new Date().toISOString()
+      }).select().single();
+      if(cp){
+        await sbC.from('counterparty_requests').update({counterparty_id:cp.id}).eq('id',id);
+        await sbC.from('counterparty_history').insert({
+          counterparty_id:cp.id,changed_by:currentUser.id,
+          change_type:'status_change',old_value:'pending',new_value:'active',
+          comment:'Активирован после проверки'
+        });
+      }
+    }
+  }
+  document.getElementById('cp-review-modal')?.remove();
+  const msgs={approved:'✅ Контрагент активирован!',rejected:'❌ Отклонено',revision:'↩ На доработку'};
+  showToast(msgs[decision]);
+  renderCPInbox();
+};
+
+// ---- СПИСОК КОНТРАГЕНТОВ ----
+async function renderCPList(){
+  const el=document.getElementById('cp-list-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data}=await (sb||window.sb).from('counterparties').select('*').order('full_name');
+  window._cpAllList=data||[];
+  el.innerHTML=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <input id="cp-search" placeholder="🔍 Поиск..." oninput="cpFilterList()" style="padding:6px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);font-size:12px;width:220px">
+    <select id="cp-status-filter" onchange="cpFilterList()" style="padding:6px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);font-size:12px">
+      <option value="">Все статусы</option><option value="active">Активен</option>
+      <option value="pending">На проверке</option><option value="blocked">Заблокирован</option>
+    </select>
+  </div><div id="cp-list-table">${cpRenderTable(data||[])}</div>`;
+}
+
+window.cpFilterList=function(){
+  const q=document.getElementById('cp-search')?.value.toLowerCase()||'';
+  const s=document.getElementById('cp-status-filter')?.value||'';
+  const f=(window._cpAllList||[]).filter(c=>{
+    if(s&&c.status!==s) return false;
+    if(q&&!c.full_name.toLowerCase().includes(q)&&!(c.inn||'').includes(q)) return false;
+    return true;
+  });
+  const el=document.getElementById('cp-list-table');
+  if(el) el.innerHTML=cpRenderTable(f);
+};
+
+function cpRenderTable(list){
+  if(!list.length) return '<div class="empty">Контрагенты не найдены</div>';
+  return `<div class="kpi-card" style="padding:0;overflow:hidden">
+  <table class="hr-tbl">
+    <thead><tr><th>Контрагент</th><th>ИНН</th><th>Тип</th><th>Контакт</th><th>Валюта</th><th>Статус</th><th></th></tr></thead>
+    <tbody>${list.map(c=>`<tr>
+      <td><div style="font-weight:500">${c.full_name}</div><div style="font-size:11px;color:var(--text3)">${c.short_name||''}</div></td>
+      <td>${c.inn||'—'}</td>
+      <td style="font-size:11px">${CP_PARTNER_TYPES[c.partner_type]||'—'}</td>
+      <td style="font-size:11px"><div>${c.contact_name||'—'}</div><div style="color:var(--text3)">${c.contact_phone||''}</div></td>
+      <td>${c.currency||'RUB'}</td>
+      <td>${cpStatusBadge(c.status)}</td>
+      <td>${c.status==='active'
+        ?`<button class="btn btn-sm" style="color:var(--red);font-size:10px" onclick="cpChangeStatus('${c.id}','blocked')">Блок</button>`
+        :c.status==='blocked'
+        ?`<button class="btn btn-sm" style="font-size:10px" onclick="cpChangeStatus('${c.id}','active')">Активировать</button>`
+        :''}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+window.cpChangeStatus=async function(id,status){
+  if(!confirm(`Изменить статус на "${CP_STATUS_MAP[status]}"?`)) return;
+  const sbC=sb||window.sb;
+  const {data:old}=await sbC.from('counterparties').select('status').eq('id',id).single();
+  await sbC.from('counterparties').update({status,updated_at:new Date().toISOString()}).eq('id',id);
+  await sbC.from('counterparty_history').insert({
+    counterparty_id:id,changed_by:currentUser.id,
+    change_type:'status_change',old_value:old?.status,new_value:status
+  });
+  showToast('Статус обновлён');
+  renderCPList();
+};
+
+// ---- ДОГОВОРЫ ----
+async function renderCPContracts(){
+  const el=document.getElementById('cp-contracts-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data}=await (sb||window.sb).from('counterparty_contracts')
+    .select('*, counterparties(full_name)').order('created_at',{ascending:false});
+  const list=data||[];
+  const addBtn=`<div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="cpOpenAddContract()">+ Добавить договор</button></div>`;
+  if(!list.length){el.innerHTML=addBtn+'<div class="empty">Договоров нет</div>';return;}
+  el.innerHTML=addBtn+`<div class="kpi-card" style="padding:0;overflow:hidden">
+  <table class="hr-tbl">
+    <thead><tr><th>Контрагент</th><th>Номер</th><th>Тип</th><th>Начало</th><th>Окончание</th><th>Сумма</th><th>Статус</th></tr></thead>
+    <tbody>${list.map(c=>{
+      const sc={active:{bg:'#EAF3DE',cl:'#27500A',l:'Действует'},expired:{bg:'#FAEEDA',cl:'#633806',l:'Истёк'},terminated:{bg:'#FCEBEB',cl:'#791F1F',l:'Расторгнут'}};
+      const s=sc[c.status]||{bg:'#F1EFE8',cl:'#444',l:c.status};
+      return `<tr>
+        <td style="font-weight:500">${c.counterparties?.full_name||'—'}</td>
+        <td>${c.contract_number||'—'}</td>
+        <td style="font-size:11px">${c.contract_type||'—'}</td>
+        <td>${c.start_date||'—'}</td><td>${c.end_date||'—'}</td>
+        <td>${c.amount?(+c.amount).toLocaleString('ru-RU')+' '+c.currency:'—'}</td>
+        <td><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:${s.bg};color:${s.cl}">${s.l}</span></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
+
+window.cpOpenAddContract=async function(){
+  const {data:cps}=await (sb||window.sb).from('counterparties').select('id,full_name').eq('status','active');
+  const list=cps||[];
+  const ex=document.getElementById('cp-contract-modal');if(ex)ex.remove();
+  const bg=document.createElement('div');
+  bg.id='cp-contract-modal';bg.className='modal-bg';bg.style.display='flex';
+  bg.innerHTML=`<div class="modal">
+    <h3>Добавить договор</h3>
+    <div class="field"><label>Контрагент *</label>
+      <select id="cpc-cp">${list.length?list.map(c=>`<option value="${c.id}">${c.full_name}</option>`).join(''):'<option>Нет активных контрагентов</option>'}</select>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Номер договора</label><input id="cpc-num" placeholder="№ 001/2026"></div>
+      <div class="field"><label>Тип</label><input id="cpc-type" placeholder="Агентский, Поставки..."></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Начало</label><input type="date" id="cpc-start"></div>
+      <div class="field"><label>Окончание</label><input type="date" id="cpc-end"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Сумма</label><input type="number" id="cpc-amount" placeholder="0"></div>
+      <div class="field"><label>Валюта</label><select id="cpc-currency"><option>RUB</option><option>USD</option><option>EUR</option></select></div>
+    </div>
+    <div class="field"><label>Примечание</label><input id="cpc-note" placeholder="..."></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)">
+      <button class="btn" onclick="document.getElementById('cp-contract-modal').remove()">Отмена</button>
+      <button class="btn btn-primary" onclick="cpSaveContract()">Сохранить</button>
+    </div>
+  </div>`;
+  bg.addEventListener('click',e=>{if(e.target===bg)bg.remove();});
+  document.body.appendChild(bg);
+};
+
+window.cpSaveContract=async function(){
+  const cpId=document.getElementById('cpc-cp')?.value;
+  if(!cpId){alert('Выберите контрагента');return;}
+  await (sb||window.sb).from('counterparty_contracts').insert({
+    counterparty_id:cpId,
+    contract_number:document.getElementById('cpc-num')?.value.trim()||null,
+    contract_type:document.getElementById('cpc-type')?.value.trim()||null,
+    start_date:document.getElementById('cpc-start')?.value||null,
+    end_date:document.getElementById('cpc-end')?.value||null,
+    amount:parseFloat(document.getElementById('cpc-amount')?.value)||0,
+    currency:document.getElementById('cpc-currency')?.value||'RUB',
+    note:document.getElementById('cpc-note')?.value.trim()||null,
+    status:'active',created_by:currentUser.id
+  });
+  document.getElementById('cp-contract-modal')?.remove();
+  showToast('✅ Договор добавлен');
+  renderCPContracts();
+};
+
+// ---- ИСТОРИЯ ----
+async function renderCPHistory(){
+  const el=document.getElementById('cp-history-content');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Загрузка...</div>';
+  const {data}=await (sb||window.sb).from('counterparty_history')
+    .select('*, counterparties(full_name)').order('created_at',{ascending:false}).limit(100);
+  const list=data||[];
+  if(!list.length){el.innerHTML='<div class="empty">История пуста</div>';return;}
+  const typeMap={status_change:'Статус',field_update:'Поле',contract_added:'Договор'};
+  el.innerHTML=`<div class="kpi-card" style="padding:0;overflow:hidden">
+  <table class="hr-tbl">
+    <thead><tr><th>Дата</th><th>Контрагент</th><th>Изменение</th><th>Было</th><th>Стало</th><th>Комментарий</th></tr></thead>
+    <tbody>${list.map(h=>`<tr>
+      <td style="color:var(--text2)">${h.created_at?.split('T')[0]||'—'}</td>
+      <td>${h.counterparties?.full_name||'—'}</td>
+      <td style="font-size:11px">${typeMap[h.change_type]||h.change_type}</td>
+      <td style="color:var(--text2)">${h.old_value||'—'}</td>
+      <td style="font-weight:500">${h.new_value||'—'}</td>
+      <td style="font-size:11px;color:var(--text2)">${h.comment||'—'}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
 </script>
 </body>
 </html>
