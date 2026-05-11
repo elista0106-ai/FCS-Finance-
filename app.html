@@ -386,7 +386,8 @@ tr:hover td{background:var(--bg2)}
   </div>
 
   <!-- Month switcher -->
-  <div class="month-bar" id="month-bar"></div>
+  <!-- Старый month-bar удалён: выбор месяца теперь встроен в карточку «Месяц» в панели статистики -->
+
 
   <!-- Role switcher (только для admin) -->
   <div class="role-switcher-bar" id="role-switcher-bar">
@@ -1517,6 +1518,7 @@ function monthEntries(){ return entries.filter(e=>getMonth(e.date)===activeMonth
 
 function renderMonthBar(months){
   const bar = document.getElementById('month-bar');
+  if(!bar) return; // элемент удалён из DOM, рендерить некуда
   const monthNames = {
     '01':'Январь','02':'Февраль','03':'Март','04':'Апрель','05':'Май','06':'Июнь',
     '07':'Июль','08':'Август','09':'Сентябрь','10':'Октябрь','11':'Ноябрь','12':'Декабрь'
