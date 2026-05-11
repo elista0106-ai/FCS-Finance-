@@ -5889,9 +5889,11 @@ async function renderAccountingInbox(){
   const el = document.getElementById('acc-inbox-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data} = await (sb||window.sb).from('operations').select('*')
+  const {data, error} = await (sb||window.sb).from('operations').select('*')
     .eq('routed_to','accounting').order('created_at',{ascending:false});
+  if(error){ console.error('[acc-inbox] supabase error:', error); el.innerHTML=`<div class="empty" style="color:var(--red)">Ошибка: ${error.message}</div>`; return; }
   const ops = data||[];
+  console.log('[acc-inbox] rows:', ops.length, ops);
   if(!ops.length){ el.innerHTML='<div class="empty">Нет входящих операций</div>'; return; }
   const role = currentProfile?.role||'admin';
   el.innerHTML=roleCard(roleTbl(
@@ -5974,9 +5976,11 @@ async function renderOperationsInbox(){
   const el = document.getElementById('ops-inbox-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data} = await (sb||window.sb).from('operations').select('*')
+  const {data, error} = await (sb||window.sb).from('operations').select('*')
     .eq('routed_to','operations').order('created_at',{ascending:false});
+  if(error){ console.error('[ops-inbox] supabase error:', error); el.innerHTML=`<div class="empty" style="color:var(--red)">Ошибка: ${error.message}</div>`; return; }
   const ops = data||[];
+  console.log('[ops-inbox] rows:', ops.length, ops);
   if(!ops.length){ el.innerHTML='<div class="empty">Нет входящих форм</div>'; return; }
   const role = currentProfile?.role||'admin';
   el.innerHTML=roleCard(roleTbl(
@@ -6350,9 +6354,11 @@ async function submitNewRequest(){
       invoice_pdf_path: invoicePath
     };
 
-    const {error} = await (sb||window.sb).from('operations').insert(row);
-    if(error){ showToast('Ошибка: '+error.message); return; }
-    showToast(`✅ Заявка создана. Отправлена: ${routedTo==='accounting'?'Бухгалтерия':'Операционист'}`);
+    console.log('[submitNewRequest] inserting row:', row);
+    const {data:inserted, error} = await (sb||window.sb).from('operations').insert(row).select().single();
+    if(error){ console.error('[submitNewRequest] supabase error:', error); showToast('Ошибка: '+error.message); return; }
+    console.log('[submitNewRequest] inserted:', inserted);
+    showToast(`✅ Заявка создана. Отправлена: ${routedTo==='accounting'?'Бухгалтерия':'Операционист'} (routed_to=${inserted?.routed_to})`);
     switchTabMenu('executor-journal', '📋 Мой журнал');
   } finally {
     if(btn) btn.disabled = false;
