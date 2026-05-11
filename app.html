@@ -1052,8 +1052,7 @@ tr:hover td{background:var(--bg2)}
     <!-- Операционист -->
     <div id="view-operations-inbox" style="display:none"><div class="content"><div id="ops-inbox-content"></div></div></div>
     <div id="view-operations-journal" style="display:none"><div class="content"><div id="ops-journal-content"></div></div></div>
-    <div id="view-operations-request" style="display:none"><div class="content"><div id="ops-req-content"></div></div></div>
-    <div id="view-operations-form" style="display:none"><div class="content"><div id="ops-form-content"></div></div></div>
+    <div id="view-new-request" style="display:none"><div class="content"><div id="new-req-content"></div></div></div>
     <div id="view-executor-journal" style="display:none"><div class="content"><div id="exec-journal-content"></div></div></div>
     <div id="view-partner-operations" style="display:none"><div class="content"><div id="partner-ops-content"></div></div></div>
     <div id="view-partner-deposits" style="display:none"><div class="content"><div id="partner-dep-content"></div></div></div>
@@ -2166,7 +2165,7 @@ window.switchViewRole = function(role){
     contract_manager:'📄 Договорной отдел'
   };
   const defaultTabs = {
-    executor:'operations-form', accounting:'accounting-inbox',
+    executor:'new-request', accounting:'accounting-inbox',
     operations:'operations-inbox', financier:'financier-journal',
     hr:'hr', partner_manager:'partners',
     account_manager:'cp-new-request',
@@ -2211,8 +2210,7 @@ function buildRoleMenu(role){
     ],
     executor: [
       {group:'Мои действия'},
-      {id:'operations-request',label:'💸 Запрос денег от клиента'},
-      {id:'operations-form',label:'📝 Форма на проведение операции'},
+      {id:'new-request',label:'⚡ Новая заявка'},
       {group:'Мои заявки'},
       {id:'executor-journal',label:'📋 Мой журнал'},
     ],
@@ -2230,8 +2228,7 @@ function buildRoleMenu(role){
       {id:'operations-inbox',label:'📥 Входящие формы'},
       {id:'operations-journal',label:'📋 Журнал операций'},
       {group:'Создать'},
-      {id:'operations-request',label:'💸 Запрос денег от клиента'},
-      {id:'operations-form',label:'📝 Форма на операцию'},
+      {id:'new-request',label:'⚡ Новая заявка'},
     ],
     financier: [
       {group:'Финансист'},
@@ -2319,7 +2316,7 @@ function switchTab(t){
   const allTabs = ['main','loss','expense','corp','invoice','treasury','dept','days','clients',
     'kpi','hr','partners',
     'accounting-inbox','accounting-requests','accounting-corp','accounting-journal',
-    'operations-inbox','operations-journal','operations-request','operations-form',
+    'operations-inbox','operations-journal','new-request',
     'financier-journal','financier-kpi','financier-commission','financier-cost','financier-analytics','financier-deposits',
     'executor-journal','partner-operations','partner-deposits',
     'cp-new-request','cp-my-requests','cp-inbox','cp-list','cp-contracts','cp-history'
@@ -2350,8 +2347,7 @@ function switchTab(t){
   else if(t==='accounting-journal') renderAccountingJournal();
   else if(t==='operations-inbox') renderOperationsInbox();
   else if(t==='operations-journal') renderOperationsJournal();
-  else if(t==='operations-request') renderOperationsRequest();
-  else if(t==='operations-form') renderOperationsForm();
+  else if(t==='new-request') renderNewRequest();
   else if(t==='executor-journal') renderExecutorJournal();
   else if(t==='partner-operations') renderPartnerOperations();
   else if(t==='partner-deposits') renderPartnerDeposits();
@@ -5645,10 +5641,35 @@ function showOpModal(op, role){
   currentOpId = op.id;
   const canConfirm = ['accounting','operations','admin','manager'].includes(role);
   const isPending = op.status==='pending' || op.status==='revision';
+  const clientLabel = op.client_name || (op.client_id_external?`ID: ${op.client_id_external}`:'—');
+  const cpaid = op.client_payment_status || 'pending';
+  const collectionLabels = {link:'🔗 Ссылка', qr:'📱 QR', none:'—'};
+  const hasTab1 = op.amo_link || op.purpose || op.collection_method || op.client_net_amount || op.payment_link;
+
+  const tab1Html = hasTab1 ? `
+  <div style="padding:10px 12px;background:var(--bg3);border-radius:var(--radius-sm);margin-bottom:12px;font-size:12px">
+    <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Запрос от клиента</div>
+    ${op.amo_link?`<div style="margin-bottom:4px"><span style="color:var(--text3)">АМО: </span><a href="${op.amo_link}" target="_blank" rel="noopener">${op.amo_link}</a></div>`:''}
+    ${op.purpose?`<div style="margin-bottom:4px"><span style="color:var(--text3)">Назначение: </span>${op.purpose}</div>`:''}
+    ${op.collection_method?`<div style="margin-bottom:4px"><span style="color:var(--text3)">Способ: </span>${collectionLabels[op.collection_method]||op.collection_method} ${op.acquiring_rate?'('+(op.acquiring_rate*100).toFixed(0)+'%)':''}</div>`:''}
+    ${op.client_net_amount?`<div style="margin-bottom:4px">
+      <span style="color:var(--text3)">К получению (net): </span><b>${(+op.client_net_amount).toLocaleString('ru-RU')} ₽</b>
+      <span style="color:var(--text3);margin-left:10px">Клиент платит: </span><b>${(+(op.client_gross_amount||0)).toLocaleString('ru-RU')} ₽</b>
+    </div>`:''}
+    ${op.payment_link?`<div style="margin-bottom:4px"><span style="color:var(--text3)">Ссылка: </span><a href="${op.payment_link}" target="_blank" rel="noopener" style="word-break:break-all">${op.payment_link}</a></div>`:''}
+    <div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="color:var(--text3)">Статус оплаты клиентом: </span>${clientPaymentBadge(cpaid)}
+      ${cpaid==='pending'?`<button class="btn btn-sm" style="font-size:10px" onclick="setClientPaymentStatus('${op.id}','paid_manual')">✅ Отметить оплачено</button>`:''}
+      ${(cpaid==='paid_manual'||cpaid==='paid_auto')?`<button class="btn btn-sm" style="font-size:10px;color:var(--text3)" onclick="setClientPaymentStatus('${op.id}','pending')">↩ Сбросить</button>`:''}
+    </div>
+  </div>` : '';
+
   const html = `
   <div style="font-size:16px;font-weight:600;margin-bottom:14px">${opTypeBadge(op.operation_type)}</div>
+  ${tab1Html}
+  <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Оплата контрагенту</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:14px">
-    <div><span style="color:var(--text3)">Клиент: </span>${op.client_name||'—'}</div>
+    <div><span style="color:var(--text3)">Клиент: </span>${clientLabel}</div>
     <div><span style="color:var(--text3)">Сумма: </span><b>${(+op.amount||0).toLocaleString('ru-RU')} ${op.currency||'₽'}</b></div>
     <div><span style="color:var(--text3)">Контрагент: </span>${op.agent||'—'}</div>
     <div><span style="color:var(--text3)">Дата: </span>${op.operation_date||'—'}</div>
@@ -5657,6 +5678,7 @@ function showOpModal(op, role){
   </div>
   ${op.service?`<div style="font-size:12px;margin-bottom:8px"><span style="color:var(--text3)">Услуга: </span>${op.service}</div>`:''}
   ${op.note?`<div style="font-size:12px;margin-bottom:8px"><span style="color:var(--text3)">Заметка: </span>${op.note}</div>`:''}
+  ${op.invoice_pdf_path?`<div style="font-size:12px;margin-bottom:8px"><span style="color:var(--text3)">Счёт: </span><a href="#" onclick="event.preventDefault();openInvoicePdf('${op.invoice_pdf_path}')">📎 Открыть PDF</a></div>`:''}
   ${op.reject_reason?`<div style="font-size:12px;margin-bottom:8px;padding:8px 10px;background:#FAEEDA;border-radius:6px;color:#633806">
     <b>Комментарий:</b> ${op.reject_reason}
   </div>`:''}
@@ -5671,7 +5693,7 @@ function showOpModal(op, role){
   bg.id='op-modal-bg';
   bg.className='modal-bg';
   bg.style.display='flex';
-  bg.innerHTML=`<div class="modal" style="max-width:500px">
+  bg.innerHTML=`<div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto">
     <h3>Детали операции</h3>
     ${html}
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border);flex-wrap:wrap">
@@ -5729,7 +5751,7 @@ async function confirmOp(id, newStatus){
   switchTab(activeTab);
 }
 
-// ---- ФОРМА СОЗДАНИЯ ОПЕРАЦИИ ----
+// ---- ФОРМА СОЗДАНИЯ ОПЕРАЦИИ ---- LEGACY: заменена на renderNewRequest, оставлена для hot-revert
 function renderNewOperationForm(containerId){
   const el = document.getElementById(containerId);
   if(!el) return;
@@ -5808,7 +5830,7 @@ async function submitOperation(){
   switchTab(activeTab);
 }
 
-// ---- ФОРМА ЗАПРОСА ДЕНЕГ ----
+// ---- ФОРМА ЗАПРОСА ДЕНЕГ ---- LEGACY: заменена на renderNewRequest, оставлена для hot-revert
 function renderNewRequestForm(containerId){
   const el = document.getElementById(containerId);
   if(!el) return;
@@ -5873,13 +5895,15 @@ async function renderAccountingInbox(){
   if(!ops.length){ el.innerHTML='<div class="empty">Нет входящих операций</div>'; return; }
   const role = currentProfile?.role||'admin';
   el.innerHTML=roleCard(roleTbl(
-    ['Дата','Клиент','Тип','Сумма','Отдел','Статус',''],
+    ['Дата','Клиент','Тип','Сумма','Отдел','💰 Клиент','📎','Статус',''],
     ops.map(op=>`<tr>
       <td>${op.operation_date||'—'}</td>
-      <td>${op.client_name||'—'}</td>
+      <td>${op.client_name||(op.client_id_external?'ID:'+op.client_id_external:'—')}</td>
       <td>${opTypeBadge(op.operation_type)}</td>
       <td><b>${(+op.amount||0).toLocaleString('ru-RU')} ${op.currency||'₽'}</b></td>
       <td>${op.dept||'—'}</td>
+      <td>${clientPaymentBadge(op.client_payment_status)}</td>
+      <td>${op.invoice_pdf_path?`<a href="#" onclick="event.preventDefault();openInvoicePdf('${op.invoice_pdf_path}')" title="Открыть PDF">📎</a>`:'—'}</td>
       <td>${opStatusBadge(op.status)}</td>
       <td><button class="btn btn-sm" onclick="showOpModal(${JSON.stringify(op).replace(/"/g,"'")}, '${role}')">Открыть</button></td>
     </tr>`).join('')
@@ -5956,13 +5980,15 @@ async function renderOperationsInbox(){
   if(!ops.length){ el.innerHTML='<div class="empty">Нет входящих форм</div>'; return; }
   const role = currentProfile?.role||'admin';
   el.innerHTML=roleCard(roleTbl(
-    ['Дата','Клиент','Тип','Сумма','Отдел','Статус',''],
+    ['Дата','Клиент','Тип','Сумма','Отдел','💰 Клиент','🔗','Статус',''],
     ops.map(op=>`<tr>
       <td>${op.operation_date||'—'}</td>
-      <td>${op.client_name||'—'}</td>
+      <td>${op.client_name||(op.client_id_external?'ID:'+op.client_id_external:'—')}</td>
       <td>${opTypeBadge(op.operation_type)}</td>
       <td><b>${(+op.amount||0).toLocaleString('ru-RU')} ${op.currency||'₽'}</b></td>
       <td>${op.dept||'—'}</td>
+      <td>${clientPaymentBadge(op.client_payment_status)}</td>
+      <td>${op.payment_link?`<a href="${op.payment_link}" target="_blank" rel="noopener" title="Ссылка клиенту">🔗</a>`:'—'}</td>
       <td>${opStatusBadge(op.status)}</td>
       <td><button class="btn btn-sm" onclick="showOpModal(${JSON.stringify(op).replace(/"/g,"'")}, '${role}')">Открыть</button></td>
     </tr>`).join('')
@@ -5978,13 +6004,400 @@ async function renderOperationsJournal(){
   renderTransactionTable(el, data||[]);
 }
 
+// LEGACY: больше не маршрутизируется, оставлено для hot-revert
 function renderOperationsRequest(){
   renderNewRequestForm('ops-req-content');
 }
-
 function renderOperationsForm(){
   renderNewOperationForm('ops-form-content');
   setTimeout(initOpFormAutocomplete, 100);
+}
+
+// ============================================================
+// ОБЪЕДИНЁННАЯ ФОРМА «НОВАЯ ЗАЯВКА» — Tab 1 (запрос клиенту) + Tab 2 (оплата контрагенту)
+// ============================================================
+
+const NR_ACQUIRING_RATES = { link: 0.03, qr: 0.01, none: 0 };
+const NR_PAYMENT_TYPES = {
+  card_rf: 'Карта РФ',
+  corp_card: 'Корп карта',
+  foreign_card: 'Иностранная карта',
+  invoice: 'По счёту'
+};
+const NR_ROUTING = { invoice:'accounting', corp_card:'accounting', card_rf:'operations', foreign_card:'operations' };
+
+window.cpActiveList = window.cpActiveList || [];
+
+async function loadActiveCounterparties(){
+  try{
+    const {data} = await (sb||window.sb).from('counterparties').select('id,full_name,short_name,contact_name').eq('status','active').order('full_name');
+    window.cpActiveList = data || [];
+  }catch(e){ console.log('loadActiveCounterparties error', e); window.cpActiveList = []; }
+}
+
+function nrSwitchTab(n){
+  document.querySelectorAll('#nr-tabs .tab').forEach(b=>b.classList.toggle('active', +b.dataset.tab===n));
+  document.getElementById('nr-tab1').style.display = n===1?'block':'none';
+  document.getElementById('nr-tab2').style.display = n===2?'block':'none';
+}
+
+function nrUpdateClientMode(){
+  const mode = document.querySelector('input[name=nr-client-mode]:checked')?.value || 'name';
+  document.getElementById('nr-client-name-field').style.display = mode==='name'?'block':'none';
+  document.getElementById('nr-client-id-field').style.display = mode==='id'?'block':'none';
+}
+
+function nrCalcRate(){
+  const method = document.querySelector('input[name=nr-collection]:checked')?.value || 'none';
+  return NR_ACQUIRING_RATES[method] ?? 0;
+}
+
+function nrUpdateCalc(){
+  const net = parseFloat(document.getElementById('nr-net')?.value)||0;
+  const rate = nrCalcRate();
+  const gross = rate>=1 ? net : (rate>0 ? net/(1-rate) : net);
+  const fee = gross - net;
+  const grossEl = document.getElementById('nr-gross-preview');
+  const feeEl = document.getElementById('nr-fee-preview');
+  if(grossEl) grossEl.textContent = Math.round(gross).toLocaleString('ru-RU') + ' ₽';
+  if(feeEl) feeEl.textContent = Math.round(fee).toLocaleString('ru-RU') + ' ₽ ('+(rate*100).toFixed(0)+'%)';
+  // если поменяли способ — старая ссылка больше не валидна
+  const linkInp = document.getElementById('nr-payment-link');
+  if(linkInp && !linkInp.dataset.locked) linkInp.value='';
+}
+
+function nrGeneratePaymentLink(){
+  const method = document.querySelector('input[name=nr-collection]:checked')?.value || 'none';
+  if(method==='none'){ showToast('Выберите способ получения (Ссылка или QR)'); return; }
+  const net = parseFloat(document.getElementById('nr-net')?.value)||0;
+  if(net<=0){ showToast('Введите сумму к получению'); return; }
+  const uuid = (crypto.randomUUID?.()||Date.now().toString(36));
+  const url = `https://pay.example.com/${method}/${uuid}`;
+  const inp = document.getElementById('nr-payment-link');
+  inp.value = url; inp.dataset.locked='1';
+  showToast('🔗 Ссылка-заглушка сгенерирована (Т-банк API будет позже)');
+}
+
+function nrSendToClient(){
+  const link = document.getElementById('nr-payment-link')?.value.trim();
+  if(!link){ showToast('Сначала сгенерируйте ссылку'); return; }
+  const channel = document.getElementById('nr-channel')?.value || 'sms';
+  const labels = {sms:'СМС',email:'Email',telegram:'Telegram',whatsapp:'WhatsApp'};
+  if(navigator.clipboard?.writeText) navigator.clipboard.writeText(link);
+  showToast(`📤 Ссылка скопирована в буфер. Отправьте клиенту через ${labels[channel]||channel}`);
+}
+
+function nrUpdatePaymentType(){
+  const t = document.getElementById('nr-payment-type')?.value;
+  const pdfBlock = document.getElementById('nr-pdf-block');
+  if(pdfBlock) pdfBlock.style.display = t==='invoice'?'block':'none';
+  const routeInfo = document.getElementById('nr-route-info');
+  if(routeInfo){
+    const to = NR_ROUTING[t]||'operations';
+    routeInfo.innerHTML = `📤 Будет отправлено: <b>${to==='accounting'?'Бухгалтерия':'Операционист'}</b>`;
+  }
+}
+
+function nrUpdateCounterpartyMode(){
+  const mode = document.querySelector('input[name=nr-cp-mode]:checked')?.value || 'list';
+  document.getElementById('nr-cp-list-field').style.display = mode==='list'?'block':'none';
+  document.getElementById('nr-cp-manual-field').style.display = mode==='manual'?'block':'none';
+}
+
+function initCpAutocomplete(){
+  const inp = document.getElementById('nr-cp-input');
+  if(!inp) return;
+  inp.parentElement.style.position = 'relative';
+  let acList = document.getElementById('ac-list-nr-cp-input');
+  if(!acList){
+    acList = document.createElement('div');
+    acList.id = 'ac-list-nr-cp-input';
+    acList.className = 'ac-list';
+    inp.parentElement.appendChild(acList);
+  }
+  inp.addEventListener('input', ()=>{
+    const q = inp.value.toLowerCase().trim();
+    delete inp.dataset.cpId; // сбрасываем выбор при ручном вводе
+    if(!q){ acList.classList.remove('open'); return; }
+    const matches = (window.cpActiveList||[]).filter(c=>(c.full_name||'').toLowerCase().includes(q) || (c.short_name||'').toLowerCase().includes(q));
+    if(!matches.length){ acList.classList.remove('open'); return; }
+    acList.innerHTML = matches.slice(0,8).map(c=>`<div class="ac-item" onclick="selectCounterparty('${c.id}',${JSON.stringify(c.full_name)})">
+      <div class="ac-item-name">${c.full_name}</div>
+      <div class="ac-item-meta">${c.short_name||''} ${c.contact_name?'· '+c.contact_name:''}</div>
+    </div>`).join('');
+    acList.classList.add('open');
+  });
+  inp.addEventListener('blur', ()=>setTimeout(()=>acList.classList.remove('open'),200));
+}
+
+window.selectCounterparty = function(id, name){
+  const inp = document.getElementById('nr-cp-input');
+  if(inp){ inp.value = name; inp.dataset.cpId = id; }
+  document.getElementById('ac-list-nr-cp-input')?.classList.remove('open');
+};
+
+function renderNewRequest(){
+  const el = document.getElementById('new-req-content');
+  if(!el) return;
+  const today = new Date().toISOString().split('T')[0];
+  el.innerHTML = `
+  <div class="kpi-card" style="padding:20px;max-width:760px">
+    <div style="font-size:14px;font-weight:600;margin-bottom:6px">⚡ Новая заявка</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Заполните оба шага — запрос денег у клиента и оплату контрагенту</div>
+    <div id="nr-tabs" style="display:flex;gap:2px;border-bottom:0.5px solid var(--border);margin-bottom:16px">
+      <div class="tab active" data-tab="1" onclick="nrSwitchTab(1)">1. Запрос от клиента</div>
+      <div class="tab" data-tab="2" onclick="nrSwitchTab(2)">2. Оплата контрагенту</div>
+    </div>
+
+    <div id="nr-tab1">
+      <div class="field" style="margin-bottom:10px"><label>Ссылка из АМО CRM</label><input id="nr-amo" placeholder="https://...amocrm.ru/leads/..."></div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Клиент</label>
+        <div style="display:flex;gap:14px;font-size:12px;margin-bottom:6px">
+          <label><input type="radio" name="nr-client-mode" value="name" checked onchange="nrUpdateClientMode()"> ФИО</label>
+          <label><input type="radio" name="nr-client-mode" value="id" onchange="nrUpdateClientMode()"> ID клиента</label>
+        </div>
+        <div id="nr-client-name-field"><input id="nr-client-name" placeholder="Иванов Иван Иванович"></div>
+        <div id="nr-client-id-field" style="display:none"><input id="nr-client-id" placeholder="ID из CRM"></div>
+      </div>
+      <div class="field" style="margin-bottom:14px"><label>Назначение платежа</label><textarea id="nr-purpose" rows="2" placeholder="За что платим..."></textarea></div>
+
+      <div style="padding:14px;background:var(--bg3);border-radius:var(--radius-sm);margin-bottom:12px">
+        <div style="font-size:12px;font-weight:500;margin-bottom:10px;color:var(--text2)">КАЛЬКУЛЯТОР ПОЛУЧЕНИЯ ОТ КЛИЕНТА</div>
+        <div style="display:flex;gap:14px;font-size:12px;margin-bottom:10px;flex-wrap:wrap">
+          <label><input type="radio" name="nr-collection" value="link" checked onchange="nrUpdateCalc()"> 🔗 Ссылка (3%)</label>
+          <label><input type="radio" name="nr-collection" value="qr" onchange="nrUpdateCalc()"> 📱 QR (1%)</label>
+          <label><input type="radio" name="nr-collection" value="none" onchange="nrUpdateCalc()"> Не требуется</label>
+        </div>
+        <div class="grid2">
+          <div class="field" style="margin-bottom:8px"><label>Сумма к получению (₽)</label><input type="number" id="nr-net" placeholder="0" oninput="nrUpdateCalc()"></div>
+          <div style="font-size:12px;padding-top:18px">
+            <div><span style="color:var(--text3)">Клиент платит: </span><b id="nr-gross-preview">0 ₽</b></div>
+            <div style="margin-top:2px"><span style="color:var(--text3)">Эквайринг: </span><span id="nr-fee-preview">0 ₽ (3%)</span></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-primary" onclick="nrGeneratePaymentLink()">✨ Сгенерировать ссылку</button>
+          <input id="nr-payment-link" readonly placeholder="ссылка появится здесь..." style="flex:1;min-width:200px;background:var(--bg2)">
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+          <select id="nr-channel" style="max-width:160px">
+            <option value="sms">📩 СМС</option>
+            <option value="email">✉️ Email</option>
+            <option value="telegram">✈️ Telegram</option>
+            <option value="whatsapp">💬 WhatsApp</option>
+          </select>
+          <button class="btn btn-sm" onclick="nrSendToClient()">📤 Отправить клиенту</button>
+        </div>
+      </div>
+
+      <div style="text-align:right">
+        <button class="btn" onclick="nrSwitchTab(2)">Далее: оплата контрагенту →</button>
+      </div>
+    </div>
+
+    <div id="nr-tab2" style="display:none">
+      <div class="grid2">
+        <div class="field"><label>Сумма оплаты *</label><input type="number" id="nr-amount" placeholder="0"></div>
+        <div class="field"><label>Валюта</label>
+          <select id="nr-currency">
+            <option value="RUB">RUB ₽</option><option value="USD">USD $</option>
+            <option value="EUR">EUR €</option><option value="AED">AED</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Тип оплаты *</label>
+          <select id="nr-payment-type" onchange="nrUpdatePaymentType()">
+            <option value="card_rf">Карта РФ</option>
+            <option value="corp_card">Корп карта</option>
+            <option value="foreign_card">Иностранная карта</option>
+            <option value="invoice">По счёту (бухгалтерия)</option>
+          </select>
+        </div>
+        <div class="field"><label>Дата</label><input type="date" id="nr-date" value="${today}"></div>
+      </div>
+
+      <div style="margin-bottom:10px">
+        <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Контрагент *</label>
+        <div style="display:flex;gap:14px;font-size:12px;margin-bottom:6px">
+          <label><input type="radio" name="nr-cp-mode" value="list" checked onchange="nrUpdateCounterpartyMode()"> Из списка</label>
+          <label><input type="radio" name="nr-cp-mode" value="manual" onchange="nrUpdateCounterpartyMode()"> Иное (ручной ввод)</label>
+        </div>
+        <div id="nr-cp-list-field"><input id="nr-cp-input" placeholder="Начните вводить название..." autocomplete="off"></div>
+        <div id="nr-cp-manual-field" style="display:none"><input id="nr-cp-manual" placeholder="Название контрагента"></div>
+      </div>
+
+      <div class="field" style="margin-bottom:10px"><label>Комментарий</label><textarea id="nr-note" rows="2" placeholder="Детали платежа..."></textarea></div>
+
+      <div id="nr-pdf-block" style="display:none;margin-bottom:10px;padding:12px;background:#FAEEDA;border-radius:var(--radius-sm)">
+        <label style="font-size:12px;font-weight:500;color:#633806;display:block;margin-bottom:6px">📎 Реквизиты (PDF со счётом) *</label>
+        <input type="file" id="nr-pdf" accept="application/pdf">
+        <div style="font-size:11px;color:#633806;margin-top:4px">До 10 МБ. Будет приложен к заявке для бухгалтерии.</div>
+      </div>
+
+      <div class="field" style="margin-bottom:10px"><label>Отдел</label>
+        <select id="nr-dept">
+          <option>Lifestyle</option><option>Travel</option><option>Логистика</option>
+          <option>КБР</option><option>Корп</option>
+        </select>
+      </div>
+
+      <div id="nr-route-info" style="font-size:12px;color:var(--accent);padding:8px;background:var(--bg3);border-radius:var(--radius-sm);margin-bottom:12px">
+        📤 Будет отправлено: <b>Операционист</b>
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:space-between">
+        <button class="btn" onclick="nrSwitchTab(1)">← Назад</button>
+        <button class="btn btn-primary" id="nr-submit-btn" onclick="submitNewRequest()">📤 Создать заявку</button>
+      </div>
+    </div>
+  </div>`;
+
+  // Инициализация
+  loadActiveCounterparties().then(()=>setTimeout(initCpAutocomplete, 50));
+  setTimeout(nrUpdateCalc, 50);
+  setTimeout(nrUpdatePaymentType, 50);
+}
+
+async function submitNewRequest(){
+  const btn = document.getElementById('nr-submit-btn');
+  if(btn) btn.disabled = true;
+  try{
+    // Tab 1 валидация
+    const clientMode = document.querySelector('input[name=nr-client-mode]:checked')?.value || 'name';
+    const clientName = document.getElementById('nr-client-name')?.value.trim() || '';
+    const clientIdExt = document.getElementById('nr-client-id')?.value.trim() || '';
+    if(clientMode==='name' && !clientName){ showToast('Укажите ФИО клиента'); return; }
+    if(clientMode==='id' && !clientIdExt){ showToast('Укажите ID клиента'); return; }
+    const amoLink = document.getElementById('nr-amo')?.value.trim() || '';
+    const purpose = document.getElementById('nr-purpose')?.value.trim() || '';
+    const collection = document.querySelector('input[name=nr-collection]:checked')?.value || 'none';
+    const net = parseFloat(document.getElementById('nr-net')?.value)||0;
+    const rate = NR_ACQUIRING_RATES[collection] ?? 0;
+    const gross = rate>0 ? net/(1-rate) : net;
+    const paymentLink = document.getElementById('nr-payment-link')?.value.trim() || '';
+    const channel = document.getElementById('nr-channel')?.value || 'sms';
+
+    // Tab 2 валидация
+    const amount = parseFloat(document.getElementById('nr-amount')?.value)||0;
+    if(amount<=0){ showToast('Укажите сумму оплаты контрагенту'); nrSwitchTab(2); return; }
+    const currency = document.getElementById('nr-currency')?.value || 'RUB';
+    const opType = document.getElementById('nr-payment-type')?.value || 'card_rf';
+    const cpMode = document.querySelector('input[name=nr-cp-mode]:checked')?.value || 'list';
+    const cpInput = document.getElementById('nr-cp-input');
+    const cpId = (cpMode==='list') ? (cpInput?.dataset.cpId || null) : null;
+    const cpName = (cpMode==='list')
+      ? (cpInput?.value.trim() || '')
+      : (document.getElementById('nr-cp-manual')?.value.trim() || '');
+    if(!cpName){ showToast('Укажите контрагента'); nrSwitchTab(2); return; }
+    if(cpMode==='list' && !cpId){ showToast('Выберите контрагента из списка (или переключите на «Иное»)'); nrSwitchTab(2); return; }
+    const note = document.getElementById('nr-note')?.value.trim() || '';
+    const dept = document.getElementById('nr-dept')?.value || 'Lifestyle';
+    const opDate = document.getElementById('nr-date')?.value || new Date().toISOString().split('T')[0];
+    const routedTo = NR_ROUTING[opType] || 'operations';
+
+    // PDF загрузка (только для invoice)
+    let invoicePath = null;
+    let status = 'pending';
+    let rejectReason = null;
+    if(opType==='invoice'){
+      const pdfInp = document.getElementById('nr-pdf');
+      const file = pdfInp?.files?.[0];
+      if(file){
+        if(file.type !== 'application/pdf'){ showToast('Файл должен быть PDF'); nrSwitchTab(2); return; }
+        if(file.size > 10*1024*1024){ showToast('Файл больше 10 МБ'); nrSwitchTab(2); return; }
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth()+1).padStart(2,'0');
+        const uuid = (crypto.randomUUID?.()||Date.now().toString(36));
+        const path = `${yyyy}/${mm}/${uuid}.pdf`;
+        const {error:upErr} = await (sb||window.sb).storage.from('invoices').upload(path, file, {contentType:'application/pdf', upsert:false});
+        if(upErr){
+          showToast('Ошибка загрузки PDF: '+(upErr.message||'проверьте политики bucket «invoices»'));
+          return;
+        }
+        invoicePath = path;
+      } else {
+        // PDF не приложен — отправляем на доработку
+        status = 'revision';
+        rejectReason = 'PDF со счётом не приложен';
+      }
+    }
+
+    const row = {
+      created_by: currentUser.id,
+      client_name: clientMode==='name' ? clientName : null,
+      client_id_external: clientMode==='id' ? clientIdExt : null,
+      agent: cpName,
+      counterparty_id: cpId,
+      counterparty_manual_name: cpMode==='manual' ? cpName : null,
+      amount, currency,
+      operation_type: opType,
+      routed_to: routedTo,
+      operation_date: opDate,
+      dept, note, status,
+      reject_reason: rejectReason,
+      amo_link: amoLink || null,
+      purpose: purpose || null,
+      collection_method: collection,
+      client_net_amount: net || null,
+      acquiring_rate: rate,
+      client_gross_amount: net>0 ? Math.round(gross*100)/100 : null,
+      payment_link: paymentLink || null,
+      send_channel: paymentLink ? channel : null,
+      client_payment_status: collection==='none' ? 'paid_manual' : 'pending',
+      invoice_pdf_path: invoicePath
+    };
+
+    const {error} = await (sb||window.sb).from('operations').insert(row);
+    if(error){ showToast('Ошибка: '+error.message); return; }
+    showToast(`✅ Заявка создана. Отправлена: ${routedTo==='accounting'?'Бухгалтерия':'Операционист'}`);
+    switchTabMenu('executor-journal', '📋 Мой журнал');
+  } finally {
+    if(btn) btn.disabled = false;
+  }
+}
+
+// Ручное переключение статуса оплаты клиентом (до интеграции Т-банка)
+window.setClientPaymentStatus = async function(opId, newStatus){
+  const update = { client_payment_status: newStatus };
+  if(newStatus==='paid_manual' || newStatus==='paid_auto'){
+    update.client_paid_at = new Date().toISOString();
+    update.client_paid_marker = currentUser.id;
+  } else {
+    update.client_paid_at = null;
+    update.client_paid_marker = null;
+  }
+  const {error} = await (sb||window.sb).from('operations').update(update).eq('id', opId);
+  if(error){ showToast('Ошибка: '+error.message); return; }
+  showToast(newStatus==='pending' ? '🟡 Статус сброшен' : '🟢 Отмечено как оплачено');
+  document.getElementById('op-modal-bg')?.remove();
+  switchTab(activeTab);
+};
+
+// Получить signed URL для PDF и открыть в новой вкладке
+window.openInvoicePdf = async function(path){
+  if(!path) return;
+  const {data, error} = await (sb||window.sb).storage.from('invoices').createSignedUrl(path, 60*60*24*7);
+  if(error || !data?.signedUrl){ showToast('Не удалось открыть файл: '+(error?.message||'нет URL')); return; }
+  window.open(data.signedUrl, '_blank', 'noopener');
+};
+
+// Заглушка для будущего API Т-банка
+window.checkClientPaymentViaTBank = async function(opId){
+  return { paid: false, reason: 'API Т-банка не подключён' };
+};
+
+// Бэйдж статуса оплаты клиентом
+function clientPaymentBadge(status){
+  const map = {
+    pending: {bg:'#FAEEDA',cl:'#633806',l:'🟡 Ждём'},
+    paid_manual: {bg:'#EAF3DE',cl:'#27500A',l:'🟢 Оплачено'},
+    paid_auto: {bg:'#EAF3DE',cl:'#27500A',l:'🟢 Оплачено (банк)'}
+  };
+  const s = map[status||'pending'] || map.pending;
+  return `<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:${s.bg};color:${s.cl}">${s.l}</span>`;
 }
 
 async function renderExecutorJournal(){
