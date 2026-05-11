@@ -1070,7 +1070,6 @@ tr:hover td{background:var(--bg2)}
     <div id="view-cp-contracts" style="display:none"><div class="content"><div id="cp-contracts-content"></div></div></div>
     <div id="view-cp-history" style="display:none"><div class="content"><div id="cp-history-content"></div></div></div>
     <!-- Финансист -->
-    <div id="view-financier-journal" style="display:none"><div class="content"><div id="fin-journal-content"></div></div></div>
     <div id="view-financier-kpi" style="display:none"><div class="content"><div id="fin-kpi-content"></div></div></div>
     <div id="view-financier-commission" style="display:none"><div class="content"><div id="fin-comm-content"></div></div></div>
     <div id="view-financier-cost" style="display:none"><div class="content"><div id="fin-cost-content"></div></div></div>
@@ -1469,7 +1468,7 @@ async function init(){
   const defaultTab = {
     accounting: 'accounting-inbox',
     operations: 'operations-inbox',
-    financier: 'financier-journal',
+    financier: 'main',
     hr: 'hr'
   }[role];
   if(defaultTab) switchTabMenu(defaultTab, roleLabels[role]||'');
@@ -2207,7 +2206,7 @@ window.switchViewRole = function(role){
   };
   const defaultTabs = {
     executor:'new-request', accounting:'accounting-inbox',
-    operations:'operations-inbox', financier:'financier-journal',
+    operations:'operations-inbox', financier:'main',
     hr:'hr', partner_manager:'partners',
     account_manager:'cp-new-request',
     contract_manager:'cp-inbox'
@@ -2235,7 +2234,6 @@ function buildRoleMenu(role){
       {group:'Операции'},
       {id:'accounting-inbox',label:'📥 Входящие (бухгалтерия)'},
       {id:'operations-inbox',label:'📥 Входящие (операционист)'},
-      {id:'financier-journal',label:'📊 Общий журнал'},
       {group:'Управление'},
       {id:'kpi',label:'🏆 KPI'},{id:'hr',label:'👥 НР — Сотрудники'},{id:'partners',label:'🤝 Партнёры'},
       {group:'Настройки'},
@@ -2278,7 +2276,6 @@ function buildRoleMenu(role){
     financier: [
       {group:'Финансист'},
       {id:'main',label:'📋 Все заявки'},
-      {id:'financier-journal',label:'📊 Общий журнал'},
       {id:'financier-kpi',label:'🏆 KPI отделов'},
       {id:'financier-commission',label:'💰 Комиссии по месяцам'},
       {id:'financier-cost',label:'📉 Себестоимость'},
@@ -2369,7 +2366,7 @@ function switchTab(t){
     'kpi','hr','partners',
     'accounting-inbox','accounting-requests','accounting-corp','accounting-journal',
     'operations-inbox','operations-journal','new-request',
-    'financier-journal','financier-kpi','financier-commission','financier-cost','financier-analytics','financier-deposits',
+    'financier-kpi','financier-commission','financier-cost','financier-analytics','financier-deposits',
     'executor-journal','partner-operations','partner-deposits',
     'cp-new-request','cp-my-requests','cp-inbox','cp-list','cp-contracts','cp-history'
   ];
@@ -2413,7 +2410,6 @@ function switchTab(t){
   else if(t==='cp-list') renderCPList();
   else if(t==='cp-contracts') renderCPContracts();
   else if(t==='cp-history') renderCPHistory();
-  else if(t==='financier-journal') renderFinancierJournal();
   else if(t==='financier-kpi') renderFinancierKPI();
   else if(t==='financier-commission') renderFinancierCommission();
   else if(t==='financier-cost') renderFinancierCost();
@@ -2432,7 +2428,6 @@ function switchMonth(m){
   // Если открыт ролевой журнал — перерисуем его под новый месяц
   if(activeTab==='operations-journal') renderOperationsJournal();
   else if(activeTab==='accounting-journal') renderAccountingJournal();
-  else if(activeTab==='financier-journal') renderFinancierJournal();
 }
 
 function addMonth(){
@@ -6566,9 +6561,9 @@ async function renderExecutorJournal(){
   </table></div>`:''}`;
 }
 
-// ---- ФИНАНСИСТ ----
+// ---- ФИНАНСИСТ ---- (legacy: «Общий журнал» удалён, оставлено для hot-revert)
 function renderFinancierJournal(){
-  renderRoleJournal('fin-journal-content', null); // без фильтра — все заявки
+  renderRoleJournal('fin-journal-content', null);
 }
 
 // Универсальный рендер ролевого журнала: legacy таблица entries + фильтр по agent_pay_type
