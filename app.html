@@ -5989,25 +5989,24 @@ async function renderAccountingInbox(){
   const el = document.getElementById('acc-inbox-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data, error} = await (sb||window.sb).from('operations').select('*')
-    .in('operation_type', INBOX_TYPES_ACCOUNTING).order('created_at',{ascending:false});
-  if(error){ console.error('[acc-inbox] supabase error:', error); el.innerHTML=`<div class="empty" style="color:var(--red)">Ошибка: ${error.message}</div>`; return; }
-  const ops = data||[];
-  console.log('[acc-inbox] rows:', ops.length, ops);
-  if(!ops.length){ el.innerHTML='<div class="empty">Нет входящих операций</div>'; return; }
-  const role = currentProfile?.role||'admin';
+  // Читаем входящие заявки из entries (единственный источник правды)
+  const inbox = (entries||[]).filter(e=>
+    e.from_form===true &&
+    (e.status==='pending' || e.status==='revision') &&
+    INBOX_TYPES_ACCOUNTING.includes(e.agent_pay_type)
+  ).sort((a,b)=>(b.created_at||b.date||'').localeCompare(a.created_at||a.date||''));
+  console.log('[acc-inbox] rows:', inbox.length);
+  if(!inbox.length){ el.innerHTML='<div class="empty">Нет входящих заявок</div>'; return; }
   el.innerHTML=roleCard(roleTbl(
-    ['Дата','Клиент','Тип','Сумма','Отдел','💰 Клиент','📎','Статус',''],
-    ops.map(op=>`<tr>
-      <td>${op.operation_date||'—'}</td>
-      <td>${op.client_name||(op.client_id_external?'ID:'+op.client_id_external:'—')}</td>
-      <td>${opTypeBadge(op.operation_type)}</td>
-      <td><b>${(+op.amount||0).toLocaleString('ru-RU')} ${op.currency||'₽'}</b></td>
-      <td>${op.dept||'—'}</td>
-      <td>${clientPaymentBadge(op.client_payment_status)}</td>
-      <td>${op.invoice_pdf_path?`<a href="#" onclick="event.preventDefault();openInvoicePdf('${op.invoice_pdf_path}')" title="Открыть PDF">📎</a>`:'—'}</td>
-      <td>${opStatusBadge(op.status)}</td>
-      <td><button class="btn btn-sm" onclick="showOpModal(${JSON.stringify(op).replace(/"/g,"'")}, '${role}')">Открыть</button></td>
+    ['Дата','Клиент','Тип','Сумма','Отдел','Статус',''],
+    inbox.map(e=>`<tr>
+      <td>${e.date||'—'}</td>
+      <td>${e.client_name||'—'}</td>
+      <td style="font-size:11px">${AGENT_PAY[e.agent_pay_type]||e.agent_pay_type||'—'}</td>
+      <td><b>${(+e.amount||0).toLocaleString('ru-RU')} ${e.currency||'₽'}</b></td>
+      <td>${e.dept||'—'}</td>
+      <td>${opStatusBadge(e.status)}</td>
+      <td><button class="btn btn-sm" onclick="openEdit('${e.id}')">Открыть</button></td>
     </tr>`).join('')
   ));
 }
@@ -6071,25 +6070,23 @@ async function renderOperationsInbox(){
   const el = document.getElementById('ops-inbox-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  const {data, error} = await (sb||window.sb).from('operations').select('*')
-    .in('operation_type', INBOX_TYPES_OPERATIONS).order('created_at',{ascending:false});
-  if(error){ console.error('[ops-inbox] supabase error:', error); el.innerHTML=`<div class="empty" style="color:var(--red)">Ошибка: ${error.message}</div>`; return; }
-  const ops = data||[];
-  console.log('[ops-inbox] rows:', ops.length, ops);
-  if(!ops.length){ el.innerHTML='<div class="empty">Нет входящих форм</div>'; return; }
-  const role = currentProfile?.role||'admin';
+  const inbox = (entries||[]).filter(e=>
+    e.from_form===true &&
+    (e.status==='pending' || e.status==='revision') &&
+    INBOX_TYPES_OPERATIONS.includes(e.agent_pay_type)
+  ).sort((a,b)=>(b.created_at||b.date||'').localeCompare(a.created_at||a.date||''));
+  console.log('[ops-inbox] rows:', inbox.length);
+  if(!inbox.length){ el.innerHTML='<div class="empty">Нет входящих форм</div>'; return; }
   el.innerHTML=roleCard(roleTbl(
-    ['Дата','Клиент','Тип','Сумма','Отдел','💰 Клиент','🔗','Статус',''],
-    ops.map(op=>`<tr>
-      <td>${op.operation_date||'—'}</td>
-      <td>${op.client_name||(op.client_id_external?'ID:'+op.client_id_external:'—')}</td>
-      <td>${opTypeBadge(op.operation_type)}</td>
-      <td><b>${(+op.amount||0).toLocaleString('ru-RU')} ${op.currency||'₽'}</b></td>
-      <td>${op.dept||'—'}</td>
-      <td>${clientPaymentBadge(op.client_payment_status)}</td>
-      <td>${op.payment_link?`<a href="${op.payment_link}" target="_blank" rel="noopener" title="Ссылка клиенту">🔗</a>`:'—'}</td>
-      <td>${opStatusBadge(op.status)}</td>
-      <td><button class="btn btn-sm" onclick="showOpModal(${JSON.stringify(op).replace(/"/g,"'")}, '${role}')">Открыть</button></td>
+    ['Дата','Клиент','Тип','Сумма','Отдел','Статус',''],
+    inbox.map(e=>`<tr>
+      <td>${e.date||'—'}</td>
+      <td>${e.client_name||'—'}</td>
+      <td style="font-size:11px">${AGENT_PAY[e.agent_pay_type]||e.agent_pay_type||'—'}</td>
+      <td><b>${(+e.amount||0).toLocaleString('ru-RU')} ${e.currency||'₽'}</b></td>
+      <td>${e.dept||'—'}</td>
+      <td>${opStatusBadge(e.status)}</td>
+      <td><button class="btn btn-sm" onclick="openEdit('${e.id}')">Открыть</button></td>
     </tr>`).join('')
   ));
 }
@@ -6456,36 +6453,47 @@ async function submitNewRequest(){
       }
     }
 
-    const row = {
-      created_by: currentUser.id,
-      client_name: clientMode==='name' ? clientName : null,
-      client_id_external: clientMode==='id' ? clientIdExt : null,
+    // Собираем краткую метку с метаданными новой формы — чтобы они не потерялись в legacy entries
+    const metaParts = [];
+    if(amoLink) metaParts.push(`АМО: ${amoLink}`);
+    if(clientIdExt && !clientName) metaParts.push(`ID клиента: ${clientIdExt}`);
+    if(collection && collection!=='none'){
+      const collMap = {link:'🔗 Ссылка 3%', qr:'📱 QR 1%', card_in:'💳 Карта РФ', account_in:'🏦 Счёт'};
+      metaParts.push(`Получение: ${collMap[collection]||collection}`);
+    }
+    if(net>0) metaParts.push(`Net: ${Math.round(net).toLocaleString('ru-RU')} ₽ → Gross: ${Math.round(gross).toLocaleString('ru-RU')} ₽`);
+    if(paymentLink) metaParts.push(`Ссылка клиенту: ${paymentLink}`);
+    if(invoicePath) metaParts.push(`PDF: ${invoicePath}`);
+    if(note) metaParts.unshift(note);
+    const combinedNote = metaParts.join('\n');
+
+    // Пишем в legacy таблицу entries (туда же, куда смотрит «📋 Все заявки» и инбоксы по filter agent_pay_type)
+    const entryRow = {
+      date: opDate,
+      dept: dept, // строка как в форме (Lifestyle/Travel/...) — renderRoleJournal не зависит от регистра
+      service: purpose || 'Заявка от исполнителя',
+      client_name: clientName || (clientIdExt ? `ID: ${clientIdExt}` : null),
       agent: cpName,
-      counterparty_id: cpId,
-      counterparty_manual_name: cpMode==='manual' ? cpName : null,
-      amount, currency,
-      operation_type: opType,
-      routed_to: routedTo,
-      operation_date: opDate,
-      dept, note, status,
-      reject_reason: rejectReason,
-      amo_link: amoLink || null,
-      purpose: purpose || null,
-      collection_method: collection,
-      client_net_amount: net || null,
-      acquiring_rate: rate,
-      client_gross_amount: net>0 ? Math.round(gross*100)/100 : null,
-      payment_link: paymentLink || null,
-      send_channel: paymentLink ? channel : null,
-      client_payment_status: collection==='none' ? 'paid_manual' : 'pending',
-      invoice_pdf_path: invoicePath
+      amount: net>0 ? Math.round(gross) : amount,     // gross от клиента (или сумма расхода если получение не требуется)
+      currency: 'RUB',
+      agent_amount: amount,                            // расход контрагенту
+      agent_currency: currency,
+      agent_pay_type: opType,                          // card_rf/foreign_card/corp_card/invoice
+      pay: collection,                                 // link/qr/card_in/account_in/none
+      commission: net>0 ? Math.max(0, Math.round(gross - amount - (gross - net))) : 0,
+      link: amoLink || null,
+      note: combinedNote || null,
+      status: status,                                  // pending / revision
+      from_form: true,
+      submitted_by: currentUser.id,
     };
 
-    console.log('[submitNewRequest] inserting row:', row);
-    const {data:inserted, error} = await (sb||window.sb).from('operations').insert(row).select().single();
+    console.log('[submitNewRequest] inserting entry:', entryRow);
+    const {data:inserted, error} = await (sb||window.sb).from('entries').insert(entryRow).select().single();
     if(error){ console.error('[submitNewRequest] supabase error:', error); showToast('Ошибка: '+error.message); return; }
-    console.log('[submitNewRequest] inserted:', inserted);
-    showToast(`✅ Заявка создана. Отправлена: ${routedTo==='accounting'?'Бухгалтерия':'Операционист'} (routed_to=${inserted?.routed_to})`);
+    console.log('[submitNewRequest] inserted entry:', inserted);
+    showToast(`✅ Заявка создана. Отправлена: ${routedTo==='accounting'?'Бухгалтерия':'Операционист'}`);
+    await loadEntries();
     switchTabMenu('executor-journal', '📋 Мой журнал');
   } finally {
     if(btn) btn.disabled = false;
