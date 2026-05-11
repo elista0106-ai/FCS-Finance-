@@ -98,6 +98,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .stat{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:12px 16px;min-width:130px}
 .stat-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px}
 .stat-value{font-size:18px;font-weight:600;color:var(--text)}
+.stat-month{cursor:pointer;position:relative;user-select:none}
+.stat-month:hover{background:var(--bg3)}
+.month-picker-pop{position:absolute;top:100%;left:0;margin-top:4px;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:200;min-width:170px;display:none;max-height:320px;overflow-y:auto}
+.month-picker-pop.open{display:block}
+.month-picker-item{padding:9px 14px;font-size:12px;cursor:pointer;border-bottom:0.5px solid var(--border);white-space:nowrap}
+.month-picker-item:last-child{border-bottom:none}
+.month-picker-item:hover{background:var(--bg3)}
+.month-picker-item.active{background:var(--bg3);color:var(--accent);font-weight:500}
 
 /* FILTERS */
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
@@ -1543,6 +1551,7 @@ function renderStats(){
   const paid = data.filter(e=>e.status==='paid').length;
   const losses = data.filter(e=>e.is_loss).length;
   statsEl.innerHTML = `
+    ${monthPickerCardHtml('stat')}
     <div class="stat"><div class="stat-label">Записей</div><div class="stat-value">${data.length}</div></div>
     <div class="stat"><div class="stat-label">Оплачено</div><div class="stat-value" style="color:#2ECC71">${paid}</div></div>
     <div class="stat"><div class="stat-label">Сумма FCS</div><div class="stat-value" style="font-size:15px;color:#60A5FA">${fmt(total)} ₽</div></div>
@@ -1550,6 +1559,43 @@ function renderStats(){
     ${losses?`<div class="stat"><div class="stat-label">Потери</div><div class="stat-value" style="color:#F87171">${losses}</div></div>`:''}
   `;
 }
+
+// ===== MONTH PICKER (встроенная карточка в панели статистики) =====
+function monthLabel(m){
+  if(!m) return '—';
+  const [y,mo] = m.split('-');
+  const monthNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  return (monthNames[+mo-1]||mo)+' '+y;
+}
+function monthPickerCardHtml(cardClass){
+  cardClass = cardClass || 'stat';
+  const labelClass = cardClass==='stat' ? 'stat-label' : 'hr-metric-lbl';
+  const valueClass = cardClass==='stat' ? 'stat-value' : 'hr-metric-val';
+  const months = [...new Set((entries||[]).map(e=>getMonth(e.date)).filter(Boolean))].sort().reverse();
+  const cur = activeMonth || months[0] || new Date().toISOString().substring(0,7);
+  if(!months.length) months.push(cur);
+  const items = months.map(m=>{
+    const cnt = (entries||[]).filter(e=>getMonth(e.date)===m).length;
+    return `<div class="month-picker-item${m===cur?' active':''}" onclick="event.stopPropagation();switchMonth('${m}');closeMonthPicker()">${monthLabel(m)} <span style="opacity:.5;font-size:10px">(${cnt})</span></div>`;
+  }).join('');
+  return `<div class="${cardClass} stat-month" onclick="toggleMonthPicker(event)">
+    <div class="${labelClass}">Месяц</div>
+    <div class="${valueClass}" style="font-size:15px">${monthLabel(cur)} <span style="font-size:11px;color:var(--text3)">▾</span></div>
+    <div class="month-picker-pop" id="month-picker-pop">${items}</div>
+  </div>`;
+}
+window.toggleMonthPicker = function(ev){
+  ev?.stopPropagation();
+  const pop = document.getElementById('month-picker-pop');
+  if(!pop) return;
+  // Закрываем все другие открытые поповеры
+  document.querySelectorAll('.month-picker-pop.open').forEach(p=>{ if(p!==pop) p.classList.remove('open'); });
+  pop.classList.toggle('open');
+};
+window.closeMonthPicker = function(){
+  document.querySelectorAll('.month-picker-pop.open').forEach(p=>p.classList.remove('open'));
+};
+document.addEventListener('click', ()=>closeMonthPicker());
 
 function updateTabCounts(){
   const data = monthEntries();
@@ -2339,10 +2385,9 @@ function switchTab(t){
   const mainJournalTabs = ['main','loss','expense','corp','invoice','treasury','dept','days','clients'];
   const filters = document.getElementById('main-filters');
   if(filters) filters.style.display = mainJournalTabs.includes(t)?'':'none';
-  // Месячный бар — на главном журнале и на ролевых журналах (operations/accounting/financier)
-  const tabsWithMonths = [...mainJournalTabs,'operations-journal','accounting-journal','financier-journal'];
+  // Месячный бар скрыт всегда — выбор месяца теперь встроен в панель статистики (карточка «Месяц»)
   const monthBar = document.getElementById('month-bar');
-  if(monthBar) monthBar.style.display = tabsWithMonths.includes(t)?'':'none';
+  if(monthBar) monthBar.style.display = 'none';
 
   // Рендерим нужный контент
   if(t==='treasury') renderTreasury();
@@ -6535,7 +6580,8 @@ function renderRoleJournal(containerId, payTypes){
     data = data.filter(e=>payTypes.includes(e.agent_pay_type));
   }
   if(!data.length){
-    el.innerHTML=`<div class="empty">Нет заявок за ${activeMonth||'выбранный месяц'}</div>`;
+    el.innerHTML=`<div class="hr-metric-grid" style="margin-bottom:1rem">${monthPickerCardHtml('hr-metric')}</div>
+      <div class="empty">Нет заявок за ${monthLabel(activeMonth)||'выбранный месяц'}</div>`;
     return;
   }
   const totalAmt = data.reduce((s,e)=>s+(+e.amount||0),0);
@@ -6543,6 +6589,7 @@ function renderRoleJournal(containerId, payTypes){
   const paid = data.filter(e=>e.status==='paid').length;
   el.innerHTML = `
   <div class="hr-metric-grid" style="margin-bottom:1rem">
+    ${monthPickerCardHtml('hr-metric')}
     <div class="hr-metric"><div class="hr-metric-lbl">Записей</div><div class="hr-metric-val">${data.length}</div></div>
     <div class="hr-metric"><div class="hr-metric-lbl">Оплачено</div><div class="hr-metric-val" style="color:var(--green)">${paid}</div></div>
     <div class="hr-metric"><div class="hr-metric-lbl">Сумма FCS</div><div class="hr-metric-val" style="font-size:16px;color:var(--accent)">${totalAmt.toLocaleString('ru-RU')} ₽</div></div>
