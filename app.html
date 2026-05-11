@@ -5571,16 +5571,15 @@ window.ptnSaveModal = function(){
   const idx=document.getElementById('ptn-edit-idx').value;
 
   if(idx!==''){
-    // Редактирование
     window.ptnList[parseInt(idx)]={...window.ptnList[parseInt(idx)],name,contact,email,note};
   } else {
-    // Новый партнёр
     const topups = initDeposit>0 ? [{date:new Date().toISOString().split('T')[0],amount:initDeposit,note:'Начальный депозит'}] : [];
     window.ptnList.push({name,contact,email,note,topups});
   }
   window.ptnSave();
   ptnCloseModal();
-  ptnRender();
+  // Переключаемся на вкладку партнёров и рендерим
+  switchTabMenu('partners','🤝 Партнёры');
   showToast(idx!==''?'Партнёр обновлён':'Партнёр добавлен');
 };
 
