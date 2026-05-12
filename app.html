@@ -6316,7 +6316,8 @@ window.closeTextImportModal = function(){
 };
 
 // Парсер свободного текста → структура заявки (regex-эвристики)
-function parseTextToEntry(text){
+// LEGACY-парсер свободного текста (старая версия, оставлена как fallback)
+function parseTextToEntryFree(text){
   const r = {};
   if(!text) return r;
   const tt = text.toLowerCase();
@@ -6389,6 +6390,173 @@ function parseTextToEntry(text){
   return r;
 }
 
+// === НОВЫЙ парсер «строчно-меточный» под структурированный шаблон ===
+const LABEL_MAP = {
+  'ссылка на сделку':'link','ссылка':'link',
+  'направление':'dept_label',
+  'воронка':'funnel',
+  'ответственный':'responsible',
+  'дата поступления':'date','дата':'date',
+  'сумма оплаты fcs':'amount','сумма fcs':'amount',
+  'куда был перевод':'pay_label','тип оплаты fcs':'pay_label',
+  'дедлайн по платежу':'deadline','дедлайн':'deadline',
+  'тип оплаты контрагенту':'agent_pay_label',
+  'сумма оплаты контрагенту':'agent_amount',
+  'валюта':'currency_label',
+  'куда':'recipient_where','банк':'recipient_bank','кому':'recipient_who',
+  'комментарий':'comment','комиссия':'commission',
+};
+const DEPT_LABEL_TO_CODE = {
+  'logistics':'logistic','logistic':'logistic','логистика':'logistic',
+  'travel':'travel','тревел':'travel',
+  'lifestyle':'lifestyle','лайфстайл':'lifestyle',
+  'kbr':'kbr','кбр':'kbr',
+  'корп':'corp','corp':'corp','vip':'vip',
+};
+const PAY_LABEL_TO_CODE = {
+  'перевод на карту':'personal','карта':'personal','карта рф':'personal',
+  'по ссылке':'link','ссылка':'link',
+  'по qr':'qr','qr':'qr','qr-код':'qr','qr код':'qr',
+  'по счёту':'invoice','по счету':'invoice','счёт':'invoice','счет':'invoice',
+  'корп карта':'corporate','корп. карта':'corporate','корпоративная':'corporate',
+  'иностр. карта':'foreign','иностр карта':'foreign','иностранная карта':'foreign','иностранная':'foreign',
+  'депозит клиента':'deposit','депозит':'deposit',
+};
+const AGENT_PAY_LABEL_TO_CODE = {
+  'карта рф':'card_rf','карта':'card_rf',
+  'иностр. карта':'foreign_card','иностр карта':'foreign_card','иностранная карта':'foreign_card',
+  'корп карта':'corp_card','корп. карта':'corp_card','корп':'corp_card',
+  'счёт':'invoice','счет':'invoice','по счёту':'invoice','по счету':'invoice',
+  'наличные':'cash','нал':'cash',
+};
+const CURRENCY_LABEL_TO_CODE = {
+  'rub':'RUB','рубль':'RUB','руб':'RUB','₽':'RUB',
+  'usd':'USD','доллар':'USD','$':'USD',
+  'eur':'EUR','евро':'EUR','€':'EUR',
+  'aed':'AED','дирхам':'AED','kzt':'KZT','тенге':'KZT','cny':'CNY','юань':'CNY',
+};
+function normalizeLabel(s){
+  return (s||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/[*•·]+$/,'').trim();
+}
+function parseNumberRu(s){
+  if(!s) return null;
+  const cleaned = String(s).replace(/[\s ]/g,'').replace(',','.').replace(/\.(?=\d{3}\b)/g,'');
+  const m = cleaned.match(/-?\d+(?:\.\d+)?/);
+  return m ? parseFloat(m[0]) : null;
+}
+function parseDateRu(s){
+  if(!s) return null;
+  const m = s.match(/(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{2,4})/);
+  if(!m) return null;
+  let [_, d, mo, y] = m;
+  d = d.padStart(2,'0'); mo = mo.padStart(2,'0');
+  if(y.length===2) y = '20'+y;
+  return `${y}-${mo}-${d}`;
+}
+
+function parseTextToEntry(text){
+  const r = {};
+  if(!text) return r;
+  const lines = text.split('\n').map(l=>l.trim());
+
+  // 1) Ссылка АМО
+  const amoMatch = text.match(/https?:\/\/[^\s]*amocrm\.ru\/leads\/(?:detail\/)?(\d+)/i);
+  if(amoMatch){ r.link = amoMatch[0]; r.lead_id = amoMatch[1]; }
+
+  // 2) Построчный разбор «Метка - значение» / «Метка: значение»
+  const labeled = {};
+  const unlabeled = [];
+  const lineRe = /^([А-ЯЁA-Z][^\-:—]{0,40}?)\s*[\-—:]\s*(.*)$/i;
+  lines.forEach(line=>{
+    if(!line) return;
+    const m = line.match(lineRe);
+    if(m){
+      const key = normalizeLabel(m[1]);
+      if(key in LABEL_MAP){
+        const val = (m[2]||'').trim();
+        const slot = LABEL_MAP[key];
+        labeled[slot] = labeled[slot] ? labeled[slot]+'\n'+val : val;
+        return;
+      }
+    }
+    unlabeled.push(line);
+  });
+
+  // 3) Маппинг меток в поля
+  if(labeled.link && !r.link){
+    const am = labeled.link.match(/https?:\/\/[^\s]+/);
+    if(am) r.link = am[0];
+  }
+  if(labeled.dept_label){
+    const c = DEPT_LABEL_TO_CODE[normalizeLabel(labeled.dept_label)];
+    if(c) r.dept = c;
+  }
+  if(labeled.date){
+    const d = parseDateRu(labeled.date);
+    if(d) r.date = d;
+  }
+  if(labeled.amount){
+    const n = parseNumberRu(labeled.amount);
+    if(n!=null) r.amount = n;
+  }
+  if(labeled.pay_label){
+    const c = PAY_LABEL_TO_CODE[normalizeLabel(labeled.pay_label)];
+    if(c) r.pay = c;
+  }
+  if(labeled.agent_pay_label){
+    const c = AGENT_PAY_LABEL_TO_CODE[normalizeLabel(labeled.agent_pay_label)];
+    if(c) r.agent_pay_type = c;
+  }
+  if(labeled.agent_amount){
+    const n = parseNumberRu(labeled.agent_amount);
+    if(n!=null) r.agent_amount = n;
+  }
+  if(labeled.currency_label){
+    const cur = normalizeLabel(labeled.currency_label.replace(/\(.*?\)/g,''));
+    const c = CURRENCY_LABEL_TO_CODE[cur];
+    if(c) r.currency = c;
+  }
+  if(labeled.commission){
+    const n = parseNumberRu(labeled.commission);
+    if(n!=null) r.commission = n;
+  }
+
+  // 4) Наименование — первая строка до «Ссылка на сделку», без URL
+  let firstLine = lines.find(l=>l.length>0) || '';
+  const slIdx = firstLine.search(/ссылка\s+на\s+сделку/i);
+  if(slIdx>=0) firstLine = firstLine.slice(0, slIdx).trim();
+  firstLine = firstLine.replace(/https?:\/\/\S+/g,'').replace(/[\-—:\s]+$/,'').trim();
+  if(firstLine) r.service = firstLine;
+
+  // 5) Комментарий — детали получателя + ответственный + дедлайн + воронка + комментарий + всё непонятное
+  const commentParts = [];
+  if(labeled.responsible) commentParts.push(`Ответственный: ${labeled.responsible}`);
+  const recipientBits = [];
+  if(labeled.recipient_who)   recipientBits.push(labeled.recipient_who);
+  if(labeled.recipient_bank)  recipientBits.push('банк '+labeled.recipient_bank);
+  if(labeled.recipient_where) recipientBits.push('тел. '+labeled.recipient_where);
+  if(recipientBits.length) commentParts.push(`Получатель: ${recipientBits.join(', ')}`);
+  if(labeled.deadline) commentParts.push(`Дедлайн: ${labeled.deadline}`);
+  if(labeled.funnel)   commentParts.push(`Воронка: ${labeled.funnel}`);
+  if(labeled.comment)  commentParts.push(labeled.comment);
+  const skipPatterns = /^(информация по приходу|информация по расходу)$/i;
+  unlabeled.forEach(l=>{
+    if(skipPatterns.test(l)) return;
+    if(r.service && l===r.service) return;
+    if(r.link && l.includes(r.link)) return;
+    if(/^https?:\/\//i.test(l)) return;
+    commentParts.push(l);
+  });
+  if(commentParts.length) r.note = commentParts.join('\n');
+
+  // 6) Fallback на свободный текст, если меток вообще не было
+  if(Object.keys(labeled).length===0){
+    return parseTextToEntryFree(text);
+  }
+
+  return r;
+}
+
 window.textImportPreview = function(){
   const text = document.getElementById('text-import-input').value;
   const parsed = parseTextToEntry(text);
@@ -6399,13 +6567,16 @@ window.textImportPreview = function(){
   }
   const rows = [];
   if(parsed.service)        rows.push(['Наименование', parsed.service]);
-  if(parsed.client_name)    rows.push(['Клиент', parsed.client_name]);
-  if(parsed.agent)          rows.push(['Контрагент', parsed.agent]);
-  if(parsed.amount)         rows.push(['Сумма', parsed.amount.toLocaleString('ru-RU')+' '+(parsed.currency||'RUB')]);
-  if(parsed.agent_pay_type) rows.push(['Тип оплаты', AGENT_PAY[parsed.agent_pay_type]||parsed.agent_pay_type]);
-  if(parsed.dept)           rows.push(['Отдел', parsed.dept]);
-  if(parsed.pay)            rows.push(['Получение', parsed.pay]);
-  if(parsed.lead_id)        rows.push(['Лид АМО', parsed.lead_id]);
+  if(parsed.dept)           rows.push(['Направление', parsed.dept]);
+  if(parsed.date)           rows.push(['Дата FCS', parsed.date]);
+  if(parsed.amount)         rows.push(['Сумма FCS', parsed.amount.toLocaleString('ru-RU')+' ₽']);
+  if(parsed.pay)            rows.push(['Тип оплаты FCS', PAYS[parsed.pay]||parsed.pay]);
+  if(parsed.agent_amount)   rows.push(['Расход контрагенту', parsed.agent_amount.toLocaleString('ru-RU')+' '+(parsed.currency||'RUB')]);
+  if(parsed.currency)       rows.push(['Валюта', parsed.currency]);
+  if(parsed.agent_pay_type) rows.push(['Тип оплаты контрагенту', AGENT_PAY[parsed.agent_pay_type]||parsed.agent_pay_type]);
+  if(parsed.commission!=null) rows.push(['Комиссия', parsed.commission.toLocaleString('ru-RU')+' ₽']);
+  if(parsed.link)           rows.push(['Ссылка АМО', parsed.link]);
+  if(parsed.note)           rows.push(['Комментарий', `<pre style="white-space:pre-wrap;font-family:inherit;font-size:11px;color:var(--text2);margin:0">${parsed.note}</pre>`]);
   previewEl.innerHTML = `<div style="background:var(--bg3);padding:10px;border-radius:var(--radius-sm)">
     <div style="font-weight:500;color:var(--text);margin-bottom:6px">Распознано:</div>
     ${rows.map(([k,v])=>`<div style="margin:2px 0"><span style="color:var(--text3)">${k}: </span>${v}</div>`).join('')}
@@ -6419,26 +6590,38 @@ window.parseAndOpenEntry = function(){
   // Открываем стандартный модал и заполняем поля распознанным
   openAddEntry();
   setTimeout(()=>{
-    if(parsed.service)        document.getElementById('m-service').value = parsed.service;
-    if(parsed.client_name)    document.getElementById('m-client-name').value = parsed.client_name;
-    if(parsed.agent)          document.getElementById('m-agent').value = parsed.agent;
-    if(parsed.amount)         document.getElementById('m-amount').value = parsed.amount;
-    if(parsed.currency && parsed.currency!=='RUB'){
+    // Дата
+    if(parsed.date) document.getElementById('m-date').value = parsed.date;
+    // Направление
+    if(parsed.dept) document.getElementById('m-dept').value = parsed.dept;
+    // Наименование
+    if(parsed.service) document.getElementById('m-service').value = parsed.service;
+    // Клиент и контрагент — НЕ заполняем (по правилу), но если когда-нибудь будут — оставлю заглушки
+    if(parsed.client_name) document.getElementById('m-client-name').value = parsed.client_name;
+    if(parsed.agent)       document.getElementById('m-agent').value = parsed.agent;
+    // Приход от клиента
+    if(parsed.amount) document.getElementById('m-amount').value = parsed.amount;
+    if(parsed.pay)    document.getElementById('m-pay').value = parsed.pay;
+    // Расход контрагенту
+    if(parsed.agent_amount) document.getElementById('m-agent-amount').value = parsed.agent_amount;
+    if(parsed.currency){
       const cs = document.getElementById('m-agent-currency');
-      if(cs){ cs.value = parsed.currency; if(typeof onCurrencyChange==='function') onCurrencyChange(); }
+      if(cs){ cs.value = parsed.currency; if(parsed.currency!=='RUB' && typeof onCurrencyChange==='function') onCurrencyChange(); }
     }
-    if(parsed.amount){
-      // если сумма указана — это сумма FCS, скорее всего она же расход (можно поправить вручную)
-      const aa = document.getElementById('m-agent-amount');
-      if(aa && !aa.value) aa.value = parsed.amount;
+    if(parsed.agent_pay_type) document.getElementById('m-agent-pay-type').value = parsed.agent_pay_type;
+    // Комиссия (если в тексте была указана)
+    if(parsed.commission!=null){
+      document.getElementById('m-commission').value = parsed.commission;
+      commManual = true; // пометим как ручной ввод, чтобы автокалькулятор не переписал
+      const badge = document.getElementById('comm-manual-badge');
+      if(badge) badge.style.display = 'inline-block';
     }
-    if(parsed.agent_pay_type)  document.getElementById('m-agent-pay-type').value = parsed.agent_pay_type;
-    if(parsed.dept)            document.getElementById('m-dept').value = parsed.dept;
-    if(parsed.pay)             document.getElementById('m-pay').value = parsed.pay;
-    if(parsed.link)            document.getElementById('m-link').value = parsed.link;
-    // Триггерим перерасчёт калькулятора
-    if(typeof calcModal==='function') calcModal();
+    // Ссылка и комментарий
+    if(parsed.link) document.getElementById('m-link').value = parsed.link;
+    if(parsed.note) document.getElementById('m-note').value = parsed.note;
+    // Перерасчёт и UI-реакции
     if(typeof onAgentPayChange==='function') onAgentPayChange();
+    if(typeof calcModal==='function') calcModal();
     showToast('✨ Поля заполнены из текста — проверьте и сохраните');
   }, 100);
 };
