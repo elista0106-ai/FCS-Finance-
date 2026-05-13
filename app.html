@@ -1040,6 +1040,7 @@ tr:hover td{background:var(--bg2)}
     <div id="view-new-request" style="display:none"><div class="content"><div id="new-req-content"></div></div></div>
     <!-- УКО -->
     <div id="view-uko-losses" style="display:none"><div class="content"><div id="uko-losses-content"></div></div></div>
+    <div id="view-uko-losses-journal" style="display:none"><div class="content"><div id="uko-losses-journal-content"></div></div></div>
     <div id="view-uko-csi" style="display:none"><div class="content"><div id="uko-csi-content"></div></div></div>
     <div id="view-executor-journal" style="display:none"><div class="content"><div id="exec-journal-content"></div></div></div>
     <div id="view-partner-operations" style="display:none"><div class="content"><div id="partner-ops-content"></div></div></div>
@@ -2331,9 +2332,9 @@ function buildRoleMenu(role){
     ],
     uko: [
       {group:'УКО — Управление качеством'},
-      {id:'uko-losses',label:'⚠ Заявки с потерями'},
+      {id:'uko-losses',label:'⚠ Заявки с потерями (в работе)'},
+      {id:'uko-losses-journal',label:'📋 Журнал обработанных потерь'},
       {id:'uko-csi',label:'📊 CSI — низкие оценки'},
-      {id:'kpi',label:'🏆 KPI отделов'},
     ],
     partner_manager: [
       {group:'Партнёры'},
@@ -2433,7 +2434,7 @@ function switchTab(t){
     'financier-kpi','financier-commission','financier-cost','financier-analytics','financier-deposits',
     'executor-journal','partner-operations','partner-deposits',
     'cp-new-request','cp-my-requests','cp-inbox','cp-list','cp-contracts','cp-history',
-    'uko-losses','uko-csi'
+    'uko-losses','uko-losses-journal','uko-csi'
   ];
 
   allTabs.forEach(tab=>{
@@ -2467,6 +2468,7 @@ function switchTab(t){
   else if(t==='operations-journal') renderOperationsJournal();
   else if(t==='new-request') renderNewRequest();
   else if(t==='uko-losses') renderUkoLosses();
+  else if(t==='uko-losses-journal') renderUkoLossesJournal();
   else if(t==='uko-csi') renderUkoCsi();
   else if(t==='executor-journal') renderExecutorJournal();
   else if(t==='partner-operations') renderPartnerOperations();
@@ -5922,37 +5924,162 @@ function ukoEmployeeName(e){
   return e?._submitter_name || (e?.submitted_by ? 'ID:'+e.submitted_by.slice(0,8) : '—');
 }
 
+// Хелпер — построить ряды таблицы потерь
+function ukoLossRows(list){
+  return list.map(e=>{
+    const lead = (e.link||'').match(/(\d{7,})/)?.[1] || '';
+    return `<tr>
+      <td style="white-space:nowrap">${e.date||'—'}</td>
+      <td style="color:#60A5FA;font-size:11px;white-space:nowrap">${lead?'#'+lead:'—'}</td>
+      <td style="white-space:nowrap">${ukoEmployeeName(e)}</td>
+      <td>${e.dept||'—'}</td>
+      <td style="font-weight:500;white-space:normal;word-wrap:break-word;max-width:340px">${e.service||'—'}</td>
+      <td style="color:var(--red);font-weight:600;white-space:nowrap">${(+e.loss_amount||0).toLocaleString('ru-RU')} ₽</td>
+      <td style="font-size:11px;color:var(--text2);white-space:normal;word-wrap:break-word;max-width:320px">${e.loss_note||'—'}</td>
+      <td style="font-size:11px">${ukoStatusBadge(e.loss_uko_status)}</td>
+      <td><button class="btn btn-sm" onclick="ukoOpenReview('${e.id}')">${(e.loss_uko_status==='approved'||e.loss_uko_status==='rejected')?'Посмотреть':'Взять в работу'}</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function ukoStatusBadge(s){
+  const map = {
+    new:        {bg:'#FAEEDA',cl:'#633806',l:'🆕 Новая'},
+    in_progress:{bg:'#E6F1FB',cl:'#0C447C',l:'🔄 В работе'},
+    approved:   {bg:'#EAF3DE',cl:'#27500A',l:'✅ Одобрена'},
+    rejected:   {bg:'#FCEBEB',cl:'#791F1F',l:'❌ Отклонена'}
+  };
+  const x = map[s||'new'] || map.new;
+  return `<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${x.bg};color:${x.cl}">${x.l}</span>`;
+}
+
+// «В работе» — новые и in_progress
 async function renderUkoLosses(){
   const el = document.getElementById('uko-losses-content');
   if(!el) return;
-  const losses = (entries||[]).filter(e=>e.is_loss).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  const totalSum = losses.reduce((s,e)=>s+(+e.loss_amount||0),0);
+  const inWork = (entries||[]).filter(e=>e.is_loss && (!e.loss_uko_status || e.loss_uko_status==='new' || e.loss_uko_status==='in_progress'))
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const totalSum = inWork.reduce((s,e)=>s+(+e.loss_amount||0),0);
   el.innerHTML = `
-    <div style="font-size:14px;font-weight:600;margin-bottom:12px">⚠ Заявки с потерями (УКО)</div>
+    <div style="font-size:14px;font-weight:600;margin-bottom:12px">⚠ Потери в работе (УКО)</div>
     <div class="hr-metric-grid" style="margin-bottom:16px">
-      <div class="hr-metric"><div class="hr-metric-lbl">Всего заявок</div><div class="hr-metric-val">${losses.length}</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">В работе</div><div class="hr-metric-val">${inWork.length}</div></div>
       <div class="hr-metric"><div class="hr-metric-lbl">Сумма потерь</div><div class="hr-metric-val" style="color:var(--red);font-size:16px">${totalSum.toLocaleString('ru-RU')} ₽</div></div>
     </div>
-    ${losses.length ? `<div class="kpi-card" style="padding:0;overflow:hidden">
+    ${inWork.length ? `<div class="kpi-card" style="padding:0;overflow:hidden">
     <table class="hr-tbl">
-      <thead><tr><th>Дата</th><th>№ заявки</th><th>Исполнитель</th><th>Отдел</th><th>Наименование</th><th>Сумма потери</th><th>Причина</th><th></th></tr></thead>
-      <tbody>
-      ${losses.map(e=>{
-        const lead = (e.link||'').match(/(\d{7,})/)?.[1] || '';
-        return `<tr>
-          <td>${e.date||'—'}</td>
-          <td style="color:#60A5FA;font-size:11px">${lead?'#'+lead:'—'}</td>
-          <td>${ukoEmployeeName(e)}</td>
-          <td>${e.dept||'—'}</td>
-          <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.service||'').replace(/"/g,'&quot;')}">${e.service||'—'}</td>
-          <td style="color:var(--red);font-weight:600">${(+e.loss_amount||0).toLocaleString('ru-RU')} ₽</td>
-          <td style="font-size:11px;color:var(--text2)">${e.loss_note||'—'}</td>
-          <td><button class="btn btn-sm" onclick="openEdit('${e.id}')">Открыть</button></td>
-        </tr>`;
-      }).join('')}
-      </tbody>
-    </table></div>` : '<div class="empty">Заявок с потерями нет</div>'}`;
+      <thead><tr><th>Дата</th><th>№ заявки</th><th>Исполнитель</th><th>Отдел</th><th>Назначение платежа</th><th>Сумма потери</th><th>Причина (от заявителя)</th><th>Статус УКО</th><th></th></tr></thead>
+      <tbody>${ukoLossRows(inWork)}</tbody>
+    </table></div>` : '<div class="empty">Нет потерь в работе — все обработаны</div>'}`;
 }
+
+// Журнал — обработанные (approved/rejected)
+async function renderUkoLossesJournal(){
+  const el = document.getElementById('uko-losses-journal-content');
+  if(!el) return;
+  const done = (entries||[]).filter(e=>e.is_loss && (e.loss_uko_status==='approved' || e.loss_uko_status==='rejected'))
+    .sort((a,b)=>(b.loss_uko_reviewed_at||b.date||'').localeCompare(a.loss_uko_reviewed_at||a.date||''));
+  const totalSum = done.reduce((s,e)=>s+(+e.loss_amount||0),0);
+  const approved = done.filter(e=>e.loss_uko_status==='approved').length;
+  const rejected = done.filter(e=>e.loss_uko_status==='rejected').length;
+  el.innerHTML = `
+    <div style="font-size:14px;font-weight:600;margin-bottom:12px">📋 Журнал обработанных потерь</div>
+    <div class="hr-metric-grid" style="margin-bottom:16px">
+      <div class="hr-metric"><div class="hr-metric-lbl">Обработано</div><div class="hr-metric-val">${done.length}</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">Одобрено</div><div class="hr-metric-val" style="color:var(--green)">${approved}</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">Отклонено</div><div class="hr-metric-val" style="color:var(--red)">${rejected}</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">Сумма</div><div class="hr-metric-val" style="font-size:16px">${totalSum.toLocaleString('ru-RU')} ₽</div></div>
+    </div>
+    ${done.length ? `<div class="kpi-card" style="padding:0;overflow:hidden">
+    <table class="hr-tbl">
+      <thead><tr><th>Дата</th><th>№ заявки</th><th>Исполнитель</th><th>Отдел</th><th>Назначение платежа</th><th>Сумма потери</th><th>Причина</th><th>Статус УКО</th><th></th></tr></thead>
+      <tbody>${ukoLossRows(done)}</tbody>
+    </table></div>` : '<div class="empty">Журнал пуст</div>'}`;
+}
+
+// Открыть модал проверки УКО (отдельно от openEdit, только нужные поля)
+window.ukoOpenReview = function(entryId){
+  const e = (entries||[]).find(x=>x.id===entryId);
+  if(!e){ showToast('Запись не найдена'); return; }
+  const lead = (e.link||'').match(/(\d{7,})/)?.[1] || '';
+  // Опции виновного сотрудника — все активные из HR
+  const empOpts = (hrEmployees||[]).filter(h=>h.status==='active')
+    .map(h=>`<option value="${h.id}" ${e.loss_responsible_id===h.id?'selected':''}>${(h.last_name||'')+' '+(h.first_name||'')} · ${h.dept||''} · ${h.position||''}</option>`).join('');
+
+  const ex = document.getElementById('uko-review-modal'); if(ex) ex.remove();
+  const bg = document.createElement('div');
+  bg.id = 'uko-review-modal'; bg.className = 'modal-bg'; bg.style.display='flex';
+  bg.innerHTML = `<div class="modal" style="max-width:640px;max-height:92vh;overflow-y:auto">
+    <h3>⚠ Разбор потери (УКО)</h3>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Запись остаётся редактируемой только в полях УКО. Исходные данные заявки — справочные.</div>
+
+    <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div><span style="color:var(--text3)">Дата: </span><b>${e.date||'—'}</b></div>
+        <div><span style="color:var(--text3)">№ заявки: </span>${lead?`<a href="${e.link}" target="_blank" rel="noopener" style="color:#60A5FA">#${lead}</a>`:'—'}</div>
+        <div><span style="color:var(--text3)">Исполнитель: </span>${ukoEmployeeName(e)}</div>
+        <div><span style="color:var(--text3)">Отдел: </span>${e.dept||'—'}</div>
+      </div>
+      <div style="margin-bottom:6px"><span style="color:var(--text3)">Назначение платежа: </span><div style="margin-top:2px;line-height:1.4">${e.service||'—'}</div></div>
+      <div style="display:flex;gap:14px;font-size:13px;padding-top:6px;border-top:0.5px solid var(--border);margin-top:8px">
+        <div><span style="color:var(--text3)">Сумма потери: </span><b style="color:var(--red)">${(+e.loss_amount||0).toLocaleString('ru-RU')} ₽</b></div>
+      </div>
+      ${e.loss_note?`<div style="margin-top:6px"><span style="color:var(--text3)">Причина (от заявителя): </span><div style="margin-top:2px;line-height:1.4">${e.loss_note}</div></div>`:''}
+    </div>
+
+    <div class="field" style="margin-bottom:10px">
+      <label>Виноватый сотрудник</label>
+      <select id="uko-rev-emp">
+        <option value="">— не выбран —</option>
+        ${empOpts}
+      </select>
+    </div>
+
+    <div class="field" style="margin-bottom:10px">
+      <label>Комментарий УКО</label>
+      <textarea id="uko-rev-comment" rows="3" placeholder="Что выяснили, какие меры приняты...">${e.loss_uko_comment||''}</textarea>
+    </div>
+
+    <div class="field" style="margin-bottom:14px">
+      <label>Статус разбора</label>
+      <select id="uko-rev-status">
+        <option value="new"         ${(!e.loss_uko_status||e.loss_uko_status==='new')?'selected':''}>🆕 Новая</option>
+        <option value="in_progress" ${e.loss_uko_status==='in_progress'?'selected':''}>🔄 В работе</option>
+        <option value="approved"    ${e.loss_uko_status==='approved'?'selected':''}>✅ Одобрена (потеря подтверждена)</option>
+        <option value="rejected"    ${e.loss_uko_status==='rejected'?'selected':''}>❌ Отклонена</option>
+      </select>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">После «Одобрена» / «Отклонена» запись уйдёт в «📋 Журнал обработанных потерь».</div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:0.5px solid var(--border)">
+      <button class="btn" onclick="document.getElementById('uko-review-modal').remove()">Отмена</button>
+      <button class="btn btn-primary" onclick="ukoSaveReview('${e.id}')">💾 Сохранить</button>
+    </div>
+  </div>`;
+  bg.addEventListener('click', ev=>{ if(ev.target===bg) bg.remove(); });
+  document.body.appendChild(bg);
+};
+
+window.ukoSaveReview = async function(entryId){
+  const status = document.getElementById('uko-rev-status').value;
+  const comment = document.getElementById('uko-rev-comment').value.trim();
+  const empId = document.getElementById('uko-rev-emp').value || null;
+  const update = {
+    loss_uko_status: status,
+    loss_uko_comment: comment || null,
+    loss_responsible_id: empId,
+  };
+  if(status==='approved' || status==='rejected'){
+    update.loss_uko_reviewed_by = currentUser.id;
+    update.loss_uko_reviewed_at = new Date().toISOString();
+  }
+  const {error} = await (sb||window.sb).from('entries').update(update).eq('id', entryId);
+  if(error){ showToast('Ошибка: '+error.message); return; }
+  showToast('✓ Разбор сохранён');
+  document.getElementById('uko-review-modal')?.remove();
+  await loadEntries();
+  switchTab(activeTab);
+};
 
 // Список CSI оценок + форма добавления
 async function renderUkoCsi(){
@@ -5985,8 +6112,26 @@ async function renderUkoCsi(){
       <div class="hr-metric"><div class="hr-metric-lbl">Новых (без статуса)</div><div class="hr-metric-val" style="color:var(--amber)">${newCount}</div></div>
     </div>
 
-    <div class="kpi-card" style="padding:14px;margin-bottom:14px;max-width:720px">
-      <div style="font-size:12px;font-weight:600;margin-bottom:10px">+ Добавить оценку</div>
+    <!-- Источники загрузки CSI: вручную / Excel / Power BI (заглушка) -->
+    <div class="kpi-card" style="padding:14px;margin-bottom:14px;max-width:780px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:600">Загрузка оценок:</div>
+        <label class="btn btn-sm" style="cursor:pointer;margin:0">
+          📤 Импорт из Excel
+          <input type="file" id="csi-import-excel" accept=".xlsx,.xls,.csv" style="display:none" onchange="ukoCsiImportExcel(this)">
+        </label>
+        <button class="btn btn-sm" onclick="ukoCsiFetchPowerBI()" title="API Power BI пока не подключён">🔗 Из Power BI</button>
+        <span id="csi-import-status" style="font-size:11px;color:var(--text3)"></span>
+      </div>
+      <details style="margin-bottom:12px">
+        <summary style="cursor:pointer;font-size:11px;color:var(--text3)">📋 Какие колонки должны быть в Excel</summary>
+        <div style="font-size:11px;color:var(--text2);background:var(--bg3);padding:8px 10px;border-radius:var(--radius-sm);margin-top:6px">
+          Обязательные: <b>ФИО</b> (или <b>Фамилия</b> + <b>Имя</b>), <b>Оценка</b> (1–5).<br>
+          Необязательные: <b>Дата</b> (ГГГГ-ММ-ДД или ДД.ММ.ГГГГ), <b>Комментарий</b>.<br>
+          Сопоставление с сотрудником — по ФИО (поиск в HR-базе, регистр не важен).
+        </div>
+      </details>
+      <div style="font-size:12px;font-weight:600;margin-bottom:10px;border-top:0.5px solid var(--border);padding-top:12px">+ Добавить оценку вручную</div>
       <div class="grid2">
         <div class="field"><label>Сотрудник *</label>
           <select id="csi-emp">${empOpts || '<option value="">Нет активных сотрудников в HR</option>'}</select>
@@ -6057,6 +6202,164 @@ window.ukoDeleteCsi = async function(id){
   const {error} = await (sb||window.sb).from('csi_ratings').delete().eq('id', id);
   if(error){ showToast('Ошибка: '+error.message); return; }
   renderUkoCsi();
+};
+
+// =========================================================
+// ИМПОРТ CSI: Excel (сейчас) + Power BI API (на будущее)
+// =========================================================
+
+// Нормализация строки для матчинга ФИО (lowercase, trim, схлопывание пробелов, ё→е)
+function ukoNormStr(s){
+  return (s||'').toString().toLowerCase().trim().replace(/ё/g,'е').replace(/\s+/g,' ');
+}
+
+// Найти сотрудника по ФИО (в любом порядке: «Фамилия Имя» / «Имя Фамилия»)
+function ukoFindEmployeeByFio(fullName){
+  if(!fullName) return null;
+  const target = ukoNormStr(fullName);
+  const list = hrEmployees||[];
+  return list.find(e=>{
+    const ln = ukoNormStr(e.last_name);
+    const fn = ukoNormStr(e.first_name);
+    const mn = ukoNormStr(e.middle_name||'');
+    if(!ln && !fn) return false;
+    // Сравниваем сценарии: «Фамилия Имя [Отчество]» и «Имя Фамилия»
+    const v1 = [ln, fn, mn].filter(Boolean).join(' ');
+    const v2 = [fn, ln, mn].filter(Boolean).join(' ');
+    const v3 = [ln, fn].filter(Boolean).join(' ');
+    const v4 = [fn, ln].filter(Boolean).join(' ');
+    return target===v1 || target===v2 || target===v3 || target===v4;
+  }) || null;
+}
+
+// Парсинг даты «11.05.2026», «2026-05-11», «11/05/2026»
+function ukoParseDateAny(s){
+  if(!s) return null;
+  s = String(s).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m = s.match(/^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{2,4})/);
+  if(m){
+    let y = m[3]; if(y.length===2) y = '20'+y;
+    return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  }
+  return null;
+}
+
+window.ukoCsiImportExcel = async function(inp){
+  const file = inp?.files?.[0];
+  if(!file) return;
+  const statusEl = document.getElementById('csi-import-status');
+  if(statusEl) statusEl.textContent = '⏳ Чтение файла...';
+  try{
+    if(typeof XLSX === 'undefined'){ throw new Error('Библиотека XLSX не загружена'); }
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+    if(!rows.length){ throw new Error('Лист пустой'); }
+
+    // Маппинг колонок (регистронезависимо, разные синонимы)
+    const findKey = (row, names)=>{
+      const keys = Object.keys(row);
+      for(const k of keys){
+        const lk = ukoNormStr(k);
+        if(names.some(n=>lk===ukoNormStr(n) || lk.includes(ukoNormStr(n)))) return k;
+      }
+      return null;
+    };
+    const sample = rows[0];
+    const kFio  = findKey(sample, ['фио','исполнитель','сотрудник','full name','name','agent']);
+    const kLast = findKey(sample, ['фамилия','last name','surname']);
+    const kFirst= findKey(sample, ['имя','first name','given name']);
+    const kRate = findKey(sample, ['оценка','csi','rating','балл','score']);
+    const kDate = findKey(sample, ['дата','date','когда']);
+    const kComm = findKey(sample, ['комментарий','comment','отзыв','feedback','note']);
+
+    if(!kRate){ throw new Error('Не найдена колонка с оценкой (заголовок «Оценка» / «CSI» / «Rating»)'); }
+    if(!kFio && !(kLast && kFirst)){ throw new Error('Не найдена колонка с ФИО (или Фамилия+Имя)'); }
+
+    const toInsert = [];
+    const unmatched = [];
+    rows.forEach((r, idx)=>{
+      const rating = parseFloat(String(r[kRate]||'').replace(',','.'));
+      if(!rating || rating<1 || rating>5){ return; } // молча пропускаем
+      const fio = kFio ? r[kFio] : ((r[kLast]||'')+' '+(r[kFirst]||'')).trim();
+      const emp = ukoFindEmployeeByFio(fio);
+      if(!emp){ unmatched.push(fio||`строка ${idx+2}`); return; }
+      const created_at = ukoParseDateAny(r[kDate]) || null;
+      const row = {
+        employee_id: emp.id,
+        rating,
+        comment: r[kComm] ? String(r[kComm]).trim() : null,
+        status: 'new',
+        created_by: currentUser.id
+      };
+      if(created_at) row.created_at = created_at+'T00:00:00Z';
+      toInsert.push(row);
+    });
+
+    if(!toInsert.length){
+      throw new Error(`Не удалось распознать ни одной валидной строки. Не сопоставлено: ${unmatched.slice(0,5).join(', ')}${unmatched.length>5?'…':''}`);
+    }
+
+    if(statusEl) statusEl.textContent = `⏳ Сохранение ${toInsert.length} оценок...`;
+    const {error} = await (sb||window.sb).from('csi_ratings').insert(toInsert);
+    if(error) throw error;
+
+    const msg = `✓ Загружено ${toInsert.length} оценок${unmatched.length?`, не сопоставлено: ${unmatched.length} (см. консоль)`:''}`;
+    if(unmatched.length) console.warn('[CSI import] Не сопоставлены:', unmatched);
+    if(statusEl) statusEl.textContent = msg;
+    showToast(msg);
+    inp.value = ''; // сброс
+    renderUkoCsi();
+  }catch(err){
+    console.error('[CSI import] ', err);
+    if(statusEl) statusEl.textContent = '⚠ '+(err.message||err);
+    showToast('Ошибка импорта: '+(err.message||err));
+  }
+};
+
+// ============================================
+// POWER BI API — заглушка для будущего подключения
+// ============================================
+// План: после получения API-ключа Power BI и URL датасета — реализовать в этой функции
+// fetch к Power BI REST API (https://api.powerbi.com/v1.0/...) с Bearer-токеном,
+// парсить JSON и вставлять в csi_ratings так же, как ukoCsiImportExcel.
+// Конфиг должен лежать в Supabase (таблица integration_settings) или в env.
+window.POWERBI_CSI_CONFIG = window.POWERBI_CSI_CONFIG || {
+  enabled: false,
+  workspace_id: '',
+  dataset_id: '',
+  query: '',
+  // bearer_token: добывается через Azure AD client credentials или service principal
+};
+async function fetchCsiFromPowerBI(){
+  if(!window.POWERBI_CSI_CONFIG.enabled){
+    return { rows: [], reason: 'API Power BI не подключён (POWERBI_CSI_CONFIG.enabled = false)' };
+  }
+  // TODO: реальный fetch к Power BI REST API
+  // const res = await fetch(`https://api.powerbi.com/v1.0/myorg/groups/${cfg.workspace_id}/datasets/${cfg.dataset_id}/executeQueries`, {
+  //   method:'POST', headers:{Authorization:`Bearer ${token}`, 'Content-Type':'application/json'},
+  //   body: JSON.stringify({queries:[{query: cfg.query}], serializerSettings:{includeNulls:true}})
+  // });
+  // const data = await res.json();
+  // return {rows: data.results[0].tables[0].rows, reason: null};
+  return { rows: [], reason: 'Заглушка — реализация после получения ключа' };
+}
+
+window.ukoCsiFetchPowerBI = async function(){
+  const statusEl = document.getElementById('csi-import-status');
+  if(statusEl) statusEl.textContent = '⏳ Запрос к Power BI...';
+  const {rows, reason} = await fetchCsiFromPowerBI();
+  if(reason){
+    if(statusEl) statusEl.textContent = '🔗 '+reason;
+    showToast('🔗 '+reason+'. Пока используйте «Импорт из Excel».');
+    return;
+  }
+  // Когда API подключим — тут уже будет реальный insert
+  if(statusEl) statusEl.textContent = `✓ Из Power BI получено: ${rows.length} оценок`;
+  showToast(`✓ Из Power BI: ${rows.length} оценок (импорт ещё не реализован — после подключения API)`);
 };
 
 // ============================================================
