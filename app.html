@@ -5907,9 +5907,22 @@ function roleTbl(cols, rows){
   return `<table class="hr-tbl"><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 function opStatusBadge(s){
-  const map={pending:'⏳ Ожидает',processing:'🔄 В работе',confirmed:'✅ Проведено',rejected:'❌ Отклонено',completed:'✓ Завершено',revision:'↩ На доработку'};
-  const col={pending:'#FAEEDA',processing:'#E6F1FB',confirmed:'#EAF3DE',rejected:'#FCEBEB',completed:'#F1EFE8',revision:'#EEEDFE'};
-  const txt={pending:'#633806',processing:'#0C447C',confirmed:'#27500A',rejected:'#791F1F',completed:'#444441',revision:'#3C3489'};
+  // Поддерживаем статусы из двух источников: entries (pending/paid/cancelled/partial) и operations (pending/processing/confirmed/rejected/completed/revision)
+  const map={
+    pending:'⏳ Ожидает', processing:'🔄 В работе', confirmed:'✅ Проведено',
+    rejected:'❌ Отклонено', completed:'✓ Завершено', revision:'↩ На доработку',
+    paid:'✓ Оплачено', cancelled:'❌ Отменено', partial:'◐ Частично'
+  };
+  const col={
+    pending:'#FAEEDA', processing:'#E6F1FB', confirmed:'#EAF3DE',
+    rejected:'#FCEBEB', completed:'#F1EFE8', revision:'#EEEDFE',
+    paid:'#EAF3DE', cancelled:'#FCEBEB', partial:'#FAEEDA'
+  };
+  const txt={
+    pending:'#633806', processing:'#0C447C', confirmed:'#27500A',
+    rejected:'#791F1F', completed:'#444441', revision:'#3C3489',
+    paid:'#27500A', cancelled:'#791F1F', partial:'#633806'
+  };
   return `<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${col[s]||'#F1EFE8'};color:${txt[s]||'#444'}">${map[s]||s}</span>`;
 }
 function opTypeBadge(t){
