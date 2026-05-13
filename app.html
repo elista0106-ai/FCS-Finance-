@@ -1219,6 +1219,20 @@ tr:hover td{background:var(--bg2)}
       <input type="text" id="m-receipt" placeholder="Яндекс Диск...">
     </div>
   </div>
+  <!-- РЕКВИЗИТЫ ПОЛУЧАТЕЛЯ — куда платить (карта/телефон/ссылка) + PDF -->
+  <div style="background:#F1EFE8;border:0.5px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px">
+    <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px">💳 РЕКВИЗИТЫ ПОЛУЧАТЕЛЯ <span id="m-requisites-req" style="color:var(--red);display:none">*</span></div>
+    <input type="text" id="m-requisites-text" placeholder="Номер карты / телефон / ссылка на оплату / номер счёта…" style="width:100%;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);padding:7px 10px;font-size:13px;outline:none;margin-bottom:8px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <label class="btn btn-sm" style="cursor:pointer;margin:0">
+        📎 Прикрепить PDF
+        <input type="file" id="m-requisites-pdf" accept="application/pdf" style="display:none" onchange="onRequisitesPdfPicked(this)">
+      </label>
+      <span id="m-requisites-pdf-name" style="font-size:12px;color:var(--text3)"></span>
+      <button type="button" id="m-requisites-pdf-clear" onclick="clearRequisitesPdf()" style="display:none;background:none;border:none;color:var(--red);cursor:pointer;font-size:12px">✕ убрать</button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:6px">Хотя бы одно: текст или файл. До 10 МБ. Видно операционисту/бухгалтеру и в «Все заявки».</div>
+  </div>
   <!-- Расчёт комиссии -->
   <div id="calc-block" style="background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius);padding:12px;margin-bottom:12px;display:none">
     <div style="font-size:11px;font-weight:600;color:#2ECC71;margin-bottom:8px" id="calc-title">📊 Автоматический расчёт</div>
@@ -2514,8 +2528,46 @@ function openAddEntry(){
   // Показ красной звёздочки у «Тип оплаты контрагенту» — только если это заявка от исполнителя
   const reqStar = document.getElementById('m-agent-pay-type-req');
   if(reqStar) reqStar.style.display = (activeTab === 'new-request') ? 'inline' : 'none';
+  // Реквизиты получателя — очищаем и тоже показываем звёздочку только из «Новая заявка»
+  const reqText = document.getElementById('m-requisites-text');
+  const reqPdf  = document.getElementById('m-requisites-pdf');
+  const reqStar2 = document.getElementById('m-requisites-req');
+  if(reqText) reqText.value = '';
+  if(reqPdf){ reqPdf.value = ''; delete reqPdf.dataset.existingPath; }
+  document.getElementById('m-requisites-pdf-name').textContent = '';
+  document.getElementById('m-requisites-pdf-clear').style.display = 'none';
+  if(reqStar2) reqStar2.style.display = (activeTab === 'new-request') ? 'inline' : 'none';
   document.getElementById('modal').style.display = 'flex';
 }
+
+// Файл реквизитов выбран в input — показываем имя + кнопку «убрать»
+window.onRequisitesPdfPicked = function(inp){
+  const f = inp.files?.[0];
+  const nameEl = document.getElementById('m-requisites-pdf-name');
+  const clrEl  = document.getElementById('m-requisites-pdf-clear');
+  if(f){
+    nameEl.textContent = '📎 ' + f.name + ' (' + Math.round(f.size/1024) + ' КБ)';
+    clrEl.style.display = 'inline-block';
+    // Если выбрали новый файл — сбрасываем existingPath
+    delete inp.dataset.existingPath;
+  } else {
+    nameEl.textContent = '';
+    clrEl.style.display = 'none';
+  }
+};
+window.clearRequisitesPdf = function(){
+  const inp = document.getElementById('m-requisites-pdf');
+  if(inp){ inp.value=''; delete inp.dataset.existingPath; }
+  document.getElementById('m-requisites-pdf-name').textContent = '';
+  document.getElementById('m-requisites-pdf-clear').style.display = 'none';
+};
+// Открыть PDF реквизитов по signed URL
+window.openRequisitesPdf = async function(path){
+  if(!path) return;
+  const {data, error} = await (sb||window.sb).storage.from('invoices').createSignedUrl(path, 60*60*24*7);
+  if(error || !data?.signedUrl){ showToast('Не удалось открыть файл: '+(error?.message||'нет URL')); return; }
+  window.open(data.signedUrl, '_blank', 'noopener');
+};
 
 function openEdit(id){
   const e = entries.find(x=>x.id===id);
@@ -2555,6 +2607,26 @@ function openEdit(id){
   document.getElementById('m-deposit').value = e.deposit||'';
   document.getElementById('m-deposit-ref').value = e.deposit_ref||'';
   document.getElementById('comm-manual-badge').style.display = 'none';
+  // Реквизиты: текст и существующий PDF (если есть)
+  const reqTxt = document.getElementById('m-requisites-text');
+  const reqPdf = document.getElementById('m-requisites-pdf');
+  const reqName = document.getElementById('m-requisites-pdf-name');
+  const reqClr  = document.getElementById('m-requisites-pdf-clear');
+  if(reqTxt) reqTxt.value = e.payment_details_text || '';
+  if(reqPdf){ reqPdf.value = ''; if(e.payment_details_pdf) reqPdf.dataset.existingPath = e.payment_details_pdf; else delete reqPdf.dataset.existingPath; }
+  if(reqName){
+    if(e.payment_details_pdf){
+      const fileName = e.payment_details_pdf.split('/').pop();
+      reqName.innerHTML = `📎 <a href="#" onclick="event.preventDefault();openRequisitesPdf('${e.payment_details_pdf}')">${fileName}</a>`;
+      reqClr.style.display = 'inline-block';
+    } else {
+      reqName.textContent = '';
+      reqClr.style.display = 'none';
+    }
+  }
+  // Звёздочки обязательности при редактировании не показываем
+  const s1 = document.getElementById('m-agent-pay-type-req'); if(s1) s1.style.display = 'none';
+  const s2 = document.getElementById('m-requisites-req');     if(s2) s2.style.display = 'none';
   updateLeadPreview();
   calcModal();
   document.getElementById('modal').style.display = 'flex';
@@ -2882,11 +2954,41 @@ async function saveEntry(){
     deposit: +document.getElementById('m-deposit').value||0,
     deposit_ref: document.getElementById('m-deposit-ref').value.trim()||null,
     submitted_by: currentUser.id,
+    payment_details_text: document.getElementById('m-requisites-text')?.value.trim() || null,
   };
+
+  // PDF реквизитов — загрузка в Supabase Storage (bucket «invoices», подпапка requisites/)
+  const reqPdfInp = document.getElementById('m-requisites-pdf');
+  const reqPdfFile = reqPdfInp?.files?.[0];
+  // Признак существующего пути (если редактируем заявку и оставили старый файл)
+  const existingReqPdf = reqPdfInp?.dataset?.existingPath || null;
+  if(reqPdfFile){
+    if(reqPdfFile.type !== 'application/pdf'){ showToast('⚠ Файл реквизитов должен быть PDF'); return; }
+    if(reqPdfFile.size > 10*1024*1024){ showToast('⚠ Файл больше 10 МБ'); return; }
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth()+1).padStart(2,'0');
+    const uuid = (crypto.randomUUID?.()||Date.now().toString(36));
+    const path = `requisites/${yyyy}/${mm}/${uuid}.pdf`;
+    const {error:upErr} = await (sb||window.sb).storage.from('invoices').upload(path, reqPdfFile, {contentType:'application/pdf', upsert:false});
+    if(upErr){ showToast('Ошибка загрузки PDF: '+(upErr.message||'проверьте bucket «invoices»')); return; }
+    payload.payment_details_pdf = path;
+  } else if(existingReqPdf){
+    payload.payment_details_pdf = existingReqPdf;
+  } else {
+    payload.payment_details_pdf = null;
+  }
+
   // Если заявка создаётся с вкладки «⚡ Новая заявка» — помечаем from_form=true,
   // чтобы она попала в инбокс операциониста/бухгалтера.
   if(!editId && activeTab === 'new-request'){
     payload.from_form = true;
+    // Реквизиты обязательны при создании заявки исполнителем
+    if(!payload.payment_details_text && !payload.payment_details_pdf){
+      showToast('⚠ Заполните реквизиты получателя (текст или PDF)');
+      document.getElementById('m-requisites-text')?.focus();
+      return;
+    }
   }
 
   let error;
@@ -6066,13 +6168,18 @@ async function renderAccountingInbox(){
   console.log('[acc-inbox] rows:', inbox.length);
   if(!inbox.length){ el.innerHTML='<div class="empty">Нет входящих заявок</div>'; return; }
   el.innerHTML=roleCard(roleTbl(
-    ['Дата','Клиент','Тип','Сумма','Отдел','Статус',''],
+    ['Дата','Клиент','Тип','Расход','Отдел','💳 Реквизиты','Статус',''],
     inbox.map(e=>`<tr>
       <td>${e.date||'—'}</td>
       <td>${e.client_name||'—'}</td>
       <td style="font-size:11px">${AGENT_PAY[e.agent_pay_type]||e.agent_pay_type||'—'}</td>
-      <td><b>${(+e.amount||0).toLocaleString('ru-RU')} ${e.currency||'₽'}</b></td>
+      <td><b>${(+e.agent_amount||+e.amount||0).toLocaleString('ru-RU')} ${e.agent_currency||e.currency||'₽'}</b></td>
       <td>${e.dept||'—'}</td>
+      <td style="font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.payment_details_text||'').replace(/"/g,'&quot;')}">${
+        (e.payment_details_text ? `<span>${e.payment_details_text}</span>` : '') +
+        (e.payment_details_pdf ? ` <a href="#" onclick="event.preventDefault();openRequisitesPdf('${e.payment_details_pdf}')">📎</a>` : '') ||
+        '—'
+      }</td>
       <td>${opStatusBadge(e.status)}</td>
       <td><button class="btn btn-sm" onclick="openEdit('${e.id}')">Открыть</button></td>
     </tr>`).join('')
@@ -6147,13 +6254,18 @@ async function renderOperationsInbox(){
   console.log('[ops-inbox] rows:', inbox.length);
   if(!inbox.length){ el.innerHTML='<div class="empty">Нет входящих форм</div>'; return; }
   el.innerHTML=roleCard(roleTbl(
-    ['Дата','Клиент','Тип','Сумма','Отдел','Статус',''],
+    ['Дата','Клиент','Тип','Расход','Отдел','💳 Реквизиты','Статус',''],
     inbox.map(e=>`<tr>
       <td>${e.date||'—'}</td>
       <td>${e.client_name||'—'}</td>
       <td style="font-size:11px">${AGENT_PAY[e.agent_pay_type]||e.agent_pay_type||'—'}</td>
-      <td><b>${(+e.amount||0).toLocaleString('ru-RU')} ${e.currency||'₽'}</b></td>
+      <td><b>${(+e.agent_amount||+e.amount||0).toLocaleString('ru-RU')} ${e.agent_currency||e.currency||'₽'}</b></td>
       <td>${e.dept||'—'}</td>
+      <td style="font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.payment_details_text||'').replace(/"/g,'&quot;')}">${
+        (e.payment_details_text ? `<span>${e.payment_details_text}</span>` : '') +
+        (e.payment_details_pdf ? ` <a href="#" onclick="event.preventDefault();openRequisitesPdf('${e.payment_details_pdf}')">📎</a>` : '') ||
+        '—'
+      }</td>
       <td>${opStatusBadge(e.status)}</td>
       <td><button class="btn btn-sm" onclick="openEdit('${e.id}')">Открыть</button></td>
     </tr>`).join('')
