@@ -2845,6 +2845,11 @@ async function saveEntry(){
     deposit_ref: document.getElementById('m-deposit-ref').value.trim()||null,
     submitted_by: currentUser.id,
   };
+  // Если заявка создаётся с вкладки «⚡ Новая заявка» — помечаем from_form=true,
+  // чтобы она попала в инбокс операциониста/бухгалтера.
+  if(!editId && activeTab === 'new-request'){
+    payload.from_form = true;
+  }
 
   let error;
   if(editId){
@@ -6013,8 +6018,10 @@ async function renderAccountingInbox(){
   const el = document.getElementById('acc-inbox-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
-  // Читаем входящие заявки из entries (единственный источник правды)
+  // Читаем входящие заявки из entries — только те, что отправлены через форму «⚡ Новая заявка»
+  // (старые pending-записи, заведённые админом вручную, не попадают в инбокс — их видно в «📋 Все заявки»)
   const inbox = (entries||[]).filter(e=>
+    e.from_form === true &&
     (e.status==='pending' || e.status==='revision') &&
     INBOX_TYPES_ACCOUNTING.includes(e.agent_pay_type)
   ).sort((a,b)=>(b.created_at||b.date||'').localeCompare(a.created_at||a.date||''));
@@ -6093,7 +6100,9 @@ async function renderOperationsInbox(){
   const el = document.getElementById('ops-inbox-content');
   if(!el) return;
   el.innerHTML='<div class="empty">Загрузка...</div>';
+  // Читаем входящие заявки из entries — только те, что отправлены через форму «⚡ Новая заявка»
   const inbox = (entries||[]).filter(e=>
+    e.from_form === true &&
     (e.status==='pending' || e.status==='revision') &&
     INBOX_TYPES_OPERATIONS.includes(e.agent_pay_type)
   ).sort((a,b)=>(b.created_at||b.date||'').localeCompare(a.created_at||a.date||''));
