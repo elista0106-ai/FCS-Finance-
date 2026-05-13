@@ -1303,7 +1303,7 @@ tr:hover td{background:var(--bg2)}
     <div style="font-size:10px;color:var(--text3);margin-top:6px">Если клиент перевёл аванс на несколько заявок — укажите сколько зачтено в эту</div>
   </div>
   <div class="grid2">
-    <div class="field"><label>Статус</label>
+    <div class="field" id="m-status-field"><label>Статус</label>
       <select id="m-status">
         <option value="pending">Ожидает</option>
         <option value="paid">Оплачено</option>
@@ -1338,7 +1338,7 @@ tr:hover td{background:var(--bg2)}
   </div>
   <div class="modal-actions">
     <button class="btn" onclick="closeModal()">Отмена</button>
-    <button class="btn btn-primary" onclick="saveEntry()">💾 Сохранить</button>
+    <button class="btn btn-primary" id="m-save-btn" onclick="saveEntry()">💾 Сохранить</button>
   </div>
 </div>
 </div>
@@ -2537,6 +2537,15 @@ function openAddEntry(){
   document.getElementById('m-requisites-pdf-name').textContent = '';
   document.getElementById('m-requisites-pdf-clear').style.display = 'none';
   if(reqStar2) reqStar2.style.display = (activeTab === 'new-request') ? 'inline' : 'none';
+  // Если открываем из «⚡ Новая заявка» (исполнитель) — фиксируем статус «Ожидает» и прячем поле,
+  // меняем подпись кнопки на «Отправить на оплату»
+  const isExecutorFlow = (activeTab === 'new-request');
+  const statusField = document.getElementById('m-status-field');
+  const statusSel   = document.getElementById('m-status');
+  const saveBtn     = document.getElementById('m-save-btn');
+  if(statusSel) statusSel.value = 'pending';
+  if(statusField) statusField.style.display = isExecutorFlow ? 'none' : '';
+  if(saveBtn) saveBtn.innerHTML = isExecutorFlow ? '📤 Отправить на оплату' : '💾 Сохранить';
   document.getElementById('modal').style.display = 'flex';
 }
 
@@ -2627,6 +2636,11 @@ function openEdit(id){
   // Звёздочки обязательности при редактировании не показываем
   const s1 = document.getElementById('m-agent-pay-type-req'); if(s1) s1.style.display = 'none';
   const s2 = document.getElementById('m-requisites-req');     if(s2) s2.style.display = 'none';
+  // При редактировании возвращаем поле «Статус» и обычную надпись кнопки
+  const stF = document.getElementById('m-status-field');
+  const sb  = document.getElementById('m-save-btn');
+  if(stF) stF.style.display = '';
+  if(sb)  sb.innerHTML = '💾 Сохранить';
   updateLeadPreview();
   calcModal();
   document.getElementById('modal').style.display = 'flex';
@@ -7065,74 +7079,47 @@ function clientPaymentBadge(status){
 async function renderExecutorJournal(){
   const el = document.getElementById('exec-journal-content');
   if(!el) return;
-  el.innerHTML='<div class="empty">Загрузка...</div>';
+  // Берём ВСЕ записи из локального entries, отфильтрованные по submitted_by = текущий юзер
+  const mine = (entries||[]).filter(e => e.submitted_by === currentUser.id)
+    .sort((a,b)=>(b.created_at||b.date||'').localeCompare(a.created_at||a.date||''));
 
-  // Загружаем операции созданные этим пользователем
-  const {data:ops} = await (sb||window.sb).from('operations')
-    .select('*')
-    .eq('created_by', currentUser.id)
-    .order('created_at',{ascending:false});
-
-  const {data:reqs} = await (sb||window.sb).from('requests')
-    .select('*')
-    .eq('created_by', currentUser.id)
-    .order('created_at',{ascending:false});
-
-  const allOps = ops||[];
-  const allReqs = reqs||[];
-
-  if(!allOps.length && !allReqs.length){
-    el.innerHTML='<div class="empty">Вы ещё не создавали операций</div>';
+  if(!mine.length){
+    el.innerHTML = '<div class="empty">Вы ещё не создавали заявок</div>';
     return;
   }
 
-  // Статистика
-  const pending = allOps.filter(o=>o.status==='pending').length;
-  const completed = allOps.filter(o=>o.status==='completed').length;
-  const rejected = allOps.filter(o=>o.status==='rejected').length;
-  const revision = allOps.filter(o=>o.status==='revision').length;
+  // Статистика по статусам (entries использует pending/paid/cancelled/revision)
+  const pending   = mine.filter(e=>e.status==='pending').length;
+  const paid      = mine.filter(e=>e.status==='paid').length;
+  const cancelled = mine.filter(e=>e.status==='cancelled').length;
+  const revision  = mine.filter(e=>e.status==='revision').length;
 
-  el.innerHTML=`
+  el.innerHTML = `
   <div class="hr-metric-grid" style="margin-bottom:1rem">
-    <div class="hr-metric"><div class="hr-metric-lbl">Всего операций</div><div class="hr-metric-val">${allOps.length}</div></div>
-    <div class="hr-metric"><div class="hr-metric-lbl">Проведено</div><div class="hr-metric-val" style="color:var(--green)">${completed}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Всего заявок</div><div class="hr-metric-val">${mine.length}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Оплачено</div><div class="hr-metric-val" style="color:var(--green)">${paid}</div></div>
     <div class="hr-metric"><div class="hr-metric-lbl">Ожидает</div><div class="hr-metric-val" style="color:var(--amber)">${pending}</div></div>
     <div class="hr-metric"><div class="hr-metric-lbl">На доработку</div><div class="hr-metric-val" style="color:var(--purple)">${revision}</div></div>
-    <div class="hr-metric"><div class="hr-metric-lbl">Отклонено</div><div class="hr-metric-val" style="color:var(--red)">${rejected}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Отменено</div><div class="hr-metric-val" style="color:var(--red)">${cancelled}</div></div>
   </div>
 
-  ${allOps.length?`
-  <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Мои операции</div>
-  <div class="kpi-card" style="padding:0;overflow:hidden;margin-bottom:14px">
-  <table class="hr-tbl">
-    <thead><tr><th>Дата</th><th>Клиент</th><th>Тип</th><th>Сумма</th><th>Статус</th><th>Комментарий</th></tr></thead>
-    <tbody>
-    ${allOps.map(op=>`<tr>
-      <td>${op.operation_date||op.created_at?.split('T')[0]||'—'}</td>
-      <td>${op.client_name||'—'}</td>
-      <td style="font-size:11px">${opTypeBadge(op.operation_type)}</td>
-      <td><b>${(+op.amount||0).toLocaleString('ru-RU')} ${op.currency||'₽'}</b></td>
-      <td>${opStatusBadge(op.status)}</td>
-      <td style="font-size:11px;color:${op.status==='revision'?'var(--purple)':op.status==='rejected'?'var(--red)':'var(--text3)'}">${op.reject_reason||'—'}</td>
-    </tr>`).join('')}
-    </tbody>
-  </table></div>`:''}
-
-  ${allReqs.length?`
-  <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Мои запросы денег</div>
+  <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Мои заявки</div>
   <div class="kpi-card" style="padding:0;overflow:hidden">
   <table class="hr-tbl">
-    <thead><tr><th>Дата</th><th>Клиент</th><th>Способ</th><th>Сумма</th><th>Статус</th></tr></thead>
+    <thead><tr><th>Дата</th><th>Клиент</th><th>Наименование</th><th>Тип</th><th>Расход</th><th>Статус</th><th>Комментарий</th><th></th></tr></thead>
     <tbody>
-    ${allReqs.map(r=>`<tr>
-      <td>${r.created_at?.split('T')[0]||'—'}</td>
-      <td>${r.client_name||'—'}</td>
-      <td style="font-size:11px">${{link:'🔗 Ссылка',qr:'📱 QR',invoice:'📄 Счёт',corp_card:'💳 Корп'}[r.request_type]||r.request_type}</td>
-      <td><b>${(+r.amount||0).toLocaleString('ru-RU')} ₽</b></td>
-      <td>${opStatusBadge(r.status)}</td>
+    ${mine.map(e=>`<tr>
+      <td>${e.date||'—'}</td>
+      <td>${e.client_name||'—'}</td>
+      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.service||'').replace(/"/g,'&quot;')}">${e.service||'—'}</td>
+      <td style="font-size:11px">${AGENT_PAY[e.agent_pay_type]||e.agent_pay_type||'—'}</td>
+      <td><b>${(+e.agent_amount||+e.amount||0).toLocaleString('ru-RU')} ${e.agent_currency||e.currency||'₽'}</b></td>
+      <td>${opStatusBadge(e.status)}</td>
+      <td style="font-size:11px;color:${e.status==='revision'?'var(--purple)':e.status==='cancelled'?'var(--red)':'var(--text3)'}">${e.reject_reason||e.expense_note||'—'}</td>
+      <td><button class="btn btn-sm" onclick="openEdit('${e.id}')">Открыть</button></td>
     </tr>`).join('')}
     </tbody>
-  </table></div>`:''}`;
+  </table></div>`;
 }
 
 // ---- ФИНАНСИСТ ---- (legacy: «Общий журнал» удалён, оставлено для hot-revert)
