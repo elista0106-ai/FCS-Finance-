@@ -1039,7 +1039,9 @@ tr:hover td{background:var(--bg2)}
     <div id="view-operations-journal" style="display:none"><div class="content"><div id="ops-journal-content"></div></div></div>
     <div id="view-new-request" style="display:none"><div class="content"><div id="new-req-content"></div></div></div>
     <!-- УКО -->
-    <div id="view-uko-losses" style="display:none"><div class="content"><div id="uko-losses-content"></div></div></div>
+    <div id="view-uko-inbox" style="display:none"><div class="content"><div id="uko-inbox-content"></div></div></div>
+    <div id="view-uko-inwork" style="display:none"><div class="content"><div id="uko-inwork-content"></div></div></div>
+    <div id="view-uko-approval" style="display:none"><div class="content"><div id="uko-approval-content"></div></div></div>
     <div id="view-uko-losses-journal" style="display:none"><div class="content"><div id="uko-losses-journal-content"></div></div></div>
     <div id="view-uko-csi" style="display:none"><div class="content"><div id="uko-csi-content"></div></div></div>
     <div id="view-executor-journal" style="display:none"><div class="content"><div id="exec-journal-content"></div></div></div>
@@ -1324,9 +1326,12 @@ tr:hover td{background:var(--bg2)}
   <div class="field"><label>Комментарий</label>
     <textarea id="m-note" style="height:60px;resize:vertical" placeholder="Дополнительная информация..."></textarea>
   </div>
-  <div style="display:flex;gap:10px">
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
     <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
       <input type="checkbox" id="m-loss" onchange="toggleField('loss-fields',this.checked)"> ⚠ Потеря компании
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
+      <input type="checkbox" id="m-uko" title="Отправить заявку на разбор в отдел УКО"> 🛡 Направить в УКО
     </label>
     <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
       <input type="checkbox" id="m-expense" onchange="toggleField('expense-fields',this.checked)"> 💼 Расход компании
@@ -2252,7 +2257,7 @@ window.switchViewRole = function(role){
     hr:'hr', partner_manager:'partners',
     account_manager:'cp-new-request',
     contract_manager:'cp-inbox',
-    uko:'uko-losses'
+    uko:'uko-inbox'
   };
 
   if(titleEl) titleEl.textContent = roleNames[role]||'';
@@ -2332,7 +2337,9 @@ function buildRoleMenu(role){
     ],
     uko: [
       {group:'УКО — Управление качеством'},
-      {id:'uko-losses',label:'⚠ Заявки с потерями (в работе)'},
+      {id:'uko-inbox',label:'📥 Входящие заявки'},
+      {id:'uko-inwork',label:'🛠 Заявки в работе'},
+      {id:'uko-approval',label:'👁 На согласовании'},
       {id:'uko-losses-journal',label:'📋 Журнал обработанных потерь'},
       {id:'uko-csi',label:'📊 CSI — низкие оценки'},
     ],
@@ -2434,7 +2441,7 @@ function switchTab(t){
     'financier-kpi','financier-commission','financier-cost','financier-analytics','financier-deposits',
     'executor-journal','partner-operations','partner-deposits',
     'cp-new-request','cp-my-requests','cp-inbox','cp-list','cp-contracts','cp-history',
-    'uko-losses','uko-losses-journal','uko-csi'
+    'uko-inbox','uko-inwork','uko-approval','uko-losses-journal','uko-csi'
   ];
 
   allTabs.forEach(tab=>{
@@ -2467,7 +2474,9 @@ function switchTab(t){
   else if(t==='operations-inbox') renderOperationsInbox();
   else if(t==='operations-journal') renderOperationsJournal();
   else if(t==='new-request') renderNewRequest();
-  else if(t==='uko-losses') renderUkoLosses();
+  else if(t==='uko-inbox') renderUkoInbox();
+  else if(t==='uko-inwork') renderUkoInWork();
+  else if(t==='uko-approval') renderUkoApproval();
   else if(t==='uko-losses-journal') renderUkoLossesJournal();
   else if(t==='uko-csi') renderUkoCsi();
   else if(t==='executor-journal') renderExecutorJournal();
@@ -2530,6 +2539,7 @@ function openAddEntry(){
   document.getElementById('m-link').value = '';
   document.getElementById('m-note').value = '';
   document.getElementById('m-loss').checked = false;
+  const ukoCb1 = document.getElementById('m-uko'); if(ukoCb1) ukoCb1.checked = false;
   document.getElementById('m-expense').checked = false;
   document.getElementById('m-loss-amount').value = '';
   document.getElementById('m-loss-note').value = '';
@@ -2624,6 +2634,7 @@ function openEdit(id){
   document.getElementById('m-link').value = e.link||'';
   document.getElementById('m-note').value = e.note||'';
   document.getElementById('m-loss').checked = !!e.is_loss;
+  const ukoCb2 = document.getElementById('m-uko'); if(ukoCb2) ukoCb2.checked = !!e.is_uko;
   document.getElementById('m-expense').checked = !!e.is_expense;
   document.getElementById('m-loss-amount').value = e.loss_amount||'';
   document.getElementById('m-loss-note').value = e.loss_note||'';
@@ -2978,6 +2989,7 @@ async function saveEntry(){
     link: normalizedLink,
     note: document.getElementById('m-note').value.trim(),
     is_loss: document.getElementById('m-loss').checked,
+    is_uko: document.getElementById('m-uko')?.checked || false,
     loss_amount: +document.getElementById('m-loss-amount').value||0,
     loss_note: document.getElementById('m-loss-note').value.trim(),
     is_expense: document.getElementById('m-expense').checked,
@@ -5924,94 +5936,220 @@ function ukoEmployeeName(e){
   return e?._submitter_name || (e?.submitted_by ? 'ID:'+e.submitted_by.slice(0,8) : '—');
 }
 
-// Хелпер — построить ряды таблицы потерь
-function ukoLossRows(list){
-  return list.map(e=>{
-    const lead = (e.link||'').match(/(\d{7,})/)?.[1] || '';
-    return `<tr>
-      <td style="white-space:nowrap">${e.date||'—'}</td>
-      <td style="color:#60A5FA;font-size:11px;white-space:nowrap">${lead?'#'+lead:'—'}</td>
-      <td style="white-space:nowrap">${ukoEmployeeName(e)}</td>
-      <td>${e.dept||'—'}</td>
-      <td style="font-weight:500;white-space:normal;word-wrap:break-word;max-width:340px">${e.service||'—'}</td>
-      <td style="color:var(--red);font-weight:600;white-space:nowrap">${(+e.loss_amount||0).toLocaleString('ru-RU')} ₽</td>
-      <td style="font-size:11px;color:var(--text2);white-space:normal;word-wrap:break-word;max-width:320px">${e.loss_note||'—'}</td>
-      <td style="font-size:11px">${ukoStatusBadge(e.loss_uko_status)}</td>
-      <td><button class="btn btn-sm" onclick="ukoOpenReview('${e.id}')">${(e.loss_uko_status==='approved'||e.loss_uko_status==='rejected')?'Посмотреть':'Взять в работу'}</button></td>
-    </tr>`;
-  }).join('');
+// =============================================================
+// УКО — 4-этапный workflow:
+// 1) Входящие (is_uko=true AND uko_taken_by IS NULL)
+// 2) В работе (uko_taken_by IS NOT NULL AND (uko_lead_status IS NULL OR uko_lead_status='pending'))
+// 3) На согласовании (uko_lead_status='pending')
+// 4) Журнал (uko_sent_to_pay=true OR uko_lead_status='rejected')
+// =============================================================
+
+// Имя сотрудника УКО по auth user id (грубое сопоставление через hrEmployees.auth_user_id если есть, иначе через email из ptn... нет, просто id-фрагмент)
+function ukoUserDisplayName(userId){
+  if(!userId) return '—';
+  // hrEmployees может иметь auth_user_id — поищем
+  const emp = (hrEmployees||[]).find(e=>e.auth_user_id===userId);
+  if(emp) return (emp.last_name||'')+' '+(emp.first_name||'');
+  // fallback — короткий id
+  return 'ID:'+String(userId).slice(0,8);
 }
 
-function ukoStatusBadge(s){
-  const map = {
-    new:        {bg:'#FAEEDA',cl:'#633806',l:'🆕 Новая'},
-    in_progress:{bg:'#E6F1FB',cl:'#0C447C',l:'🔄 В работе'},
-    approved:   {bg:'#EAF3DE',cl:'#27500A',l:'✅ Одобрена'},
-    rejected:   {bg:'#FCEBEB',cl:'#791F1F',l:'❌ Отклонена'}
-  };
-  const x = map[s||'new'] || map.new;
-  return `<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${x.bg};color:${x.cl}">${x.l}</span>`;
+// Общий ряд таблицы с базовыми колонками потери
+function ukoRowBasic(e, extraCells){
+  const lead = (e.link||'').match(/(\d{7,})/)?.[1] || '';
+  return `<tr>
+    <td style="white-space:nowrap">${e.date||'—'}</td>
+    <td style="color:#60A5FA;font-size:11px;white-space:nowrap">${lead?'#'+lead:'—'}</td>
+    <td style="white-space:nowrap">${ukoEmployeeName(e)}</td>
+    <td>${e.dept||'—'}</td>
+    <td style="font-weight:500;white-space:normal;word-wrap:break-word;max-width:340px">${e.service||'—'}</td>
+    <td style="color:var(--red);font-weight:600;white-space:nowrap">${(+e.loss_amount||0).toLocaleString('ru-RU')} ₽</td>
+    <td style="font-size:11px;color:var(--text2);white-space:normal;word-wrap:break-word;max-width:320px">${e.loss_note||'—'}</td>
+    ${extraCells||''}
+  </tr>`;
 }
 
-// «В работе» — новые и in_progress
-async function renderUkoLosses(){
-  const el = document.getElementById('uko-losses-content');
+// ---- 1. ВХОДЯЩИЕ ----
+async function renderUkoInbox(){
+  const el = document.getElementById('uko-inbox-content');
   if(!el) return;
-  const inWork = (entries||[]).filter(e=>e.is_loss && (!e.loss_uko_status || e.loss_uko_status==='new' || e.loss_uko_status==='in_progress'))
+  const list = (entries||[]).filter(e=>e.is_uko && !e.uko_taken_by)
     .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  const totalSum = inWork.reduce((s,e)=>s+(+e.loss_amount||0),0);
+  const totalSum = list.reduce((s,e)=>s+(+e.loss_amount||0),0);
   el.innerHTML = `
-    <div style="font-size:14px;font-weight:600;margin-bottom:12px">⚠ Потери в работе (УКО)</div>
+    <div style="font-size:14px;font-weight:600;margin-bottom:12px">📥 Входящие заявки в УКО</div>
     <div class="hr-metric-grid" style="margin-bottom:16px">
-      <div class="hr-metric"><div class="hr-metric-lbl">В работе</div><div class="hr-metric-val">${inWork.length}</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">Входящих</div><div class="hr-metric-val">${list.length}</div></div>
       <div class="hr-metric"><div class="hr-metric-lbl">Сумма потерь</div><div class="hr-metric-val" style="color:var(--red);font-size:16px">${totalSum.toLocaleString('ru-RU')} ₽</div></div>
     </div>
-    ${inWork.length ? `<div class="kpi-card" style="padding:0;overflow:hidden">
+    ${list.length ? `<div class="kpi-card" style="padding:0;overflow:hidden">
     <table class="hr-tbl">
-      <thead><tr><th>Дата</th><th>№ заявки</th><th>Исполнитель</th><th>Отдел</th><th>Назначение платежа</th><th>Сумма потери</th><th>Причина (от заявителя)</th><th>Статус УКО</th><th></th></tr></thead>
-      <tbody>${ukoLossRows(inWork)}</tbody>
-    </table></div>` : '<div class="empty">Нет потерь в работе — все обработаны</div>'}`;
+      <thead><tr><th>Дата</th><th>№ заявки</th><th>Исполнитель</th><th>Отдел</th><th>Назначение платежа</th><th>Сумма</th><th>Причина</th><th></th></tr></thead>
+      <tbody>${list.map(e=>ukoRowBasic(e, `<td><button class="btn btn-sm btn-primary" onclick="ukoTakeInWork('${e.id}')">🛠 Взять в работу</button></td>`)).join('')}</tbody>
+    </table></div>` : '<div class="empty">Входящих заявок нет</div>'}`;
 }
 
-// Журнал — обработанные (approved/rejected)
-async function renderUkoLossesJournal(){
-  const el = document.getElementById('uko-losses-journal-content');
+window.ukoTakeInWork = async function(entryId){
+  const {error} = await (sb||window.sb).from('entries').update({
+    uko_taken_by: currentUser.id,
+    uko_taken_at: new Date().toISOString()
+  }).eq('id', entryId);
+  if(error){ showToast('Ошибка: '+error.message); return; }
+  showToast('✓ Заявка взята в работу');
+  await loadEntries();
+  switchTab(activeTab);
+};
+
+// ---- 2. В РАБОТЕ ----
+async function renderUkoInWork(){
+  const el = document.getElementById('uko-inwork-content');
   if(!el) return;
-  const done = (entries||[]).filter(e=>e.is_loss && (e.loss_uko_status==='approved' || e.loss_uko_status==='rejected'))
-    .sort((a,b)=>(b.loss_uko_reviewed_at||b.date||'').localeCompare(a.loss_uko_reviewed_at||a.date||''));
-  const totalSum = done.reduce((s,e)=>s+(+e.loss_amount||0),0);
-  const approved = done.filter(e=>e.loss_uko_status==='approved').length;
-  const rejected = done.filter(e=>e.loss_uko_status==='rejected').length;
+  // показываем все в работе (не только мои) — чтобы видеть кто взял
+  const list = (entries||[]).filter(e=>e.is_uko && e.uko_taken_by && !e.uko_sent_to_pay && e.uko_lead_status!=='approved' && e.uko_lead_status!=='rejected')
+    .sort((a,b)=>(b.uko_taken_at||b.date||'').localeCompare(a.uko_taken_at||a.date||''));
+  const mineCount = list.filter(e=>e.uko_taken_by===currentUser.id).length;
   el.innerHTML = `
-    <div style="font-size:14px;font-weight:600;margin-bottom:12px">📋 Журнал обработанных потерь</div>
+    <div style="font-size:14px;font-weight:600;margin-bottom:12px">🛠 Заявки в работе</div>
     <div class="hr-metric-grid" style="margin-bottom:16px">
-      <div class="hr-metric"><div class="hr-metric-lbl">Обработано</div><div class="hr-metric-val">${done.length}</div></div>
-      <div class="hr-metric"><div class="hr-metric-lbl">Одобрено</div><div class="hr-metric-val" style="color:var(--green)">${approved}</div></div>
-      <div class="hr-metric"><div class="hr-metric-lbl">Отклонено</div><div class="hr-metric-val" style="color:var(--red)">${rejected}</div></div>
-      <div class="hr-metric"><div class="hr-metric-lbl">Сумма</div><div class="hr-metric-val" style="font-size:16px">${totalSum.toLocaleString('ru-RU')} ₽</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">Всего в работе</div><div class="hr-metric-val">${list.length}</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">Из них мои</div><div class="hr-metric-val" style="color:var(--accent)">${mineCount}</div></div>
     </div>
-    ${done.length ? `<div class="kpi-card" style="padding:0;overflow:hidden">
+    ${list.length ? `<div class="kpi-card" style="padding:0;overflow:hidden">
     <table class="hr-tbl">
-      <thead><tr><th>Дата</th><th>№ заявки</th><th>Исполнитель</th><th>Отдел</th><th>Назначение платежа</th><th>Сумма потери</th><th>Причина</th><th>Статус УКО</th><th></th></tr></thead>
-      <tbody>${ukoLossRows(done)}</tbody>
-    </table></div>` : '<div class="empty">Журнал пуст</div>'}`;
+      <thead><tr><th>Дата</th><th>№ заявки</th><th>Исполнитель</th><th>Отдел</th><th>Назначение платежа</th><th>Сумма</th><th>Причина</th><th>Работает</th><th>Статус</th><th></th></tr></thead>
+      <tbody>${list.map(e=>{
+        const lead = (e.link||'').match(/(\d{7,})/)?.[1] || '';
+        const isMine = e.uko_taken_by === currentUser.id;
+        const onApproval = e.uko_lead_status === 'pending';
+        return `<tr style="${isMine?'background:rgba(96,165,250,0.06)':''}">
+          <td style="white-space:nowrap">${e.date||'—'}</td>
+          <td style="color:#60A5FA;font-size:11px;white-space:nowrap">${lead?'#'+lead:'—'}</td>
+          <td style="white-space:nowrap">${ukoEmployeeName(e)}</td>
+          <td>${e.dept||'—'}</td>
+          <td style="font-weight:500;white-space:normal;word-wrap:break-word;max-width:280px">${e.service||'—'}</td>
+          <td style="color:var(--red);font-weight:600;white-space:nowrap">${(+e.loss_amount||0).toLocaleString('ru-RU')} ₽</td>
+          <td style="font-size:11px;color:var(--text2);max-width:240px;word-wrap:break-word">${e.loss_note||'—'}</td>
+          <td style="font-size:11px">${ukoUserDisplayName(e.uko_taken_by)}${isMine?' <span style="color:var(--accent)">(вы)</span>':''}</td>
+          <td style="font-size:11px">${onApproval?'<span style="color:var(--amber)">⏳ На согласовании</span>':'<span style="color:var(--accent)">🛠 В работе</span>'}</td>
+          <td><button class="btn btn-sm" onclick="ukoOpenWorkModal('${e.id}')">${isMine?'Открыть':'Посмотреть'}</button></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>` : '<div class="empty">Заявок в работе нет</div>'}`;
 }
 
-// Открыть модал проверки УКО (отдельно от openEdit, только нужные поля)
-window.ukoOpenReview = function(entryId){
+// Модал «сотрудник УКО работает с заявкой»
+window.ukoOpenWorkModal = function(entryId){
   const e = (entries||[]).find(x=>x.id===entryId);
   if(!e){ showToast('Запись не найдена'); return; }
   const lead = (e.link||'').match(/(\d{7,})/)?.[1] || '';
-  // Опции виновного сотрудника — все активные из HR
   const empOpts = (hrEmployees||[]).filter(h=>h.status==='active')
     .map(h=>`<option value="${h.id}" ${e.loss_responsible_id===h.id?'selected':''}>${(h.last_name||'')+' '+(h.first_name||'')} · ${h.dept||''} · ${h.position||''}</option>`).join('');
+  const onApproval = e.uko_lead_status === 'pending';
 
-  const ex = document.getElementById('uko-review-modal'); if(ex) ex.remove();
+  const ex = document.getElementById('uko-work-modal'); if(ex) ex.remove();
   const bg = document.createElement('div');
-  bg.id = 'uko-review-modal'; bg.className = 'modal-bg'; bg.style.display='flex';
+  bg.id = 'uko-work-modal'; bg.className = 'modal-bg'; bg.style.display='flex';
   bg.innerHTML = `<div class="modal" style="max-width:640px;max-height:92vh;overflow-y:auto">
-    <h3>⚠ Разбор потери (УКО)</h3>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Запись остаётся редактируемой только в полях УКО. Исходные данные заявки — справочные.</div>
+    <h3>🛠 Разбор потери (УКО — сотрудник)</h3>
+    <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div><span style="color:var(--text3)">Дата: </span><b>${e.date||'—'}</b></div>
+        <div><span style="color:var(--text3)">№ заявки: </span>${lead?`<a href="${e.link}" target="_blank" rel="noopener" style="color:#60A5FA">#${lead}</a>`:'—'}</div>
+        <div><span style="color:var(--text3)">Исполнитель: </span>${ukoEmployeeName(e)}</div>
+        <div><span style="color:var(--text3)">Отдел: </span>${e.dept||'—'}</div>
+      </div>
+      <div><span style="color:var(--text3)">Назначение: </span><div style="line-height:1.4;margin-top:2px">${e.service||'—'}</div></div>
+      <div style="margin-top:8px"><span style="color:var(--text3)">Сумма потери: </span><b style="color:var(--red)">${(+e.loss_amount||0).toLocaleString('ru-RU')} ₽</b></div>
+      ${e.loss_note?`<div style="margin-top:6px"><span style="color:var(--text3)">Причина: </span><div style="line-height:1.4;margin-top:2px">${e.loss_note}</div></div>`:''}
+    </div>
+
+    <div class="field" style="margin-bottom:10px">
+      <label>Виноватый сотрудник</label>
+      <select id="uko-w-emp"><option value="">— не выбран —</option>${empOpts}</select>
+    </div>
+    <div class="field" style="margin-bottom:10px">
+      <label>Комментарий УКО</label>
+      <textarea id="uko-w-comment" rows="3" placeholder="Что выяснили, причины, меры...">${e.uko_employee_comment||''}</textarea>
+    </div>
+    <div class="field" style="margin-bottom:10px">
+      <label>Корректировка суммы потери (₽)</label>
+      <input type="number" id="uko-w-loss-amount" value="${+e.loss_amount||0}">
+    </div>
+    ${onApproval?`<div style="background:#FAEEDA;color:#633806;padding:8px 10px;border-radius:6px;font-size:12px;margin-bottom:12px">⏳ Заявка уже отправлена на согласование руководителю. Изменения сохранятся, но повторно отправлять не нужно.</div>`:''}
+
+    <div style="display:flex;gap:8px;justify-content:space-between;padding-top:12px;border-top:0.5px solid var(--border);flex-wrap:wrap">
+      <button class="btn" onclick="document.getElementById('uko-work-modal').remove()">Отмена</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="ukoSaveWork('${e.id}',false)">💾 Сохранить</button>
+        ${!onApproval?`<button class="btn btn-primary" onclick="ukoSaveWork('${e.id}',true)">📤 Отправить на согласование</button>`:''}
+      </div>
+    </div>
+  </div>`;
+  bg.addEventListener('click', ev=>{ if(ev.target===bg) bg.remove(); });
+  document.body.appendChild(bg);
+};
+
+window.ukoSaveWork = async function(entryId, sendForApproval){
+  const update = {
+    loss_responsible_id: document.getElementById('uko-w-emp').value || null,
+    uko_employee_comment: document.getElementById('uko-w-comment').value.trim() || null,
+    loss_amount: +document.getElementById('uko-w-loss-amount').value || 0,
+  };
+  if(sendForApproval){
+    update.uko_lead_status = 'pending';
+  }
+  const {error} = await (sb||window.sb).from('entries').update(update).eq('id', entryId);
+  if(error){ showToast('Ошибка: '+error.message); return; }
+  showToast(sendForApproval ? '📤 Отправлено на согласование руководителю' : '💾 Сохранено');
+  document.getElementById('uko-work-modal')?.remove();
+  await loadEntries();
+  switchTab(activeTab);
+};
+
+// ---- 3. НА СОГЛАСОВАНИИ (руководитель УКО) ----
+async function renderUkoApproval(){
+  const el = document.getElementById('uko-approval-content');
+  if(!el) return;
+  const list = (entries||[]).filter(e=>e.is_uko && e.uko_lead_status==='pending' && !e.uko_sent_to_pay)
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  el.innerHTML = `
+    <div style="font-size:14px;font-weight:600;margin-bottom:12px">👁 На согласовании у руководителя УКО</div>
+    <div class="hr-metric-grid" style="margin-bottom:16px">
+      <div class="hr-metric"><div class="hr-metric-lbl">На согласовании</div><div class="hr-metric-val" style="color:var(--amber)">${list.length}</div></div>
+    </div>
+    ${list.length ? `<div class="kpi-card" style="padding:0;overflow:hidden">
+    <table class="hr-tbl">
+      <thead><tr><th>Дата</th><th>№ заявки</th><th>Исполнитель</th><th>Отдел</th><th>Назначение</th><th>Сумма</th><th>Комментарий УКО</th><th>Подготовил</th><th></th></tr></thead>
+      <tbody>${list.map(e=>{
+        const lead = (e.link||'').match(/(\d{7,})/)?.[1] || '';
+        return `<tr>
+          <td style="white-space:nowrap">${e.date||'—'}</td>
+          <td style="color:#60A5FA;font-size:11px;white-space:nowrap">${lead?'#'+lead:'—'}</td>
+          <td style="white-space:nowrap">${ukoEmployeeName(e)}</td>
+          <td>${e.dept||'—'}</td>
+          <td style="font-weight:500;white-space:normal;word-wrap:break-word;max-width:260px">${e.service||'—'}</td>
+          <td style="color:var(--red);font-weight:600;white-space:nowrap">${(+e.loss_amount||0).toLocaleString('ru-RU')} ₽</td>
+          <td style="font-size:11px;max-width:260px;word-wrap:break-word">${e.uko_employee_comment||'—'}</td>
+          <td style="font-size:11px">${ukoUserDisplayName(e.uko_taken_by)}</td>
+          <td><button class="btn btn-sm btn-primary" onclick="ukoOpenApprovalModal('${e.id}')">Рассмотреть</button></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>` : '<div class="empty">Нет заявок на согласовании</div>'}`;
+}
+
+// Модал «руководитель УКО» — рассмотрение
+window.ukoOpenApprovalModal = function(entryId){
+  const e = (entries||[]).find(x=>x.id===entryId);
+  if(!e){ showToast('Запись не найдена'); return; }
+  const lead = (e.link||'').match(/(\d{7,})/)?.[1] || '';
+  const respEmp = (hrEmployees||[]).find(h=>h.id===e.loss_responsible_id);
+  const respName = respEmp ? `${respEmp.last_name||''} ${respEmp.first_name||''} (${respEmp.dept||''})` : '— не указан';
+
+  const ex = document.getElementById('uko-approval-modal'); if(ex) ex.remove();
+  const bg = document.createElement('div');
+  bg.id = 'uko-approval-modal'; bg.className = 'modal-bg'; bg.style.display='flex';
+  bg.innerHTML = `<div class="modal" style="max-width:640px;max-height:92vh;overflow-y:auto">
+    <h3>👁 Рассмотрение (руководитель УКО)</h3>
 
     <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:12px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
@@ -6020,65 +6158,157 @@ window.ukoOpenReview = function(entryId){
         <div><span style="color:var(--text3)">Исполнитель: </span>${ukoEmployeeName(e)}</div>
         <div><span style="color:var(--text3)">Отдел: </span>${e.dept||'—'}</div>
       </div>
-      <div style="margin-bottom:6px"><span style="color:var(--text3)">Назначение платежа: </span><div style="margin-top:2px;line-height:1.4">${e.service||'—'}</div></div>
-      <div style="display:flex;gap:14px;font-size:13px;padding-top:6px;border-top:0.5px solid var(--border);margin-top:8px">
+      <div><span style="color:var(--text3)">Назначение: </span><div style="line-height:1.4;margin-top:2px">${e.service||'—'}</div></div>
+      <div style="margin-top:8px;display:flex;gap:14px">
         <div><span style="color:var(--text3)">Сумма потери: </span><b style="color:var(--red)">${(+e.loss_amount||0).toLocaleString('ru-RU')} ₽</b></div>
+        <div><span style="color:var(--text3)">Виноватый: </span><b>${respName}</b></div>
       </div>
-      ${e.loss_note?`<div style="margin-top:6px"><span style="color:var(--text3)">Причина (от заявителя): </span><div style="margin-top:2px;line-height:1.4">${e.loss_note}</div></div>`:''}
+      ${e.loss_note?`<div style="margin-top:6px"><span style="color:var(--text3)">Причина (от заявителя): </span><div style="line-height:1.4;margin-top:2px">${e.loss_note}</div></div>`:''}
+      <div style="margin-top:8px;padding-top:8px;border-top:0.5px solid var(--border)">
+        <span style="color:var(--text3)">Подготовил УКО (${ukoUserDisplayName(e.uko_taken_by)}): </span>
+        <div style="line-height:1.4;margin-top:2px">${e.uko_employee_comment||'—'}</div>
+      </div>
     </div>
 
     <div class="field" style="margin-bottom:10px">
-      <label>Виноватый сотрудник</label>
-      <select id="uko-rev-emp">
-        <option value="">— не выбран —</option>
-        ${empOpts}
-      </select>
+      <label>Комментарий руководителя</label>
+      <textarea id="uko-l-comment" rows="3" placeholder="Решение, обоснование...">${e.uko_lead_comment||''}</textarea>
     </div>
 
-    <div class="field" style="margin-bottom:10px">
-      <label>Комментарий УКО</label>
-      <textarea id="uko-rev-comment" rows="3" placeholder="Что выяснили, какие меры приняты...">${e.loss_uko_comment||''}</textarea>
-    </div>
-
-    <div class="field" style="margin-bottom:14px">
-      <label>Статус разбора</label>
-      <select id="uko-rev-status">
-        <option value="new"         ${(!e.loss_uko_status||e.loss_uko_status==='new')?'selected':''}>🆕 Новая</option>
-        <option value="in_progress" ${e.loss_uko_status==='in_progress'?'selected':''}>🔄 В работе</option>
-        <option value="approved"    ${e.loss_uko_status==='approved'?'selected':''}>✅ Одобрена (потеря подтверждена)</option>
-        <option value="rejected"    ${e.loss_uko_status==='rejected'?'selected':''}>❌ Отклонена</option>
-      </select>
-      <div style="font-size:11px;color:var(--text3);margin-top:4px">После «Одобрена» / «Отклонена» запись уйдёт в «📋 Журнал обработанных потерь».</div>
-    </div>
-
-    <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:0.5px solid var(--border)">
-      <button class="btn" onclick="document.getElementById('uko-review-modal').remove()">Отмена</button>
-      <button class="btn btn-primary" onclick="ukoSaveReview('${e.id}')">💾 Сохранить</button>
+    <div style="display:flex;gap:8px;justify-content:space-between;padding-top:12px;border-top:0.5px solid var(--border);flex-wrap:wrap">
+      <button class="btn" onclick="document.getElementById('uko-approval-modal').remove()">Отмена</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" style="color:var(--red)" onclick="ukoLeadDecide('${e.id}','rejected')">❌ Отклонить</button>
+        <button class="btn" style="color:var(--green)" onclick="ukoLeadDecide('${e.id}','approved')">✅ Согласовать</button>
+        ${e.uko_lead_status==='approved'?`<button class="btn btn-primary" onclick="ukoSendToPayment('${e.id}')">📤 Отправить на оплату</button>`:''}
+      </div>
     </div>
   </div>`;
   bg.addEventListener('click', ev=>{ if(ev.target===bg) bg.remove(); });
   document.body.appendChild(bg);
 };
 
-window.ukoSaveReview = async function(entryId){
-  const status = document.getElementById('uko-rev-status').value;
-  const comment = document.getElementById('uko-rev-comment').value.trim();
-  const empId = document.getElementById('uko-rev-emp').value || null;
+window.ukoLeadDecide = async function(entryId, decision){
+  const comment = document.getElementById('uko-l-comment')?.value.trim() || null;
   const update = {
-    loss_uko_status: status,
-    loss_uko_comment: comment || null,
-    loss_responsible_id: empId,
+    uko_lead_status: decision,
+    uko_lead_by: currentUser.id,
+    uko_lead_at: new Date().toISOString(),
+    uko_lead_comment: comment
   };
-  if(status==='approved' || status==='rejected'){
-    update.loss_uko_reviewed_by = currentUser.id;
-    update.loss_uko_reviewed_at = new Date().toISOString();
-  }
+  // При rejected — сразу финализируем (запись уйдёт в Журнал)
+  // При approved — ждём «Отправить на оплату»
   const {error} = await (sb||window.sb).from('entries').update(update).eq('id', entryId);
   if(error){ showToast('Ошибка: '+error.message); return; }
-  showToast('✓ Разбор сохранён');
-  document.getElementById('uko-review-modal')?.remove();
+  if(decision==='approved'){
+    showToast('✅ Согласовано. Теперь нажмите «Отправить на оплату»');
+    await loadEntries();
+    // Переоткрыть модал в новом состоянии — будет видна кнопка Отправить на оплату
+    ukoOpenApprovalModal(entryId);
+  } else {
+    showToast('❌ Отклонено. Запись ушла в журнал');
+    document.getElementById('uko-approval-modal')?.remove();
+    await loadEntries();
+    switchTab(activeTab);
+  }
+};
+
+window.ukoSendToPayment = async function(entryId){
+  const {error} = await (sb||window.sb).from('entries').update({
+    uko_sent_to_pay: true,
+    uko_sent_to_pay_at: new Date().toISOString()
+  }).eq('id', entryId);
+  if(error){ showToast('Ошибка: '+error.message); return; }
+  showToast('📤 Отправлено на оплату — заявка появится у операциониста/бухгалтера');
+  document.getElementById('uko-approval-modal')?.remove();
   await loadEntries();
   switchTab(activeTab);
+};
+
+// ---- 4. ЖУРНАЛ ОБРАБОТАННЫХ ----
+async function renderUkoLossesJournal(){
+  const el = document.getElementById('uko-losses-journal-content');
+  if(!el) return;
+  const list = (entries||[]).filter(e=>e.is_uko && (e.uko_sent_to_pay===true || e.uko_lead_status==='rejected'))
+    .sort((a,b)=>(b.uko_sent_to_pay_at||b.uko_lead_at||b.date||'').localeCompare(a.uko_sent_to_pay_at||a.uko_lead_at||a.date||''));
+  const totalSum = list.reduce((s,e)=>s+(+e.loss_amount||0),0);
+  const sentToPay = list.filter(e=>e.uko_sent_to_pay).length;
+  const rejected = list.filter(e=>e.uko_lead_status==='rejected').length;
+  const paid = list.filter(e=>e.uko_sent_to_pay && e.status==='paid').length;
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+      <div style="font-size:14px;font-weight:600">📋 Журнал обработанных потерь</div>
+      <button class="btn btn-sm" onclick="ukoExportJournalExcel()">⬇ Выгрузить в Excel</button>
+    </div>
+    <div class="hr-metric-grid" style="margin-bottom:16px">
+      <div class="hr-metric"><div class="hr-metric-lbl">Обработано</div><div class="hr-metric-val">${list.length}</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">Отправлено на оплату</div><div class="hr-metric-val" style="color:var(--accent)">${sentToPay}</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">Уже оплачено</div><div class="hr-metric-val" style="color:var(--green)">${paid}</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">Отклонено</div><div class="hr-metric-val" style="color:var(--red)">${rejected}</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">Сумма потерь</div><div class="hr-metric-val" style="font-size:16px">${totalSum.toLocaleString('ru-RU')} ₽</div></div>
+    </div>
+    ${list.length ? `<div class="kpi-card" style="padding:0;overflow:hidden">
+    <table class="hr-tbl">
+      <thead><tr>
+        <th>Дата</th><th>№ заявки</th><th>Исполнитель</th><th>Отдел</th><th>Назначение</th>
+        <th>Сумма</th><th>Виноватый</th><th>Решение УКО</th><th>Оплата</th><th></th>
+      </tr></thead>
+      <tbody>${list.map(e=>{
+        const lead = (e.link||'').match(/(\d{7,})/)?.[1] || '';
+        const respEmp = (hrEmployees||[]).find(h=>h.id===e.loss_responsible_id);
+        const respName = respEmp ? `${respEmp.last_name||''} ${respEmp.first_name||''}` : '—';
+        const leadDecision = e.uko_lead_status==='approved' ? '<span style="color:var(--green)">✅ Согласовано</span>' : e.uko_lead_status==='rejected' ? '<span style="color:var(--red)">❌ Отклонено</span>' : '—';
+        const payStatus = !e.uko_sent_to_pay ? '<span style="color:var(--text3)">—</span>'
+          : e.status==='paid' ? '<span style="color:var(--green)">✓ Оплачено</span>'
+          : e.status==='cancelled' ? '<span style="color:var(--red)">Отменено</span>'
+          : '<span style="color:var(--amber)">⏳ Ожидает оплаты</span>';
+        return `<tr>
+          <td style="white-space:nowrap">${e.date||'—'}</td>
+          <td style="color:#60A5FA;font-size:11px;white-space:nowrap">${lead?'#'+lead:'—'}</td>
+          <td style="white-space:nowrap">${ukoEmployeeName(e)}</td>
+          <td>${e.dept||'—'}</td>
+          <td style="font-weight:500;white-space:normal;word-wrap:break-word;max-width:240px">${e.service||'—'}</td>
+          <td style="color:var(--red);font-weight:600;white-space:nowrap">${(+e.loss_amount||0).toLocaleString('ru-RU')} ₽</td>
+          <td style="font-size:11px">${respName}</td>
+          <td style="font-size:11px">${leadDecision}</td>
+          <td style="font-size:11px">${payStatus}</td>
+          <td><button class="btn btn-sm" onclick="ukoOpenApprovalModal('${e.id}')">Открыть</button></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>` : '<div class="empty">Журнал пуст</div>'}`;
+}
+
+window.ukoExportJournalExcel = function(){
+  const list = (entries||[]).filter(e=>e.is_uko && (e.uko_sent_to_pay===true || e.uko_lead_status==='rejected'));
+  if(!list.length){ showToast('Нет данных для выгрузки'); return; }
+  if(typeof XLSX === 'undefined'){ showToast('Библиотека XLSX не загружена'); return; }
+  const rows = list.map(e=>{
+    const lead = (e.link||'').match(/(\d{7,})/)?.[1] || '';
+    const respEmp = (hrEmployees||[]).find(h=>h.id===e.loss_responsible_id);
+    return {
+      'Дата заявки': e.date||'',
+      '№ заявки': lead?'#'+lead:'',
+      'Исполнитель': ukoEmployeeName(e),
+      'Отдел': e.dept||'',
+      'Назначение платежа': e.service||'',
+      'Сумма потери (₽)': +e.loss_amount||0,
+      'Причина (от заявителя)': e.loss_note||'',
+      'Виноватый сотрудник': respEmp ? `${respEmp.last_name||''} ${respEmp.first_name||''}` : '',
+      'Отдел виноватого': respEmp?.dept||'',
+      'Комментарий УКО': e.uko_employee_comment||'',
+      'Комментарий руководителя': e.uko_lead_comment||'',
+      'Решение УКО': e.uko_lead_status==='approved'?'Согласовано':e.uko_lead_status==='rejected'?'Отклонено':'',
+      'Дата решения': e.uko_lead_at?e.uko_lead_at.split('T')[0]:'',
+      'Отправлено на оплату': e.uko_sent_to_pay?'Да':'',
+      'Статус оплаты': e.status==='paid'?'Оплачено':e.status==='cancelled'?'Отменено':e.status==='pending'?'Ожидает':e.status||''
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'УКО — Журнал потерь');
+  XLSX.writeFile(wb, `UKO_journal_${new Date().toISOString().split('T')[0]}.xlsx`);
+  showToast('⬇ Файл выгружен');
 };
 
 // Список CSI оценок + форма добавления
@@ -6655,7 +6885,9 @@ async function renderAccountingInbox(){
   const inbox = (entries||[]).filter(e=>
     e.from_form === true &&
     (e.status==='pending' || e.status==='revision') &&
-    INBOX_TYPES_ACCOUNTING.includes(e.agent_pay_type)
+    INBOX_TYPES_ACCOUNTING.includes(e.agent_pay_type) &&
+    // заявки УКО (is_uko=true) показываем только после того, как УКО отправил их на оплату
+    (!e.is_uko || e.uko_sent_to_pay === true)
   ).sort((a,b)=>(b.created_at||b.date||'').localeCompare(a.created_at||a.date||''));
   console.log('[acc-inbox] rows:', inbox.length);
   if(!inbox.length){ el.innerHTML='<div class="empty">Нет входящих заявок</div>'; return; }
@@ -6741,7 +6973,8 @@ async function renderOperationsInbox(){
   const inbox = (entries||[]).filter(e=>
     e.from_form === true &&
     (e.status==='pending' || e.status==='revision') &&
-    INBOX_TYPES_OPERATIONS.includes(e.agent_pay_type)
+    INBOX_TYPES_OPERATIONS.includes(e.agent_pay_type) &&
+    (!e.is_uko || e.uko_sent_to_pay === true)
   ).sort((a,b)=>(b.created_at||b.date||'').localeCompare(a.created_at||a.date||''));
   console.log('[ops-inbox] rows:', inbox.length);
   if(!inbox.length){ el.innerHTML='<div class="empty">Нет входящих форм</div>'; return; }
