@@ -7089,48 +7089,110 @@ function clientPaymentBadge(status){
   return `<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:${s.bg};color:${s.cl}">${s.l}</span>`;
 }
 
+// Состояние сортировки и фильтра для журнала исполнителя
+window.execJournalState = window.execJournalState || { sortKey:'date', sortDir:'desc', filterStatus:'' };
+
+window.execJournalSetSort = function(key){
+  const s = window.execJournalState;
+  if(s.sortKey === key) s.sortDir = (s.sortDir === 'asc' ? 'desc' : 'asc');
+  else { s.sortKey = key; s.sortDir = 'desc'; }
+  renderExecutorJournal();
+};
+window.execJournalSetFilter = function(val){
+  window.execJournalState.filterStatus = val;
+  renderExecutorJournal();
+};
+
 async function renderExecutorJournal(){
   const el = document.getElementById('exec-journal-content');
   if(!el) return;
-  // Берём ВСЕ записи из локального entries, отфильтрованные по submitted_by = текущий юзер
-  const mine = (entries||[]).filter(e => e.submitted_by === currentUser.id)
-    .sort((a,b)=>(b.created_at||b.date||'').localeCompare(a.created_at||a.date||''));
+  // Все записи юзера
+  let mine = (entries||[]).filter(e => e.submitted_by === currentUser.id);
 
-  if(!mine.length){
-    el.innerHTML = '<div class="empty">Вы ещё не создавали заявок</div>';
-    return;
-  }
-
-  // Статистика по статусам (entries использует pending/paid/cancelled/revision)
+  // Статистика по статусам (по всем, без фильтра — общая картина)
   const pending   = mine.filter(e=>e.status==='pending').length;
   const paid      = mine.filter(e=>e.status==='paid').length;
   const cancelled = mine.filter(e=>e.status==='cancelled').length;
   const revision  = mine.filter(e=>e.status==='revision').length;
+  const totalAll  = mine.length;
+
+  // Фильтр по статусу
+  const st = window.execJournalState;
+  if(st.filterStatus) mine = mine.filter(e => e.status === st.filterStatus);
+
+  // Сортировка
+  const dir = st.sortDir === 'asc' ? 1 : -1;
+  mine.sort((a,b)=>{
+    let av, bv;
+    if(st.sortKey === 'date'){ av = a.date||''; bv = b.date||''; }
+    else if(st.sortKey === 'lead'){ av = +getLeadNum(a.link||'')||0; bv = +getLeadNum(b.link||'')||0; }
+    else if(st.sortKey === 'amount'){ av = +a.agent_amount||+a.amount||0; bv = +b.agent_amount||+b.amount||0; }
+    else if(st.sortKey === 'status'){ av = a.status||''; bv = b.status||''; }
+    else { av = a[st.sortKey]||''; bv = b[st.sortKey]||''; }
+    if(av < bv) return -1*dir;
+    if(av > bv) return 1*dir;
+    return 0;
+  });
+
+  if(!totalAll){
+    el.innerHTML = '<div class="empty">Вы ещё не создавали заявок</div>';
+    return;
+  }
+
+  const arrow = key => st.sortKey===key ? (st.sortDir==='asc'?' ▲':' ▼') : '';
+  const sortable = (key,label) => `<th onclick="execJournalSetSort('${key}')" style="cursor:pointer;user-select:none">${label}${arrow(key)}</th>`;
 
   el.innerHTML = `
   <div class="hr-metric-grid" style="margin-bottom:1rem">
-    <div class="hr-metric"><div class="hr-metric-lbl">Всего заявок</div><div class="hr-metric-val">${mine.length}</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Всего заявок</div><div class="hr-metric-val">${totalAll}</div></div>
     <div class="hr-metric"><div class="hr-metric-lbl">Оплачено</div><div class="hr-metric-val" style="color:var(--green)">${paid}</div></div>
     <div class="hr-metric"><div class="hr-metric-lbl">Ожидает</div><div class="hr-metric-val" style="color:var(--amber)">${pending}</div></div>
     <div class="hr-metric"><div class="hr-metric-lbl">На доработку</div><div class="hr-metric-val" style="color:var(--purple)">${revision}</div></div>
     <div class="hr-metric"><div class="hr-metric-lbl">Отменено</div><div class="hr-metric-val" style="color:var(--red)">${cancelled}</div></div>
   </div>
 
-  <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Мои заявки</div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+    <div style="font-size:12px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">Мои заявки</div>
+    <span style="font-size:12px;color:var(--text3)">${mine.length} из ${totalAll}</span>
+    <span style="margin-left:auto"></span>
+    <label style="font-size:12px;color:var(--text3)">Статус:</label>
+    <select onchange="execJournalSetFilter(this.value)" style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);padding:5px 8px;font-size:12px">
+      <option value="" ${st.filterStatus===''?'selected':''}>Все</option>
+      <option value="pending"   ${st.filterStatus==='pending'?'selected':''}>⏳ Ожидает</option>
+      <option value="paid"      ${st.filterStatus==='paid'?'selected':''}>✓ Оплачено</option>
+      <option value="revision"  ${st.filterStatus==='revision'?'selected':''}>↩ На доработку</option>
+      <option value="cancelled" ${st.filterStatus==='cancelled'?'selected':''}>❌ Отменено</option>
+    </select>
+  </div>
+
   <div class="kpi-card" style="padding:0;overflow:hidden">
   <table class="hr-tbl">
-    <thead><tr><th>Дата</th><th>Клиент</th><th>Наименование</th><th>Тип</th><th>Расход</th><th>Статус</th><th>Комментарий</th><th></th></tr></thead>
+    <thead><tr>
+      ${sortable('lead','№ заявки')}
+      ${sortable('date','Дата')}
+      <th>Клиент</th>
+      <th>Наименование</th>
+      <th>Тип</th>
+      ${sortable('amount','Расход')}
+      ${sortable('status','Статус')}
+      <th>Комментарий</th>
+      <th></th>
+    </tr></thead>
     <tbody>
-    ${mine.map(e=>`<tr>
-      <td>${e.date||'—'}</td>
-      <td>${e.client_name||'—'}</td>
-      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.service||'').replace(/"/g,'&quot;')}">${e.service||'—'}</td>
-      <td style="font-size:11px">${AGENT_PAY[e.agent_pay_type]||e.agent_pay_type||'—'}</td>
-      <td><b>${(+e.agent_amount||+e.amount||0).toLocaleString('ru-RU')} ${e.agent_currency||e.currency||'₽'}</b></td>
-      <td>${opStatusBadge(e.status)}</td>
-      <td style="font-size:11px;color:${e.status==='revision'?'var(--purple)':e.status==='cancelled'?'var(--red)':'var(--text3)'}">${e.reject_reason||e.expense_note||'—'}</td>
-      <td><button class="btn btn-sm" onclick="openEdit('${e.id}')">Открыть</button></td>
-    </tr>`).join('')}
+    ${mine.length ? mine.map(e=>{
+      const lead = getLeadNum(e.link||'');
+      return `<tr>
+        <td style="font-size:11px;color:${lead?'#60A5FA':'var(--text3)'}">${lead?'#'+lead:'—'}</td>
+        <td>${e.date||'—'}</td>
+        <td>${e.client_name||'—'}</td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.service||'').replace(/"/g,'&quot;')}">${e.service||'—'}</td>
+        <td style="font-size:11px">${AGENT_PAY[e.agent_pay_type]||e.agent_pay_type||'—'}</td>
+        <td><b>${(+e.agent_amount||+e.amount||0).toLocaleString('ru-RU')} ${e.agent_currency||e.currency||'₽'}</b></td>
+        <td>${opStatusBadge(e.status)}</td>
+        <td style="font-size:11px;color:${e.status==='revision'?'var(--purple)':e.status==='cancelled'?'var(--red)':'var(--text3)'}">${e.reject_reason||e.expense_note||'—'}</td>
+        <td><button class="btn btn-sm" onclick="openEdit('${e.id}')">Открыть</button></td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text3)">Нет заявок с выбранным фильтром</td></tr>`}
     </tbody>
   </table></div>`;
 }
