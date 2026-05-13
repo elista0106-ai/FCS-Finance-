@@ -402,6 +402,7 @@ tr:hover td{background:var(--bg2)}
     <button class="rs-btn" onclick="switchViewRole('partner_manager')">🤝 Партнёры</button>
     <button class="rs-btn" onclick="switchViewRole('account_manager')">💼 Аккаунт</button>
     <button class="rs-btn" onclick="switchViewRole('contract_manager')">📄 Договорной</button>
+    <button class="rs-btn" onclick="switchViewRole('uko')">🛡 УКО</button>
     <button class="rs-btn" onclick="switchViewRole('admin')" style="margin-left:auto">✕ Сбросить</button>
   </div>
 
@@ -1037,6 +1038,9 @@ tr:hover td{background:var(--bg2)}
     <div id="view-operations-inbox" style="display:none"><div class="content"><div id="ops-inbox-content"></div></div></div>
     <div id="view-operations-journal" style="display:none"><div class="content"><div id="ops-journal-content"></div></div></div>
     <div id="view-new-request" style="display:none"><div class="content"><div id="new-req-content"></div></div></div>
+    <!-- УКО -->
+    <div id="view-uko-losses" style="display:none"><div class="content"><div id="uko-losses-content"></div></div></div>
+    <div id="view-uko-csi" style="display:none"><div class="content"><div id="uko-csi-content"></div></div></div>
     <div id="view-executor-journal" style="display:none"><div class="content"><div id="exec-journal-content"></div></div></div>
     <div id="view-partner-operations" style="display:none"><div class="content"><div id="partner-ops-content"></div></div></div>
     <div id="view-partner-deposits" style="display:none"><div class="content"><div id="partner-dep-content"></div></div></div>
@@ -2238,14 +2242,16 @@ window.switchViewRole = function(role){
     operations:'⚙️ Операционист', financier:'📊 Финансист',
     hr:'👥 НР', partner_manager:'🤝 Партнёрский менеджер',
     account_manager:'💼 Аккаунт-менеджер',
-    contract_manager:'📄 Договорной отдел'
+    contract_manager:'📄 Договорной отдел',
+    uko:'🛡 УКО — Управление качеством'
   };
   const defaultTabs = {
     executor:'new-request', accounting:'accounting-inbox',
     operations:'operations-inbox', financier:'main',
     hr:'hr', partner_manager:'partners',
     account_manager:'cp-new-request',
-    contract_manager:'cp-inbox'
+    contract_manager:'cp-inbox',
+    uko:'uko-losses'
   };
 
   if(titleEl) titleEl.textContent = roleNames[role]||'';
@@ -2322,6 +2328,12 @@ function buildRoleMenu(role){
     hr: [
       {group:'НР'},
       {id:'hr',label:'👥 HR — Сотрудники'},
+    ],
+    uko: [
+      {group:'УКО — Управление качеством'},
+      {id:'uko-losses',label:'⚠ Заявки с потерями'},
+      {id:'uko-csi',label:'📊 CSI — низкие оценки'},
+      {id:'kpi',label:'🏆 KPI отделов'},
     ],
     partner_manager: [
       {group:'Партнёры'},
@@ -2420,7 +2432,8 @@ function switchTab(t){
     'operations-inbox','operations-journal','new-request',
     'financier-kpi','financier-commission','financier-cost','financier-analytics','financier-deposits',
     'executor-journal','partner-operations','partner-deposits',
-    'cp-new-request','cp-my-requests','cp-inbox','cp-list','cp-contracts','cp-history'
+    'cp-new-request','cp-my-requests','cp-inbox','cp-list','cp-contracts','cp-history',
+    'uko-losses','uko-csi'
   ];
 
   allTabs.forEach(tab=>{
@@ -2453,6 +2466,8 @@ function switchTab(t){
   else if(t==='operations-inbox') renderOperationsInbox();
   else if(t==='operations-journal') renderOperationsJournal();
   else if(t==='new-request') renderNewRequest();
+  else if(t==='uko-losses') renderUkoLosses();
+  else if(t==='uko-csi') renderUkoCsi();
   else if(t==='executor-journal') renderExecutorJournal();
   else if(t==='partner-operations') renderPartnerOperations();
   else if(t==='partner-deposits') renderPartnerDeposits();
@@ -5896,6 +5911,153 @@ document.getElementById('ptn-modal')?.addEventListener('click',function(e){
 ptnLoad();
 
 })(); // end Partners module
+
+// ============================================================
+// UKO (Управление качеством) MODULE
+// ============================================================
+
+// Сопоставление submitted_by (auth user id) → ФИО сотрудника из hr_employees
+// HR-табл связана через email; для упрощения используем то, что доступно в hrEmployees / entries._submitter_name
+function ukoEmployeeName(e){
+  return e?._submitter_name || (e?.submitted_by ? 'ID:'+e.submitted_by.slice(0,8) : '—');
+}
+
+async function renderUkoLosses(){
+  const el = document.getElementById('uko-losses-content');
+  if(!el) return;
+  const losses = (entries||[]).filter(e=>e.is_loss).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const totalSum = losses.reduce((s,e)=>s+(+e.loss_amount||0),0);
+  el.innerHTML = `
+    <div style="font-size:14px;font-weight:600;margin-bottom:12px">⚠ Заявки с потерями (УКО)</div>
+    <div class="hr-metric-grid" style="margin-bottom:16px">
+      <div class="hr-metric"><div class="hr-metric-lbl">Всего заявок</div><div class="hr-metric-val">${losses.length}</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">Сумма потерь</div><div class="hr-metric-val" style="color:var(--red);font-size:16px">${totalSum.toLocaleString('ru-RU')} ₽</div></div>
+    </div>
+    ${losses.length ? `<div class="kpi-card" style="padding:0;overflow:hidden">
+    <table class="hr-tbl">
+      <thead><tr><th>Дата</th><th>№ заявки</th><th>Исполнитель</th><th>Отдел</th><th>Наименование</th><th>Сумма потери</th><th>Причина</th><th></th></tr></thead>
+      <tbody>
+      ${losses.map(e=>{
+        const lead = (e.link||'').match(/(\d{7,})/)?.[1] || '';
+        return `<tr>
+          <td>${e.date||'—'}</td>
+          <td style="color:#60A5FA;font-size:11px">${lead?'#'+lead:'—'}</td>
+          <td>${ukoEmployeeName(e)}</td>
+          <td>${e.dept||'—'}</td>
+          <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.service||'').replace(/"/g,'&quot;')}">${e.service||'—'}</td>
+          <td style="color:var(--red);font-weight:600">${(+e.loss_amount||0).toLocaleString('ru-RU')} ₽</td>
+          <td style="font-size:11px;color:var(--text2)">${e.loss_note||'—'}</td>
+          <td><button class="btn btn-sm" onclick="openEdit('${e.id}')">Открыть</button></td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table></div>` : '<div class="empty">Заявок с потерями нет</div>'}`;
+}
+
+// Список CSI оценок + форма добавления
+async function renderUkoCsi(){
+  const el = document.getElementById('uko-csi-content');
+  if(!el) return;
+  el.innerHTML = '<div class="empty">Загрузка...</div>';
+  const sbC = (sb||window.sb);
+  const {data, error} = await sbC.from('csi_ratings')
+    .select('*, hr_employees(last_name, first_name, position, dept)')
+    .order('created_at',{ascending:false});
+  if(error){
+    el.innerHTML = `<div class="empty" style="color:var(--red)">Ошибка: ${error.message}<br><br>Создайте таблицу <code>csi_ratings</code> по SQL из инструкции.</div>`;
+    return;
+  }
+  const list = data || [];
+  const avg = list.length ? (list.reduce((s,r)=>s+(+r.rating||0),0)/list.length) : 0;
+  const lowCount = list.filter(r=>(+r.rating||0) < 4).length;
+  const newCount = list.filter(r=>!r.status || r.status==='new').length;
+
+  // Опции сотрудников для формы добавления
+  const empOpts = (hrEmployees||[]).filter(e=>e.status==='active')
+    .map(e=>`<option value="${e.id}">${(e.last_name||'')+' '+(e.first_name||'')} · ${e.dept||''}</option>`).join('');
+
+  el.innerHTML = `
+    <div style="font-size:14px;font-weight:600;margin-bottom:12px">📊 CSI — низкие оценки</div>
+    <div class="hr-metric-grid" style="margin-bottom:16px">
+      <div class="hr-metric"><div class="hr-metric-lbl">Всего оценок</div><div class="hr-metric-val">${list.length}</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">Средняя</div><div class="hr-metric-val" style="color:${avg>=4?'var(--green)':'var(--red)'}">${avg.toFixed(2)}</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">Низких (&lt;4)</div><div class="hr-metric-val" style="color:var(--red)">${lowCount}</div></div>
+      <div class="hr-metric"><div class="hr-metric-lbl">Новых (без статуса)</div><div class="hr-metric-val" style="color:var(--amber)">${newCount}</div></div>
+    </div>
+
+    <div class="kpi-card" style="padding:14px;margin-bottom:14px;max-width:720px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:10px">+ Добавить оценку</div>
+      <div class="grid2">
+        <div class="field"><label>Сотрудник *</label>
+          <select id="csi-emp">${empOpts || '<option value="">Нет активных сотрудников в HR</option>'}</select>
+        </div>
+        <div class="field"><label>Оценка (1–5) *</label>
+          <input type="number" id="csi-rating" min="1" max="5" step="0.1" placeholder="3.5">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:10px"><label>Комментарий клиента</label>
+        <textarea id="csi-comment" rows="2" placeholder="Что не понравилось..."></textarea>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="ukoAddCsi()">➕ Сохранить оценку</button>
+    </div>
+
+    ${list.length ? `<div class="kpi-card" style="padding:0;overflow:hidden">
+    <table class="hr-tbl">
+      <thead><tr><th>Дата</th><th>Сотрудник</th><th>Отдел</th><th>Должность</th><th>Оценка</th><th>Комментарий клиента</th><th>Статус УКО</th><th></th></tr></thead>
+      <tbody>
+      ${list.map(r=>{
+        const emp = r.hr_employees;
+        const name = emp ? ((emp.last_name||'')+' '+(emp.first_name||'')) : '—';
+        const r_ = +r.rating||0;
+        return `<tr>
+          <td>${r.created_at?.split('T')[0]||'—'}</td>
+          <td>${name}</td>
+          <td>${emp?.dept||'—'}</td>
+          <td>${emp?.position||'—'}</td>
+          <td style="color:${r_>=4?'var(--green)':'var(--red)'};font-weight:600">${r_.toFixed(1)}</td>
+          <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.comment||'').replace(/"/g,'&quot;')}">${r.comment||'—'}</td>
+          <td>
+            <select onchange="ukoSetCsiStatus('${r.id}',this.value)" style="font-size:11px;padding:3px 6px;background:var(--bg2);border:0.5px solid var(--border2);border-radius:4px;color:var(--text)">
+              <option value="new"      ${r.status==='new'||!r.status?'selected':''}>🆕 Новая</option>
+              <option value="reviewed" ${r.status==='reviewed'?'selected':''}>👀 Рассмотрена</option>
+              <option value="action"   ${r.status==='action'?'selected':''}>⚙ Меры приняты</option>
+              <option value="dismissed"${r.status==='dismissed'?'selected':''}>✕ Отклонена</option>
+            </select>
+          </td>
+          <td><button class="btn btn-sm" style="color:var(--red)" onclick="ukoDeleteCsi('${r.id}')">🗑</button></td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table></div>` : '<div class="empty">Оценок пока нет</div>'}`;
+}
+
+window.ukoAddCsi = async function(){
+  const empId = document.getElementById('csi-emp').value;
+  const rating = parseFloat(document.getElementById('csi-rating').value);
+  const comment = document.getElementById('csi-comment').value.trim();
+  if(!empId){ showToast('Выберите сотрудника'); return; }
+  if(!rating || rating<1 || rating>5){ showToast('Оценка должна быть от 1 до 5'); return; }
+  const {error} = await (sb||window.sb).from('csi_ratings').insert({
+    employee_id: empId, rating, comment: comment||null,
+    status:'new', created_by: currentUser.id
+  });
+  if(error){ showToast('Ошибка: '+error.message); return; }
+  showToast('✓ Оценка добавлена');
+  renderUkoCsi();
+};
+window.ukoSetCsiStatus = async function(id, status){
+  const {error} = await (sb||window.sb).from('csi_ratings').update({
+    status, reviewed_by: currentUser.id, reviewed_at: new Date().toISOString()
+  }).eq('id', id);
+  if(error) showToast('Ошибка: '+error.message);
+  else showToast('Статус обновлён');
+};
+window.ukoDeleteCsi = async function(id){
+  if(!confirm('Удалить оценку?')) return;
+  const {error} = await (sb||window.sb).from('csi_ratings').delete().eq('id', id);
+  if(error){ showToast('Ошибка: '+error.message); return; }
+  renderUkoCsi();
+};
 
 // ============================================================
 // ROUTING MODULE — Маршрутизация по ролям
