@@ -98,6 +98,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .stat{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:12px 16px;min-width:130px}
 .stat-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px}
 .stat-value{font-size:18px;font-weight:600;color:var(--text)}
+/* Колонки/карточки, видимые только финансисту и админу. body.hide-finance прячет их. */
+body.hide-finance .col-finance{display:none !important}
 .stat-month{cursor:pointer;position:relative;user-select:none}
 .stat-month:hover{background:var(--bg3)}
 .month-picker-pop{position:absolute;top:100%;left:0;margin-top:4px;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:200;min-width:170px;display:none;max-height:320px;overflow-y:auto}
@@ -477,8 +479,8 @@ tr:hover td{background:var(--bg2)}
             <tr>
               <th><input type="checkbox" id="cb-all" onchange="toggleAll(this)" style="cursor:pointer"></th>
               <th>№ заявки</th><th>Статус</th><th>Дата</th><th>Отдел</th>
-              <th>Наименование</th><th>Сумма FCS</th><th>Тип оплаты</th>
-              <th>Расход</th><th>Комиссия</th><th>Метки</th><th>Клиент</th><th>Контрагент</th>
+              <th>Наименование</th><th class="col-finance">Сумма FCS</th><th>Тип оплаты</th>
+              <th>Расход</th><th class="col-finance">Комиссия</th><th>Метки</th><th>Клиент</th><th>Контрагент</th>
               <th style="color:#60A5FA">От кого</th><th></th>
             </tr>
           </thead>
@@ -1201,7 +1203,7 @@ tr:hover td{background:var(--bg2)}
   </div>
 
   <div class="grid2">
-    <div class="field"><label>Тип оплаты контрагенту</label>
+    <div class="field"><label>Тип оплаты контрагенту <span id="m-agent-pay-type-req" style="color:var(--red);display:none">*</span></label>
       <select id="m-agent-pay-type" onchange="onAgentPayChange()">
         <option value="">— не указано —</option>
         <option value="card_rf">Карта РФ</option>
@@ -1458,6 +1460,9 @@ async function init(){
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = 'block';
 
+  // Скрываем финансовые поля (Сумма FCS, Комиссия) для не-финансистов
+  if(typeof updateFinanceVisibility==='function') updateFinanceVisibility();
+
   // Открываем нужную вкладку по умолчанию для роли
   const defaultTab = {
     accounting: 'accounting-inbox',
@@ -1548,8 +1553,8 @@ function renderStats(){
     ${monthPickerCardHtml('stat')}
     <div class="stat"><div class="stat-label">Записей</div><div class="stat-value">${data.length}</div></div>
     <div class="stat"><div class="stat-label">Оплачено</div><div class="stat-value" style="color:#2ECC71">${paid}</div></div>
-    <div class="stat"><div class="stat-label">Сумма FCS</div><div class="stat-value" style="font-size:15px;color:#60A5FA">${fmt(total)} ₽</div></div>
-    <div class="stat"><div class="stat-label">Комиссия</div><div class="stat-value" style="font-size:15px;color:#2ECC71">${fmt(comm)} ₽</div></div>
+    <div class="stat col-finance"><div class="stat-label">Сумма FCS</div><div class="stat-value" style="font-size:15px;color:#60A5FA">${fmt(total)} ₽</div></div>
+    <div class="stat col-finance"><div class="stat-label">Комиссия</div><div class="stat-value" style="font-size:15px;color:#2ECC71">${fmt(comm)} ₽</div></div>
     ${losses?`<div class="stat"><div class="stat-label">Потери</div><div class="stat-value" style="color:#F87171">${losses}</div></div>`:''}
   `;
 }
@@ -2151,9 +2156,9 @@ function renderTable(){
       <td style="white-space:nowrap;font-size:11px;color:var(--text2)">${e.date||'—'}</td>
       <td><span class="dept-dot d-${e.dept}"></span><span style="font-size:11px">${DEPTS[e.dept]||e.dept}</span></td>
       <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.service||''}">${e.service||'—'}</td>
-      <td style="white-space:nowrap;font-weight:600;color:var(--accent)">
+      <td class="col-finance" style="white-space:nowrap;font-weight:600;color:var(--accent)">
         ${e.amount>0?fmt(e.amount)+' ₽':'—'}
-        <button onclick="togglePaymentReceived('${e.id}',${!!e.payment_received},this)" 
+        <button onclick="togglePaymentReceived('${e.id}',${!!e.payment_received},this)"
           title="${e.payment_received?'✓ Деньги поступили · нажмите чтобы снять отметку':'○ Нажмите чтобы отметить поступление'}"
           style="margin-left:4px;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;transition:all 0.15s;
           background:${e.payment_received?'#EAF3DE':'#F4F4F2'};
@@ -2164,7 +2169,7 @@ function renderTable(){
       </td>
       <td style="font-size:11px;color:var(--text2)">${PAYS[e.pay]||e.pay||'—'}</td>
       <td style="font-size:11px;color:var(--amber)">${agentAmt}</td>
-      <td style="color:var(--green);white-space:nowrap">${e.commission>0?'+'+fmt(e.commission)+' ₽':'—'}</td>
+      <td class="col-finance" style="color:var(--green);white-space:nowrap">${e.commission>0?'+'+fmt(e.commission)+' ₽':'—'}</td>
       <td style="white-space:nowrap">${badges||'—'}</td>
       <td style="font-size:11px;color:var(--text);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.client_name||''}">${e.client_name||'—'}</td>
       <td style="font-size:11px;color:var(--text2);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.agent||'—'}</td>
@@ -2184,12 +2189,24 @@ function renderTable(){
 // ===== ROLE VIEW SWITCHER (только для admin) =====
 let viewingAsRole = 'admin'; // текущая просматриваемая роль
 
+// Финансовые поля (Сумма FCS, Комиссия) видит только финансист и админ
+function updateFinanceVisibility(){
+  const role = (typeof viewingAsRole!=='undefined' && viewingAsRole!=='admin')
+    ? viewingAsRole
+    : (currentProfile?.role || 'admin');
+  const canSeeFinance = (role === 'admin' || role === 'financier' || role === 'manager');
+  document.body.classList.toggle('hide-finance', !canSeeFinance);
+}
+
 window.switchViewRole = function(role){
   viewingAsRole = role;
 
   // Подсвечиваем кнопку
   document.querySelectorAll('.rs-btn').forEach(b=>b.classList.remove('rs-active'));
   event?.target?.classList.add('rs-active');
+
+  // Скрываем «Сумма FCS» и «Комиссия» для всех ролей, кроме админа и финансиста
+  updateFinanceVisibility();
 
   // Перестраиваем меню
   buildRoleMenu(role === 'admin' ? 'admin' : role);
@@ -2494,6 +2511,9 @@ function openAddEntry(){
   document.getElementById('m-deposit').value = '';
   document.getElementById('m-deposit-ref').value = '';
   document.getElementById('calc-block').style.display = 'none';
+  // Показ красной звёздочки у «Тип оплаты контрагенту» — только если это заявка от исполнителя
+  const reqStar = document.getElementById('m-agent-pay-type-req');
+  if(reqStar) reqStar.style.display = (activeTab === 'new-request') ? 'inline' : 'none';
   document.getElementById('modal').style.display = 'flex';
 }
 
@@ -2813,6 +2833,24 @@ function calcModal(){
 async function saveEntry(){
   const service = document.getElementById('m-service').value.trim();
   if(!service){ showToast('Введите наименование'); return; }
+
+  // Если создаём заявку с вкладки «⚡ Новая заявка» — «Тип оплаты контрагенту» обязателен,
+  // иначе заявка не попадёт в инбокс операциониста/бухгалтера.
+  if(!editId && activeTab === 'new-request'){
+    const aptEl = document.getElementById('m-agent-pay-type');
+    const apt = aptEl?.value;
+    if(!apt){
+      showToast('⚠ Выберите «Тип оплаты контрагенту» — иначе заявка не уйдёт в инбокс');
+      aptEl?.focus();
+      // Подсветим поле красной рамкой на пару секунд
+      if(aptEl){
+        const orig = aptEl.style.border;
+        aptEl.style.border = '1px solid var(--red)';
+        setTimeout(()=>{ aptEl.style.border = orig; }, 2500);
+      }
+      return;
+    }
+  }
 
   const link = document.getElementById('m-link').value.trim();
   const normalizedLink = /^\d+$/.test(link) ? 'https://conciergecom.amocrm.ru/leads/detail/'+link : link;
