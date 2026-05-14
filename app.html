@@ -1327,13 +1327,13 @@ tr:hover td{background:var(--bg2)}
     <textarea id="m-note" style="height:60px;resize:vertical" placeholder="Дополнительная информация..."></textarea>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
+    <label id="m-loss-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
       <input type="checkbox" id="m-loss" onchange="toggleField('loss-fields',this.checked)"> ⚠ Потеря компании
     </label>
     <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
       <input type="checkbox" id="m-uko" title="Отправить заявку на разбор в отдел УКО"> 🛡 Направить в УКО
     </label>
-    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
+    <label id="m-expense-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
       <input type="checkbox" id="m-expense" onchange="toggleField('expense-fields',this.checked)"> 💼 Расход компании
     </label>
   </div>
@@ -2578,6 +2578,17 @@ function openAddEntry(){
   if(statusSel) statusSel.value = 'pending';
   if(statusField) statusField.style.display = isExecutorFlow ? 'none' : '';
   if(saveBtn) saveBtn.innerHTML = isExecutorFlow ? '📤 Отправить на оплату' : '💾 Сохранить';
+  // У исполнителя прячем чекбоксы «Потеря компании» и «Расход компании» — оставляем только «🛡 Направить в УКО»
+  const lossLabel    = document.getElementById('m-loss-label');
+  const expenseLabel = document.getElementById('m-expense-label');
+  const lossFields   = document.getElementById('loss-fields');
+  const expenseFields= document.getElementById('expense-fields');
+  if(lossLabel)    lossLabel.style.display    = isExecutorFlow ? 'none' : '';
+  if(expenseLabel) expenseLabel.style.display = isExecutorFlow ? 'none' : '';
+  if(isExecutorFlow){
+    if(lossFields)    lossFields.style.display    = 'none';
+    if(expenseFields) expenseFields.style.display = 'none';
+  }
   document.getElementById('modal').style.display = 'flex';
 }
 
@@ -2674,6 +2685,11 @@ function openEdit(id){
   const sb  = document.getElementById('m-save-btn');
   if(stF) stF.style.display = '';
   if(sb)  sb.innerHTML = '💾 Сохранить';
+  // Возвращаем чекбоксы «Потеря» и «Расход» — при редактировании они снова видны
+  const lossLbl = document.getElementById('m-loss-label');
+  const expLbl  = document.getElementById('m-expense-label');
+  if(lossLbl) lossLbl.style.display = '';
+  if(expLbl)  expLbl.style.display = '';
   updateLeadPreview();
   calcModal();
   document.getElementById('modal').style.display = 'flex';
@@ -7199,8 +7215,7 @@ function renderNewRequest(){
       <div style="font-size:11px;color:var(--text3);margin-top:14px">«Из текста» — вставьте описание из мессенджера / АМО, система разберёт его в поля.</div>
     </div>`;
   }
-  // По умолчанию сразу открываем форму ручного ввода — самый частый сценарий
-  setTimeout(()=>{ if(typeof openAddEntry==='function') openAddEntry(); }, 50);
+  // Модал больше не открывается автоматически — исполнитель сам выбирает способ кнопкой
 }
 
 // ===== «СОЗДАТЬ ЗАЯВКУ ИЗ ТЕКСТА» =====
