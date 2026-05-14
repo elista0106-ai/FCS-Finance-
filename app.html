@@ -1499,6 +1499,11 @@ async function init(){
 
 // ===== DATA LOADING =====
 async function loadEntries(){
+  // Параллельно подгружаем профили всех пользователей (для отображения «кто взял», «кто согласовал»)
+  if(!window.allProfiles){
+    const {data:profs} = await sb.from('profiles').select('id, full_name, email');
+    window.allProfiles = profs || [];
+  }
   const {data, error} = await sb
     .from('entries')
     .select('*, profiles!entries_submitted_by_fkey(full_name, email)')
@@ -5944,13 +5949,16 @@ function ukoEmployeeName(e){
 // 4) Журнал (uko_sent_to_pay=true OR uko_lead_status='rejected')
 // =============================================================
 
-// Имя сотрудника УКО по auth user id (грубое сопоставление через hrEmployees.auth_user_id если есть, иначе через email из ptn... нет, просто id-фрагмент)
+// Имя сотрудника УКО по auth user id — берём из кэша profiles (загружается в loadEntries)
 function ukoUserDisplayName(userId){
   if(!userId) return '—';
-  // hrEmployees может иметь auth_user_id — поищем
+  // 1) hrEmployees связан через auth_user_id (если HR заполнен этой колонкой)
   const emp = (hrEmployees||[]).find(e=>e.auth_user_id===userId);
-  if(emp) return (emp.last_name||'')+' '+(emp.first_name||'');
-  // fallback — короткий id
+  if(emp) return ((emp.last_name||'')+' '+(emp.first_name||'')).trim() || emp.email || '—';
+  // 2) Профиль из таблицы profiles
+  const prof = (window.allProfiles||[]).find(p=>p.id===userId);
+  if(prof) return prof.full_name || prof.email || ('ID:'+String(userId).slice(0,8));
+  // 3) fallback
   return 'ID:'+String(userId).slice(0,8);
 }
 
@@ -5990,14 +5998,17 @@ async function renderUkoInbox(){
 }
 
 window.ukoTakeInWork = async function(entryId){
-  const {error} = await (sb||window.sb).from('entries').update({
+  console.log('[UKO] takeInWork', entryId, 'by', currentUser.id);
+  const {data, error} = await (sb||window.sb).from('entries').update({
     uko_taken_by: currentUser.id,
     uko_taken_at: new Date().toISOString()
-  }).eq('id', entryId);
-  if(error){ showToast('Ошибка: '+error.message); return; }
+  }).eq('id', entryId).select().single();
+  if(error){ console.error('[UKO] takeInWork error:', error); showToast('Ошибка: '+error.message); return; }
+  console.log('[UKO] takeInWork updated row:', data);
   showToast('✓ Заявка взята в работу');
   await loadEntries();
-  switchTab(activeTab);
+  // Сразу переключимся на «В работе», чтобы УКО видел свою заявку
+  switchTabMenu('uko-inwork','🛠 Заявки в работе');
 };
 
 // ---- 2. В РАБОТЕ ----
@@ -6005,8 +6016,12 @@ async function renderUkoInWork(){
   const el = document.getElementById('uko-inwork-content');
   if(!el) return;
   // показываем все в работе (не только мои) — чтобы видеть кто взял
-  const list = (entries||[]).filter(e=>e.is_uko && e.uko_taken_by && !e.uko_sent_to_pay && e.uko_lead_status!=='approved' && e.uko_lead_status!=='rejected')
+  const allUko = (entries||[]).filter(e=>e.is_uko);
+  console.log('[UKO inwork] всего is_uko=true:', allUko.length, 'из них:',
+    allUko.map(e=>({id:e.id.slice(0,8), taken:!!e.uko_taken_by, lead:e.uko_lead_status, sent:!!e.uko_sent_to_pay})));
+  const list = allUko.filter(e=>e.uko_taken_by && !e.uko_sent_to_pay && e.uko_lead_status!=='approved' && e.uko_lead_status!=='rejected')
     .sort((a,b)=>(b.uko_taken_at||b.date||'').localeCompare(a.uko_taken_at||a.date||''));
+  console.log('[UKO inwork] подходят под фильтр:', list.length);
   const mineCount = list.filter(e=>e.uko_taken_by===currentUser.id).length;
   el.innerHTML = `
     <div style="font-size:14px;font-weight:600;margin-bottom:12px">🛠 Заявки в работе</div>
