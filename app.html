@@ -1592,14 +1592,33 @@ async function init(){
   // Скрываем финансовые поля (Сумма FCS, Комиссия) для не-финансистов
   if(typeof updateFinanceVisibility==='function') updateFinanceVisibility();
 
-  // Открываем нужную вкладку по умолчанию для роли
-  const defaultTab = {
+  // Открываем нужную вкладку по умолчанию для роли (все роли!)
+  const defaultTabMap = {
     accounting: 'accounting-inbox',
     operations: 'operations-inbox',
     financier: 'main',
-    hr: 'hr'
-  }[role];
-  if(defaultTab) switchTabMenu(defaultTab, roleLabels[role]||'');
+    hr: 'hr',
+    uko: 'uko-inbox',
+    scheduler: 'schedule',
+    executor: 'new-request',
+    partner_manager: 'partners',
+    account_manager: 'cp-new-request',
+    contract_manager: 'cp-inbox',
+    manager: 'main',
+    viewer: 'main'
+  };
+  let defaultTab = defaultTabMap[role];
+  // Учитываем индивидуальное ограничение вкладок (profiles.allowed_tabs)
+  const allowedT = (window.currentProfile && Array.isArray(window.currentProfile.allowed_tabs) && window.currentProfile.allowed_tabs.length)
+    ? window.currentProfile.allowed_tabs : null;
+  if(allowedT && defaultTab && !allowedT.includes(defaultTab)){
+    defaultTab = allowedT[0];
+  }
+  // Для admin не трогаем (у него свой флоу), для остальных всегда переключаем
+  if(role !== 'admin'){
+    if(!defaultTab) defaultTab = allowedT ? allowedT[0] : 'main';
+    switchTabMenu(defaultTab, roleLabels[role]||'');
+  }
 }
 
 // ===== DATA LOADING =====
