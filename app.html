@@ -403,8 +403,6 @@ tr:hover td{background:var(--bg2)}
     <button class="rs-btn" onclick="switchViewRole('account_manager')">💼 Аккаунт</button>
     <button class="rs-btn" onclick="switchViewRole('contract_manager')">📄 Договорной</button>
     <button class="rs-btn" onclick="switchViewRole('uko')">🛡 УКО</button>
-    <button class="rs-btn" onclick="switchViewRole('uko_specialist')">🛡 УКО Спец.</button>
-    <button class="rs-btn" onclick="switchViewRole('uko_manager')">🛡 УКО Рук.</button>
     <button class="rs-btn" onclick="switchViewRole('scheduler')">📅 Планировщик</button>
     <button class="rs-btn" onclick="switchViewRole('admin')" style="margin-left:auto">✕ Сбросить</button>
   </div>
@@ -1150,6 +1148,9 @@ tr:hover td{background:var(--bg2)}
     <!-- График работы сотрудников -->
     <div id="view-schedule" style="display:none"><div class="content"><div id="schedule-content"></div></div></div>
 
+    <!-- Настройки программы -->
+    <div id="view-settings" style="display:none"><div class="content"><div id="settings-content"></div></div></div>
+
     <div class="hr-modal-bg" id="hr-modal" style="display:none">
       <div class="hr-modal">
         <h3 id="hr-modal-title">Сотрудник</h3>
@@ -1451,7 +1452,7 @@ tr:hover td{background:var(--bg2)}
   </div>
   <div class="table-wrap">
     <table class="user-table">
-      <thead><tr><th>Email</th><th>Имя</th><th>Роль</th><th>Статус</th><th>Последний вход</th><th></th></tr></thead>
+      <thead><tr><th>Email</th><th>Имя</th><th>Роль</th><th>Статус</th><th>Последний вход</th><th>Роль</th><th>Доступ</th></tr></thead>
       <tbody id="users-tbody"></tbody>
     </table>
   </div>
@@ -1468,15 +1469,18 @@ tr:hover td{background:var(--bg2)}
   <div class="field"><label>Email *</label><input type="email" id="inv-email" placeholder="email@company.com"></div>
   <div class="field"><label>Имя</label><input type="text" id="inv-name" placeholder="Имя Фамилия"></div>
   <div class="field"><label>Роль</label>
-    <select id="inv-role">
+    <select id="inv-role" onchange="invRenderTabs()">
       <option value="executor">👤 Исполнитель — только форма заявок</option>
       <option value="viewer">👁 Просмотр — журнал без изменений</option>
       <option value="manager">✏️ Менеджер — добавление и редактирование</option>
       <option value="scheduler">📅 Планировщик — график работы сотрудников</option>
-      <option value="uko_specialist">🛡 Специалист УКО — обработка заявок и жалоб</option>
-      <option value="uko_manager">🛡 Руководитель УКО — согласование и контроль</option>
+      <option value="uko">🛡 УКО — Управление качеством</option>
       <option value="admin">👑 Администратор — полный доступ</option>
     </select>
+  </div>
+  <div class="field" id="inv-tabs-block" style="display:none">
+    <label>Видимые вкладки <span style="font-size:10px;color:var(--text3)">(снимите галку — пункт не будет виден пользователю)</span></label>
+    <div id="inv-tabs-list" style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:8px 10px;max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px"></div>
   </div>
   <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:10px;font-size:12px;color:var(--text3);margin-bottom:8px">
     Пользователь получит письмо с ссылкой для установки пароля. После входа он попадёт в нужный раздел автоматически.
@@ -1537,6 +1541,16 @@ async function init(){
   // Получаем профиль
   const {data:profile} = await (sb||window.sb).from('profiles').select('*').eq('id',currentUser.id).single();
   currentProfile = profile;
+  // Fallback: если allowed_tabs нет в профиле, но есть в метаданных приглашения — берём оттуда
+  if(currentProfile && (!Array.isArray(currentProfile.allowed_tabs) || !currentProfile.allowed_tabs.length)){
+    const metaTabs = currentUser?.user_metadata?.allowed_tabs;
+    if(Array.isArray(metaTabs) && metaTabs.length){
+      currentProfile.allowed_tabs = metaTabs;
+      // Доливаем в профиль на будущее
+      try{ await (sb||window.sb).from('profiles').update({allowed_tabs:metaTabs}).eq('id',currentUser.id); }catch(e){}
+    }
+  }
+  window.currentProfile = currentProfile; // для buildRoleMenu
 
   const role = profile?.role || 'viewer';
 
@@ -2346,8 +2360,6 @@ window.switchViewRole = function(role){
     account_manager:'💼 Аккаунт-менеджер',
     contract_manager:'📄 Договорной отдел',
     uko:'🛡 УКО — Управление качеством',
-    uko_specialist:'🛡 Специалист УКО',
-    uko_manager:'🛡 Руководитель УКО',
     scheduler:'📅 Планировщик — График работы'
   };
   const defaultTabs = {
@@ -2357,13 +2369,19 @@ window.switchViewRole = function(role){
     account_manager:'cp-new-request',
     contract_manager:'cp-inbox',
     uko:'uko-inbox',
-    uko_specialist:'uko-inbox',
-    uko_manager:'uko-inbox',
     scheduler:'schedule'
   };
 
   if(titleEl) titleEl.textContent = roleNames[role]||'';
-  switchTab(defaultTabs[role]||'main');
+  // Стартовая вкладка — дефолтная для роли, но если она скрыта индивидуальными правами,
+  // открываем первую разрешённую
+  let startTab = defaultTabs[role]||'main';
+  const allowedT = (window.currentProfile && Array.isArray(window.currentProfile.allowed_tabs) && window.currentProfile.allowed_tabs.length)
+    ? window.currentProfile.allowed_tabs : null;
+  if(allowedT && !allowedT.includes(startTab)){
+    startTab = allowedT[0];
+  }
+  switchTab(startTab);
 };
 
 // ===== ROLE-BASED MENU =====
@@ -2387,8 +2405,7 @@ function buildRoleMenu(role){
       {group:'Управление'},
       {id:'kpi',label:'🏆 KPI'},{id:'hr',label:'👥 НР — Сотрудники'},{id:'schedule',label:'📅 График'},{id:'partners',label:'🤝 Партнёры'},
       {group:'Настройки'},
-      {label:'👥 Пользователи', action:'openUsers()'},
-      {label:'💾 Резервная копия', action:'backupData()'},
+      {id:'settings',label:'⚙️ Настройки'},
     ],
     manager: [
       {group:'Журнал'},
@@ -2447,27 +2464,11 @@ function buildRoleMenu(role){
     uko: [
       {group:'УКО — Управление качеством'},
       {id:'uko-inbox',label:'📥 Входящие заявки'},
+      {id:'uko-csi',label:'📊 CSI — низкие оценки'},
+      {id:'uko-complaints',label:'📣 Жалобы'},
       {id:'uko-inwork',label:'🛠 Заявки в работе'},
       {id:'uko-approval',label:'👁 На согласовании'},
       {id:'uko-losses-journal',label:'📋 Журнал обработанных потерь'},
-      {id:'uko-csi',label:'📊 CSI — низкие оценки'},
-      {id:'uko-complaints',label:'📣 Жалобы'},
-    ],
-    uko_specialist: [
-      {group:'УКО — Специалист'},
-      {id:'uko-inbox',label:'📥 Входящие заявки'},
-      {id:'uko-inwork',label:'🛠 Заявки в работе'},
-      {id:'uko-losses-journal',label:'📋 Журнал обработанных потерь'},
-      {id:'uko-csi',label:'📊 CSI — низкие оценки'},
-      {id:'uko-complaints',label:'📣 Жалобы'},
-    ],
-    uko_manager: [
-      {group:'УКО — Руководитель'},
-      {id:'uko-inbox',label:'📥 Входящие заявки'},
-      {id:'uko-approval',label:'👁 На согласовании'},
-      {id:'uko-losses-journal',label:'📋 Журнал обработанных потерь'},
-      {id:'uko-csi',label:'📊 CSI — низкие оценки'},
-      {id:'uko-complaints',label:'📣 Жалобы'},
     ],
     partner_manager: [
       {group:'Партнёры'},
@@ -2494,7 +2495,23 @@ function buildRoleMenu(role){
     ],
   };
 
-  const items = MENUS[role] || MENUS.viewer;
+  window.ROLE_MENUS = MENUS; // экспорт для настройки видимости вкладок при приглашении
+  let items = MENUS[role] || MENUS.viewer;
+  // Индивидуальное ограничение видимости вкладок (profiles.allowed_tabs)
+  const allowed = (window.currentProfile && Array.isArray(window.currentProfile.allowed_tabs))
+    ? window.currentProfile.allowed_tabs : null;
+  if(allowed && allowed.length){
+    items = items.filter(it=> it.group || it.url || it.action || (it.id && allowed.includes(it.id)));
+    // Убираем «осиротевшие» заголовки групп, под которыми не осталось пунктов
+    items = items.filter((it,idx)=>{
+      if(!it.group) return true;
+      for(let j=idx+1;j<items.length;j++){
+        if(items[j].group) break;
+        if(items[j].id || items[j].url || items[j].action) return true;
+      }
+      return false;
+    });
+  }
   let dropdownHtml = '';
   let tabsHtml = '';
   let groupIdx = 0;
@@ -2565,6 +2582,7 @@ function switchTab(t){
     'accounting-inbox','accounting-requests','accounting-corp','accounting-journal',
     'operations-inbox','operations-journal','new-request',
     'financier-kpi','financier-commission','financier-cost','financier-comp','financier-analytics','financier-deposits',
+    'settings',
     'executor-journal','partner-operations','partner-deposits',
     'cp-new-request','cp-my-requests','cp-inbox','cp-list','cp-contracts','cp-history',
     'uko-inbox','uko-inwork','uko-approval','uko-losses-journal','uko-csi','uko-complaints',
@@ -2731,6 +2749,7 @@ function switchTab(t){
   else if(t==='financier-analytics') renderFinancierAnalytics();
   else if(t==='financier-deposits') renderFinancierDeposits();
   else if(t==='schedule') renderSchedule();
+  else if(t==='settings') renderSettings();
   else renderTable();
 
   renderStats();
@@ -3365,6 +3384,81 @@ async function bulkStatus(status){
   showToast(`✓ Статус обновлён`);
 }
 
+// ===== НАСТРОЙКИ ПРОГРАММЫ =====
+async function renderSettings(){
+  const el = document.getElementById('settings-content');
+  if(!el) return;
+  el.innerHTML = '<div class="empty">Загрузка…</div>';
+
+  // Пользователи
+  const {data:users, error} = await (sb||window.sb).from('profiles').select('*').order('created_at');
+  const roleClass = {admin:'role-admin',manager:'role-manager',viewer:'role-viewer',executor:'role-executor'};
+  const roleLabel = {admin:'👑 Админ',manager:'✏️ Менеджер',viewer:'👁 Просмотр',executor:'👤 Исполнитель',
+    scheduler:'📅 Планировщик',uko:'🛡 УКО',hr:'👥 НР',financier:'📊 Финансист',
+    accounting:'📒 Бухгалтерия',operations:'⚙️ Операционист',partner_manager:'🤝 Партнёры',
+    account_manager:'💼 Аккаунт',contract_manager:'📄 Договорной'};
+  const allRoles = ['executor','viewer','manager','scheduler','uko','hr','financier','accounting','operations','partner_manager','account_manager','contract_manager','admin'];
+
+  const usersRows = (users||[]).map(u=>{
+    const tabsBadge = Array.isArray(u.allowed_tabs) && u.allowed_tabs.length
+      ? `<span style="font-size:10px;color:var(--amber)">огранич. (${u.allowed_tabs.length})</span>`
+      : `<span style="font-size:10px;color:var(--text3)">полный</span>`;
+    return `<tr>
+      <td style="font-size:12px">${u.email||'—'}</td>
+      <td style="font-size:12px">${u.full_name||'—'}</td>
+      <td><span class="role-badge ${roleClass[u.role]||''}">${roleLabel[u.role]||u.role}</span></td>
+      <td><span style="color:${u.is_active?'#2ECC71':'#F87171'};font-size:11px">${u.is_active?'Активен':'Неактивен'}</span></td>
+      <td style="font-size:11px;color:var(--text3)">${u.last_login?new Date(u.last_login).toLocaleDateString('ru-RU'):'Не входил'}</td>
+      <td>
+        <select style="background:var(--bg3);border:0.5px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:11px"
+          onchange="changeRole('${u.id}',this.value)">
+          ${allRoles.map(r=>`<option value="${r}"${u.role===r?' selected':''}>${roleLabel[r]||r}</option>`).join('')}
+        </select>
+      </td>
+      <td>${tabsBadge}<br><button class="btn btn-sm" style="margin-top:3px" onclick='ukoOpenTabsEditor(${JSON.stringify(u.id)}, ${JSON.stringify(u.role)}, ${JSON.stringify(u.full_name||u.email)}, ${JSON.stringify(u.allowed_tabs||null)})'>⚙ Вкладки</button></td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+  <h2 style="margin:0 0 4px">⚙️ Настройки программы</h2>
+  <div style="color:var(--text2);font-size:13px;margin-bottom:20px">Управление пользователями, доступами и резервными копиями.</div>
+
+  <div class="kpi-card" style="padding:18px;margin-bottom:18px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <h3 style="margin:0">👥 Пользователи и доступы</h3>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary btn-sm" onclick="openInvite()">+ Пригласить пользователя</button>
+      <button class="btn btn-sm" onclick="renderSettings()">🔄 Обновить</button>
+    </div>
+    <div style="color:var(--text3);font-size:12px;margin-bottom:10px">
+      Колонка <b>«Доступ»</b>: кнопка «⚙ Вкладки» настраивает, какие вкладки видит конкретный сотрудник в его рабочей панели (например для УКО — скрыть «На согласовании» специалистам).
+    </div>
+    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:6px">
+      <table class="user-table" style="width:100%">
+        <thead><tr>
+          <th>Email</th><th>Имя</th><th>Роль (бейдж)</th><th>Статус</th><th>Последний вход</th><th>Сменить роль</th><th>Доступ к вкладкам</th>
+        </tr></thead>
+        <tbody>${usersRows || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text3)">Нет пользователей</td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="kpi-card" style="padding:18px;margin-bottom:18px">
+    <h3 style="margin:0 0 12px">💾 Резервное копирование</h3>
+    <div style="color:var(--text3);font-size:12px;margin-bottom:12px">Скачать резервную копию всех заявок в JSON-файл.</div>
+    <button class="btn btn-sm" onclick="backupData()">⬇ Скачать резервную копию</button>
+  </div>
+
+  <div class="kpi-card" style="padding:18px">
+    <h3 style="margin:0 0 12px">ℹ️ О программе</h3>
+    <div style="font-size:12px;color:var(--text2);line-height:1.7">
+      <b>FCS Finance</b> — финансовая CRM.<br>
+      Бэкенд: Supabase · Хранилище счетов: bucket <code>invoices</code><br>
+      Модули: Журнал · KPI · НР · Планировщик · УКО · Финансист · Договоры
+    </div>
+  </div>`;
+}
+
 // ===== USERS =====
 async function openUsers(){
   document.getElementById('users-modal').style.display = 'flex';
@@ -3380,13 +3474,73 @@ async function openUsers(){
       <td><span style="color:${u.is_active?'#2ECC71':'#F87171'};font-size:11px">${u.is_active?'Активен':'Неактивен'}</span></td>
       <td style="font-size:11px;color:var(--text3)">${u.last_login?new Date(u.last_login).toLocaleDateString('ru-RU'):'Не входил'}</td>
       <td>
-        <select style="background:var(--bg3);border:0.5px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:11px" 
+        <select style="background:var(--bg3);border:0.5px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:11px"
           onchange="changeRole('${u.id}',this.value)">
-          ${['executor','viewer','manager','admin'].map(r=>`<option value="${r}"${u.role===r?' selected':''}>${roleLabel[r]}</option>`).join('')}
+          ${['executor','viewer','manager','scheduler','uko','hr','financier','accounting','operations','admin'].map(r=>`<option value="${r}"${u.role===r?' selected':''}>${roleLabel[r]||r}</option>`).join('')}
         </select>
+      </td>
+      <td>
+        <button class="btn btn-sm" onclick='ukoOpenTabsEditor(${JSON.stringify(u.id)}, ${JSON.stringify(u.role)}, ${JSON.stringify(u.full_name||u.email)}, ${JSON.stringify(u.allowed_tabs||null)})'>⚙ Вкладки</button>
       </td>
     </tr>`).join('');
 }
+
+// Редактор индивидуальной видимости вкладок для существующего пользователя
+window.ukoOpenTabsEditor = function(userId, role, name, currentAllowed){
+  const tabs = (typeof invGetRoleTabs==='function') ? invGetRoleTabs(role) : [];
+  let bg = document.getElementById('tabs-editor-modal');
+  if(!bg){
+    bg = document.createElement('div');
+    bg.id = 'tabs-editor-modal';
+    bg.className = 'modal-bg';
+    document.body.appendChild(bg);
+  }
+  bg.style.display = 'flex';
+  if(!tabs.length){
+    bg.innerHTML = `<div class="modal" style="max-width:420px">
+      <h3 style="margin:0 0 10px">⚙ Видимые вкладки</h3>
+      <div style="color:var(--text2);font-size:13px;margin-bottom:14px">У роли <b>${role}</b> нет настраиваемых вкладок (одна рабочая область).</div>
+      <div style="display:flex;justify-content:flex-end"><button class="btn" onclick="document.getElementById('tabs-editor-modal').style.display='none'">Закрыть</button></div>
+    </div>`;
+    return;
+  }
+  const allowedSet = Array.isArray(currentAllowed) ? new Set(currentAllowed) : null;
+  bg.innerHTML = `<div class="modal" style="max-width:460px">
+    <h3 style="margin:0 0 4px">⚙ Видимые вкладки</h3>
+    <div style="color:var(--text2);font-size:12px;margin-bottom:12px">${name} · роль: <b>${role}</b></div>
+    <div style="color:var(--text3);font-size:11px;margin-bottom:8px">Снимите галку — пункт не будет виден этому пользователю. Если отмечены все — ограничения нет.</div>
+    <div style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;background:var(--bg2);border:0.5px solid var(--border2);border-radius:6px;padding:10px">
+      ${tabs.map(t=>`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+        <input type="checkbox" class="te-tab-chk" value="${t.id}" ${(!allowedSet || allowedSet.has(t.id))?'checked':''}> ${t.label}
+      </label>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn" onclick="document.getElementById('tabs-editor-modal').style.display='none'">Отмена</button>
+      <button class="btn btn-primary" onclick="ukoSaveTabsEditor('${userId}','${role}')">Сохранить</button>
+    </div>
+  </div>`;
+};
+
+window.ukoSaveTabsEditor = async function(userId, role){
+  const tabs = (typeof invGetRoleTabs==='function') ? invGetRoleTabs(role) : [];
+  const allIds = tabs.map(t=>t.id);
+  const checked = Array.from(document.querySelectorAll('.te-tab-chk:checked')).map(c=>c.value);
+  // Все отмечены → снимаем ограничение (null)
+  let allowed_tabs = null;
+  if(checked.length && checked.length < allIds.length){
+    allowed_tabs = checked;
+  }
+  if(!checked.length){ showToast('Оставьте хотя бы одну вкладку'); return; }
+  try{
+    const {error} = await (sb||window.sb).from('profiles').update({allowed_tabs}).eq('id', userId);
+    if(error) throw error;
+    showToast('✓ Видимость вкладок сохранена');
+    document.getElementById('tabs-editor-modal').style.display='none';
+    openUsers();
+  }catch(e){
+    showToast('Ошибка: '+(e.message||e));
+  }
+};
 
 async function changeRole(userId, role){
   const {error} = await (sb||window.sb).from('profiles').update({role}).eq('id',userId);
@@ -3394,25 +3548,114 @@ async function changeRole(userId, role){
   else showToast('✓ Роль изменена');
 }
 
-function openInvite(){ document.getElementById('invite-modal').style.display='flex'; }
+function openInvite(){
+  document.getElementById('invite-modal').style.display='flex';
+  invRenderTabs();
+}
+
+// Список настраиваемых вкладок для выбранной роли (берём из ROLE_MENUS, пропуская группы/действия)
+function invGetRoleTabs(role){
+  const menus = window.ROLE_MENUS || {};
+  const items = menus[role] || [];
+  return items.filter(it=>it && it.id && it.label).map(it=>({id:it.id, label:it.label}));
+}
+
+window.invRenderTabs = function(){
+  const role = document.getElementById('inv-role')?.value;
+  const block = document.getElementById('inv-tabs-block');
+  const list = document.getElementById('inv-tabs-list');
+  if(!block || !list) return;
+  const tabs = invGetRoleTabs(role);
+  // Показываем настройку только если у роли > 1 вкладки (есть что ограничивать)
+  if(tabs.length < 2){
+    block.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+  block.style.display = '';
+  list.innerHTML = tabs.map(t=>`
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+      <input type="checkbox" class="inv-tab-chk" value="${t.id}" checked> ${t.label}
+    </label>`).join('');
+};
+
+function invGenPassword(){
+  // Удобочитаемый временный пароль: 3 буквы + 4 цифры + спецсимвол
+  const a = 'abcdefghjkmnpqrstuvwxyz';
+  const A = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+  let p = '';
+  for(let i=0;i<2;i++) p += A[Math.floor(Math.random()*A.length)];
+  for(let i=0;i<3;i++) p += a[Math.floor(Math.random()*a.length)];
+  for(let i=0;i<4;i++) p += Math.floor(Math.random()*10);
+  p += '!';
+  return p;
+}
 
 async function sendInvite(){
   const email = document.getElementById('inv-email').value.trim();
   const name = document.getElementById('inv-name').value.trim();
   const role = document.getElementById('inv-role').value;
-  if(!email){ document.getElementById('inv-error').textContent='Введите email'; document.getElementById('inv-error').style.display='block'; return; }
+  const errEl = document.getElementById('inv-error');
+  if(!email){ errEl.textContent='Введите email'; errEl.style.display='block'; return; }
 
-  const {data, error} = await sb.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: name, role }
+  // Собираем выбранные вкладки. Если все отмечены — не ограничиваем (allowed_tabs = null)
+  const allTabs = invGetRoleTabs(role).map(t=>t.id);
+  const checked = Array.from(document.querySelectorAll('.inv-tab-chk:checked')).map(c=>c.value);
+  let allowed_tabs = null;
+  if(allTabs.length >= 2 && checked.length && checked.length < allTabs.length){
+    allowed_tabs = checked;
+  }
+
+  // Отдельный клиент Supabase — чтобы signUp не перезаписал текущую сессию админа
+  let tempClient;
+  try{
+    tempClient = window.supabase.createClient(SB_URL, SB_KEY, {
+      auth: { storageKey: 'sb-temp-signup', persistSession: false, autoRefreshToken: false }
+    });
+  }catch(e){
+    errEl.textContent = 'Не удалось создать клиент: '+(e.message||e);
+    errEl.style.display='block';
+    return;
+  }
+
+  const tempPass = invGenPassword();
+  errEl.style.display='none';
+
+  const {data, error} = await tempClient.auth.signUp({
+    email, password: tempPass,
+    options: { data: { full_name: name, role, allowed_tabs } }
   });
 
   if(error){
-    document.getElementById('inv-error').textContent = error.message;
-    document.getElementById('inv-error').style.display='block';
+    // Частый кейс — пользователь уже существует
+    if(/registered|exists|already/i.test(error.message||'')){
+      // Просто обновим роль и доступы в его профиле
+      try{
+        await (sb||window.sb).from('profiles').update({role, allowed_tabs}).eq('email', email);
+        document.getElementById('invite-modal').style.display='none';
+        showToast(`✓ Пользователь ${email} уже есть — роль и доступы обновлены`);
+        if(typeof renderSettings==='function' && activeTab==='settings') renderSettings();
+        return;
+      }catch(e2){}
+    }
+    errEl.innerHTML = `Ошибка: ${error.message}<br><span style="color:var(--text3);font-size:11px">Если Supabase требует подтверждение email — пользователь получит письмо для активации.</span>`;
+    errEl.style.display='block';
     return;
   }
+
+  // Профиль создаётся триггером в Supabase. Доливаем роль и allowed_tabs по email.
+  try{
+    await (sb||window.sb).from('profiles').update({role, allowed_tabs}).eq('email', email);
+  }catch(e){ console.log('[invite] profile sync deferred:', e); }
+
   document.getElementById('invite-modal').style.display='none';
-  showToast(`✓ Приглашение отправлено на ${email}`);
+
+  // Показываем админу временный пароль (письмо-приглашение из браузера отправить нельзя)
+  const msg = `Пользователь создан.\n\nEmail: ${email}\nВременный пароль: ${tempPass}\nРоль: ${role}\n\nПередайте эти данные сотруднику. При первом входе пусть сменит пароль.`;
+  try{ await navigator.clipboard.writeText(`${email} / ${tempPass}`); }catch(e){}
+  alert(msg + '\n\n(Логин и пароль скопированы в буфер обмена)');
+  showToast(`✓ ${email} создан · пароль скопирован`);
+  if(typeof renderSettings==='function' && activeTab==='settings') renderSettings();
 }
 
 // ===== FILTERS =====
