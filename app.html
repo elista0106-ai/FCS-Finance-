@@ -3399,24 +3399,38 @@ async function renderSettings(){
     account_manager:'💼 Аккаунт',contract_manager:'📄 Договорной'};
   const allRoles = ['executor','viewer','manager','scheduler','uko','hr','financier','accounting','operations','partner_manager','account_manager','contract_manager','admin'];
 
-  const usersRows = (users||[]).map(u=>{
-    const tabsBadge = Array.isArray(u.allowed_tabs) && u.allowed_tabs.length
-      ? `<span style="font-size:10px;color:var(--amber)">огранич. (${u.allowed_tabs.length})</span>`
-      : `<span style="font-size:10px;color:var(--text3)">полный</span>`;
-    return `<tr>
-      <td style="font-size:12px">${u.email||'—'}</td>
-      <td style="font-size:12px">${u.full_name||'—'}</td>
-      <td><span class="role-badge ${roleClass[u.role]||''}">${roleLabel[u.role]||u.role}</span></td>
-      <td><span style="color:${u.is_active?'#2ECC71':'#F87171'};font-size:11px">${u.is_active?'Активен':'Неактивен'}</span></td>
-      <td style="font-size:11px;color:var(--text3)">${u.last_login?new Date(u.last_login).toLocaleDateString('ru-RU'):'Не входил'}</td>
-      <td>
-        <select style="background:var(--bg3);border:0.5px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:11px"
+  const userCards = (users||[]).map(u=>{
+    const restricted = Array.isArray(u.allowed_tabs) && u.allowed_tabs.length;
+    const tabsBadge = restricted
+      ? `<span style="font-size:11px;color:var(--amber);font-weight:600">⚠ ограничено (${u.allowed_tabs.length} вкл.)</span>`
+      : `<span style="font-size:11px;color:var(--text3)">полный доступ роли</span>`;
+    const fioOrEmail = (u.full_name||u.email||'').replace(/'/g,'’');
+    return `<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);margin-bottom:10px">
+      <div style="min-width:220px;flex:1">
+        <div style="font-weight:600;font-size:13px">${u.full_name||u.email||'—'}</div>
+        <div style="font-size:12px;color:var(--text3)">${u.email||''}</div>
+        <div style="margin-top:4px">
+          <span class="role-badge ${roleClass[u.role]||''}">${roleLabel[u.role]||u.role}</span>
+          <span style="color:${u.is_active?'#2ECC71':'#F87171'};font-size:11px;margin-left:8px">${u.is_active?'● Активен':'● Неактивен'}</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:200px">
+        <label style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Роль</label>
+        <select style="background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px;padding:7px 10px;font-size:12px"
           onchange="changeRole('${u.id}',this.value)">
           ${allRoles.map(r=>`<option value="${r}"${u.role===r?' selected':''}>${roleLabel[r]||r}</option>`).join('')}
         </select>
-      </td>
-      <td>${tabsBadge}<br><button class="btn btn-sm" style="margin-top:3px" onclick='ukoOpenTabsEditor(${JSON.stringify(u.id)}, ${JSON.stringify(u.role)}, ${JSON.stringify(u.full_name||u.email)}, ${JSON.stringify(u.allowed_tabs||null)})'>⚙ Вкладки</button></td>
-    </tr>`;
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:200px">
+        <label style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Доступ к вкладкам</label>
+        <div>${tabsBadge}</div>
+        <button class="btn btn-sm" style="margin-top:2px" onclick='ukoOpenTabsEditor(${JSON.stringify(u.id)}, ${JSON.stringify(u.role)}, ${JSON.stringify(fioOrEmail)}, ${JSON.stringify(u.allowed_tabs||null)})'>⚙ Настроить вкладки</button>
+      </div>
+      <div style="min-width:120px;font-size:11px;color:var(--text3)">
+        <div style="text-transform:uppercase;letter-spacing:.04em;font-size:10px">Последний вход</div>
+        <div>${u.last_login?new Date(u.last_login).toLocaleDateString('ru-RU'):'Не входил'}</div>
+      </div>
+    </div>`;
   }).join('');
 
   el.innerHTML = `
@@ -3430,17 +3444,12 @@ async function renderSettings(){
       <button class="btn btn-primary btn-sm" onclick="openInvite()">+ Пригласить пользователя</button>
       <button class="btn btn-sm" onclick="renderSettings()">🔄 Обновить</button>
     </div>
-    <div style="color:var(--text3);font-size:12px;margin-bottom:10px">
-      Колонка <b>«Доступ»</b>: кнопка «⚙ Вкладки» настраивает, какие вкладки видит конкретный сотрудник в его рабочей панели (например для УКО — скрыть «На согласовании» специалистам).
+    <div style="color:var(--text3);font-size:12px;margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:6px">
+      <b>Порядок настройки:</b> 1) выбери <b>Роль</b> сотрудника → 2) нажми <b>«⚙ Настроить вкладки»</b> и сними галки с лишних разделов.
+      Пример для УКО: специалисту убрать «На согласовании», руководителю — «Заявки в работе».
     </div>
-    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:6px">
-      <table class="user-table" style="width:100%">
-        <thead><tr>
-          <th>Email</th><th>Имя</th><th>Роль (бейдж)</th><th>Статус</th><th>Последний вход</th><th>Сменить роль</th><th>Доступ к вкладкам</th>
-        </tr></thead>
-        <tbody>${usersRows || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text3)">Нет пользователей</td></tr>'}</tbody>
-      </table>
-    </div>
+    ${error ? `<div class="empty" style="color:var(--red)">Ошибка загрузки пользователей: ${error.message}</div>`
+      : (userCards || '<div class="empty">Нет пользователей</div>')}
   </div>
 
   <div class="kpi-card" style="padding:18px;margin-bottom:18px">
@@ -3543,9 +3552,26 @@ window.ukoSaveTabsEditor = async function(userId, role){
 };
 
 async function changeRole(userId, role){
-  const {error} = await (sb||window.sb).from('profiles').update({role}).eq('id',userId);
-  if(error) showToast('Ошибка: '+error.message);
-  else showToast('✓ Роль изменена');
+  // Шаг 1: пробуем сменить роль И сбросить ограничения вкладок
+  let {data, error} = await (sb||window.sb).from('profiles')
+    .update({role, allowed_tabs:null}).eq('id',userId).select();
+  // Если упало именно из-за колонки allowed_tabs — пробуем только роль
+  if(error && /allowed_tabs/i.test(error.message||'')){
+    console.warn('[changeRole] allowed_tabs нет в схеме, меняю только роль');
+    ({data, error} = await (sb||window.sb).from('profiles').update({role}).eq('id',userId).select());
+  }
+  if(error){
+    console.error('[changeRole] FAIL', error);
+    alert('Не удалось сменить роль.\n\nКод: '+(error.code||'—')+'\nСообщение: '+(error.message||error)+'\nДетали: '+(error.details||'—')+'\nПодсказка: '+(error.hint||'—'));
+    return;
+  }
+  if(!data || !data.length){
+    alert('Роль не обновилась — нет прав на изменение этого профиля (RLS) или пользователь не найден. ID: '+userId);
+    return;
+  }
+  showToast('✓ Роль изменена на «'+role+'». Теперь настройте вкладки.');
+  if(typeof renderSettings==='function' && activeTab==='settings') renderSettings();
+  else if(typeof openUsers==='function' && document.getElementById('users-modal')?.style.display==='flex') openUsers();
 }
 
 function openInvite(){
