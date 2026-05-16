@@ -1419,7 +1419,7 @@ tr:hover td{background:var(--bg2)}
     <label id="m-loss-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
       <input type="checkbox" id="m-loss" onchange="toggleField('loss-fields',this.checked)"> ⚠ Потеря компании
     </label>
-    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
+    <label id="m-uko-label" style="display:none;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
       <input type="checkbox" id="m-uko" title="Отправить заявку на разбор в отдел УКО"> 🛡 Направить в УКО
     </label>
     <label id="m-expense-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
@@ -1574,8 +1574,12 @@ async function init(){
       });
       if(emp){
         window.currentHrEmployee = emp;
+        const fio=((emp.last_name||'')+' '+(emp.first_name||'')+(emp.middle_name?' '+emp.middle_name:'')).trim();
         const posTxt=(emp.position||emp.role||'').toString().trim();
         const deptTxt=(emp.department||'').toString().trim();
+        // ФИО в шапку (приоритет: ФИО из HR > full_name профиля > email)
+        const nEl=document.getElementById('user-name');
+        if(nEl && fio) nEl.textContent = fio;
         const rEl=document.getElementById('user-role');
         if(rEl && posTxt){
           rEl.textContent = `${roleLabels[role]||role} · ${posTxt}${deptTxt?' ('+deptTxt+')':''}`;
@@ -2877,6 +2881,18 @@ function openAddEntry(){
   if(isExecutorFlow){
     if(lossFields)    lossFields.style.display    = 'none';
     if(expenseFields) expenseFields.style.display = 'none';
+  }
+  // Галочка «🛡 Направить в УКО» — видна ТОЛЬКО Главным Консьержам (по должности из HR),
+  // а также admin/manager (им нужно для рабочего процесса разбора)
+  const ukoLabel = document.getElementById('m-uko-label');
+  if(ukoLabel){
+    const r = (window.currentProfile?.role)||'';
+    const emp = window.currentHrEmployee;
+    const pos = ((emp?.position||emp?.role||'')+'').toLowerCase();
+    const isGK = pos.includes('главный конс') || pos.replace(/\s/g,'')==='гк' || pos.includes('гк ');
+    const canSeeUko = isGK || r==='admin' || r==='manager';
+    ukoLabel.style.display = canSeeUko ? 'flex' : 'none';
+    if(!canSeeUko){ const cb=document.getElementById('m-uko'); if(cb) cb.checked=false; }
   }
   document.getElementById('modal').style.display = 'flex';
 }
