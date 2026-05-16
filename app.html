@@ -2817,7 +2817,31 @@ function openAddEntry(){
   commManual = false;
   document.getElementById('modal-title').textContent = 'Новая заявка';
   document.getElementById('m-date').value = new Date().toISOString().split('T')[0];
-  document.getElementById('m-dept').value = 'logistic';
+  // Авто-подстановка направления из отдела сотрудника (HR). По умолчанию logistic.
+  (function(){
+    let deptVal = 'logistic';
+    const hrDept = ((window.currentHrEmployee?.department)||'').toString().trim().toLowerCase();
+    if(hrDept){
+      const map = {
+        'travel':'travel',
+        'логистика':'logistic','logistics':'logistic','логистик':'logistic',
+        'lifestyle':'lifestyle','лайфстайл':'lifestyle',
+        'кбр':'kbr','kbr':'kbr',
+        'vip':'vip','вип':'vip',
+        'внутренний':'internal','инфо':'internal','цпо':'internal'
+      };
+      for(const k in map){ if(hrDept.includes(k)){ deptVal = map[k]; break; } }
+      // Прямое совпадение с label/value (на случай новых отделов)
+      const selEl = document.getElementById('m-dept');
+      if(selEl){
+        for(const opt of selEl.options){
+          const lbl=(opt.textContent||'').trim().toLowerCase().replace(/[⭐\s]/g,'');
+          if(lbl===hrDept.replace(/\s/g,'') || (opt.value||'').toLowerCase()===hrDept){ deptVal=opt.value; break; }
+        }
+      }
+    }
+    document.getElementById('m-dept').value = deptVal;
+  })();
   document.getElementById('m-service').value = '';
   document.getElementById('m-client-name').value = '';
   document.getElementById('m-client-name').value = '';
