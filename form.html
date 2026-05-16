@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Заявка на оплату — FCS</title>
 <style>
-:root{--bg:#0C0B09;--bg2:#141210;--bg3:#1C1A16;--border:#2A2620;--border2:#363028;--text:#F0EBE0;--text2:#9A9080;--text3:#5A5448;--accent:#185FA5;--green:#0F6E56;--radius:10px;--radius-sm:6px;}
+:root{--bg:#F4F4F2;--bg2:#FFFFFF;--bg3:#EFEFED;--border:#DDDDD8;--border2:#CACAC4;--text:#1A1A18;--text2:#5A5A52;--text3:#8A8A82;--accent:#185FA5;--green:#3B6D11;--radius:10px;--radius-sm:6px;}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px 16px 60px}
 .container{max-width:540px;margin:0 auto}
@@ -24,17 +24,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 .field.required label::after{content:" *";color:#F87171}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .autocomplete-wrap{position:relative}
-.autocomplete-list{position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:0.5px solid var(--accent);border-radius:var(--radius-sm);z-index:100;max-height:180px;overflow-y:auto;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.5)}
+.autocomplete-list{position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:0.5px solid var(--accent);border-radius:var(--radius-sm);z-index:100;max-height:180px;overflow-y:auto;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.12)}
 .autocomplete-item{padding:10px 14px;font-size:13px;cursor:pointer;border-bottom:0.5px solid var(--border)}
 .autocomplete-item:hover{background:var(--bg3);color:var(--accent)}
 .autocomplete-item:last-child{border-bottom:none}
 .calc-box{background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius);padding:14px;margin-top:8px}
 .calc-row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;color:var(--text2)}
-.calc-row.total{border-top:0.5px solid var(--border2);margin-top:8px;padding-top:10px;font-size:15px;font-weight:600;color:#2ECC71}
-.loss-warning{background:#1A0808;border:1px solid #5C1A1A;border-radius:var(--radius-sm);padding:12px;margin-top:8px;display:none}
+.calc-row.total{border-top:0.5px solid var(--border2);margin-top:8px;padding-top:10px;font-size:15px;font-weight:600;color:var(--green)}
+.loss-warning{background:#FBEAEA;border:1px solid #E8B4B4;border-radius:var(--radius-sm);padding:12px;margin-top:8px;display:none}
 .file-upload{border:1.5px dashed var(--border2);border-radius:var(--radius-sm);padding:16px;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--bg3)}
 .file-upload:hover{border-color:var(--accent)}
-.file-attached{background:#0A2018;border:1px solid var(--green);border-radius:var(--radius-sm);padding:10px 12px;display:flex;align-items:center;gap:8px;font-size:12px;color:#2ECC71;margin-top:8px}
+.file-attached{background:#EAF3DF;border:1px solid var(--green);border-radius:var(--radius-sm);padding:10px 12px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--green);margin-top:8px}
 .btn-submit{width:100%;padding:15px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;transition:background 0.15s}
 .btn-submit:hover{background:#0C447C}
 .btn-submit:disabled{background:var(--border2);color:var(--text3);cursor:not-allowed}
@@ -95,11 +95,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
       </div>
       <div class="loss-warning" id="loss-warning">
         <div style="font-size:12px;font-weight:600;color:#F87171;margin-bottom:4px">⚠️ Компания в минусе!</div>
-        <div style="font-size:11px;color:#FCA5A5">Приход равен расходу — эквайринг съедает прибыль. Заявка будет отмечена как потеря.</div>
+        <div style="font-size:11px;color:#A32D2D">Приход равен расходу — эквайринг съедает прибыль. Заявка будет отмечена как потеря.</div>
       </div>
       <div class="field" style="margin-top:12px">
         <label>Комиссия FCS (₽) <span style="font-size:10px;color:var(--text3)">— можно изменить вручную</span></label>
-        <input type="number" id="f-commission" placeholder="0" style="font-size:16px;font-weight:600;color:#2ECC71">
+        <input type="number" id="f-commission" placeholder="0" style="font-size:16px;font-weight:600;color:#3B6D11">
       </div>
     </div>
     <!-- Расход -->
@@ -154,21 +154,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
     <div class="card" style="border-radius:0 0 14px 14px;border-bottom:0.5px solid var(--border)">
       <div class="section-title">📝 Дополнительно</div>
       <div class="field"><label>Комментарий</label><textarea id="f-note" style="min-height:70px;resize:vertical" placeholder="Любая важная информация..."></textarea></div>
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;padding:12px;background:var(--bg3);border-radius:var(--radius-sm);border:0.5px solid var(--border2)">
-        <input type="checkbox" id="f-is-loss"> <span>⚠️ Потеря компании</span>
-      </label>
-      <div id="f-loss-fields" style="display:none;margin-top:8px;background:#1A0808;border-radius:var(--radius-sm);padding:12px">
-        <div class="grid2">
-          <div class="field" style="margin:0"><label>Сумма потери (₽)</label><input type="number" id="f-loss-amount" placeholder="0"></div>
-          <div class="field" style="margin:0"><label>Причина</label><input type="text" id="f-loss-note" placeholder="Причина..."></div>
-        </div>
+      <!-- Скрытые поля потери: автоопределение эквайринг-минуса работает в фоне, ручная галка убрана -->
+      <input type="checkbox" id="f-is-loss" style="display:none">
+      <div id="f-loss-fields" style="display:none">
+        <input type="number" id="f-loss-amount">
+        <input type="text" id="f-loss-note">
       </div>
+      <!-- Направить в УКО — видно только должности «Главный Консьерж» -->
+      <label id="f-uko-block" style="display:none;align-items:center;gap:10px;cursor:pointer;font-size:13px;padding:12px;background:var(--bg3);border-radius:var(--radius-sm);border:0.5px solid var(--border2)">
+        <input type="checkbox" id="f-is-uko"> <span>🛡 Направить в УКО (спорная / проблемная заявка)</span>
+      </label>
     </div>
     <button class="btn-submit" id="btn-submit" onclick="submitForm()">📨 Отправить заявку</button>
   </div>
   <div class="success" id="success">
     <div style="font-size:48px;margin-bottom:16px">✅</div>
-    <div style="font-size:20px;font-weight:600;color:#2ECC71;margin-bottom:8px">Заявка отправлена!</div>
+    <div style="font-size:20px;font-weight:600;color:#3B6D11;margin-bottom:8px">Заявка отправлена!</div>
     <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:24px" id="success-msg"></div>
     <button onclick="resetForm()" style="padding:12px 24px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius);color:var(--text2);font-size:14px;cursor:pointer">📝 Подать новую заявку</button>
   </div>
@@ -189,16 +190,63 @@ async function init(){
   currentProfile=profile;
   document.getElementById("user-display").textContent=profile?.full_name||currentUser.email;
   document.getElementById("f-date").value=new Date().toISOString().split("T")[0];
+  // Авто-подстановка отдела по карточке HR (сопоставление по email)
+  try{ await prefillDeptFromHR(); }catch(e){ console.log("prefill dept err:",e); }
   document.getElementById("loading").style.display="none";
   document.getElementById("app").style.display="block";
   await loadContractors();
   calcForm();
-  document.getElementById("f-is-loss").addEventListener("change",function(){
-    document.getElementById("f-loss-fields").style.display=this.checked?"block":"none";
-  });
   document.addEventListener("click",e=>{
     if(!e.target.closest(".autocomplete-wrap"))document.getElementById("agent-list").style.display="none";
   });
+}
+
+// Подтягивает отдел из карточки HR сотрудника по его email и подставляет в «Направление»
+async function prefillDeptFromHR(){
+  const email=(currentUser?.email||"").trim().toLowerCase();
+  if(!email) return;
+  // Ищем сотрудника по любому из email-полей
+  let emp=null;
+  try{
+    const {data}=await sb.from("hr_employees").select("department,position,role,personal_email,email,work_email").limit(2000);
+    emp=(data||[]).find(e=>{
+      const cand=[e.personal_email,e.email,e.work_email].map(x=>(x||"").trim().toLowerCase());
+      return cand.includes(email);
+    });
+  }catch(e){ console.log("hr lookup err:",e); return; }
+  if(!emp) return;
+  // Галку «Направить в УКО» показываем ТОЛЬКО должности «Главный Консьерж» (ГК)
+  const pos=((emp.position||emp.role||"")+"").toLowerCase();
+  const isGK = pos.includes("главный конс") || pos.includes("гк") || pos.replace(/\s/g,"")==="гк";
+  const ukoBlock=document.getElementById("f-uko-block");
+  if(ukoBlock) ukoBlock.style.display = isGK ? "flex" : "none";
+  if(!emp.department) return;
+  const hrDept=emp.department.trim().toLowerCase();
+  const sel=document.getElementById("f-dept");
+  if(!sel) return;
+  // Сопоставляем название отдела HR с пунктами выпадашки (по тексту опции или по value)
+  let matched=null;
+  for(const opt of sel.options){
+    const label=(opt.textContent||"").trim().toLowerCase().replace(/[⭐\s]/g,"");
+    const val=(opt.value||"").trim().toLowerCase();
+    const hd=hrDept.replace(/\s/g,"");
+    if(!val) continue;
+    if(label===hd || val===hd || label.includes(hd) || hd.includes(label)){ matched=opt.value; break; }
+  }
+  // Доп. синонимы (HR-название → value формы)
+  if(!matched){
+    const map={ "travel":"travel","логистика":"logistic","logistics":"logistic","lifestyle":"lifestyle",
+      "лайфстайл":"lifestyle","кбр":"kbr","kbr":"kbr","vip":"vip","вип":"vip",
+      "внутренний":"internal","инфо":"internal","цпо":"internal" };
+    for(const k in map){ if(hrDept.includes(k)){ matched=map[k]; break; } }
+  }
+  if(matched){
+    sel.value=matched;
+    // Подсказка что подставлено автоматически
+    const lbl=sel.closest(".field")?.querySelector("label");
+    if(lbl && !lbl.dataset.hint){ lbl.dataset.hint="1"; lbl.innerHTML+=' <span style="font-size:10px;color:#3B6D11">· авто из HR</span>'; }
+    if(typeof calcForm==="function") calcForm();
+  }
 }
 
 async function loadContractors(){
@@ -274,16 +322,18 @@ function calcForm(){
   else agRow.style.display="none";
   const commEl=document.getElementById("c-comm");
   commEl.textContent=fmt(Math.max(0,comm))+" ₽";
-  commEl.style.color=comm<0?"#F87171":"#2ECC71";
+  commEl.style.color=comm<0?"#F87171":"#3B6D11";
   document.getElementById("f-commission").value=Math.max(0,comm)||"";
   const warn=document.getElementById("loss-warning");
   if(acq>0&&comm<=0&&income>0){
     warn.style.display="block";
     document.getElementById("f-is-loss").checked=true;
-    document.getElementById("f-loss-fields").style.display="block";
     document.getElementById("f-loss-amount").value=acq;
     document.getElementById("f-loss-note").value="Эквайринг "+(pay==="qr"?"1%":"3%")+" — приход равен расходу";
-  }else{warn.style.display="none";}
+  }else{
+    warn.style.display="none";
+    document.getElementById("f-is-loss").checked=false;
+  }
 }
 
 async function submitForm(){
@@ -327,6 +377,7 @@ async function submitForm(){
     status:"pending",link:normalizedLink||null,note:noteText||null,
     is_loss:isLoss,loss_amount:isLoss?+document.getElementById("f-loss-amount").value||0:0,
     loss_note:isLoss?document.getElementById("f-loss-note").value.trim():null,
+    is_uko:document.getElementById("f-is-uko")?.checked||false,
     is_expense:false,submitted_by:currentUser.id,from_form:true
   };
   const {error}=await sb.from("entries").insert(payload);
