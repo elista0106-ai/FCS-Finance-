@@ -1562,12 +1562,30 @@ async function init(){
   };
   document.getElementById('user-name').textContent = profile?.full_name || currentUser.email;
   document.getElementById('user-role').textContent = roleLabels[role] || role;
+  // Подтягиваем должность из HR по email и показываем рядом с ролью
+  (async()=>{
+    try{
+      const em=(currentUser.email||'').trim().toLowerCase();
+      if(!em) return;
+      const {data}=await (sb||window.sb).from('hr_employees').select('*').limit(3000);
+      const emp=(data||[]).find(e=>{
+        const c=[e.personal_email,e.email,e.work_email,e.corp_email,e.login].map(x=>(x||'').toString().trim().toLowerCase());
+        return c.includes(em);
+      });
+      if(emp){
+        window.currentHrEmployee = emp;
+        const posTxt=(emp.position||emp.role||'').toString().trim();
+        const deptTxt=(emp.department||'').toString().trim();
+        const rEl=document.getElementById('user-role');
+        if(rEl && posTxt){
+          rEl.textContent = `${roleLabels[role]||role} · ${posTxt}${deptTxt?' ('+deptTxt+')':''}`;
+        }
+      }
+    }catch(e){ console.log('[hr position] err:',e); }
+  })();
 
-  // Перенаправляем исполнителя на form.html
-  if(role === 'executor'){
-    window.location.href = 'form.html';
-    return;
-  }
+  // Исполнитель остаётся в app.html — у него своя панель: «Новая заявка» + «Мой журнал»
+  // (редирект на form.html убран — иначе он не видит свой журнал и должность)
 
   // Строим меню по роли
   buildRoleMenu(role);

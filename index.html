@@ -159,13 +159,9 @@ async function doLogin(){
 
   btn.innerHTML = '✓ Входим...';
 
-  // Редирект по роли
-  const role = profile?.role || 'viewer';
-  if(role === 'executor'){
-    window.location.href = 'form.html';
-  } else {
-    window.location.href = 'app.html';
-  }
+  // Все роли (включая исполнителя) входят в панель app.html.
+  // У исполнителя там свои вкладки: «⚡ Новая заявка» и «📋 Мой журнал».
+  window.location.href = 'app.html';
 }
 
 async function sendReset(){

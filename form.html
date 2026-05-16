@@ -190,6 +190,10 @@ function fmt(n){return Number(n||0).toLocaleString("ru-RU");}
 async function init(){
   const {data:{session}}=await sb.auth.getSession();
   if(!session){window.location.href="index.html";return;}
+  // Эта страница больше не используется как самостоятельная — вход всегда через панель app.html
+  // (там у исполнителя вкладки «⚡ Новая заявка» и «📋 Мой журнал», должность и журнал)
+  window.location.replace("app.html");
+  return;
   currentUser=session.user;
   const {data:profile}=await sb.from("profiles").select("*").eq("id",currentUser.id).single();
   currentProfile=profile;
