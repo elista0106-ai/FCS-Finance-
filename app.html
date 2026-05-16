@@ -6236,7 +6236,16 @@ window.hrSaveEdit = async function(){
 
   const client = getSB();
   if(client){
-    await client.from('hr_employees').update(data).eq('id',id);
+    const {data:upd, error:updErr} = await client.from('hr_employees').update(data).eq('id',id).select();
+    if(updErr){
+      console.error('[hrSaveEdit] update error:', updErr);
+      alert('❌ НЕ сохранено в базу!\n\nКод: '+(updErr.code||'—')+'\nСообщение: '+(updErr.message||updErr)+'\nДетали: '+(updErr.details||'—')+'\nПодсказка: '+(updErr.hint||'—')+'\n\n(частая причина: RLS не даёт админу менять hr_employees, либо нет колонки)');
+      return;
+    }
+    if(!upd || !upd.length){
+      alert('❌ Запись не обновилась — 0 строк изменено.\nВозможно RLS-политика на UPDATE для hr_employees или неверный id.\nID: '+id);
+      return;
+    }
     // Логируем каждое изменение отдельной записью в hr_history
     for(const c of changes){
       try{
