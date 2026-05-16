@@ -71,7 +71,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
           </select>
         </div>
       </div>
-      <div class="field"><label>Ссылка AmoCRM</label><input type="text" id="f-link" placeholder="27XXXXXX или полная ссылка"></div>
+      <div class="grid2">
+        <div class="field"><label>Должность <span style="font-size:10px;color:var(--text3)">· из HR</span></label>
+          <input type="text" id="f-position" readonly placeholder="подтянется из НР" style="background:var(--bg3);cursor:default;color:var(--text2)">
+        </div>
+        <div class="field"><label>Ссылка AmoCRM</label><input type="text" id="f-link" placeholder="27XXXXXX или полная ссылка"></div>
+      </div>
     </div>
     <!-- Приход -->
     <div class="card">
@@ -205,22 +210,30 @@ async function init(){
 async function prefillDeptFromHR(){
   const email=(currentUser?.email||"").trim().toLowerCase();
   if(!email) return;
-  // Ищем сотрудника по любому из email-полей
+  // Ищем сотрудника. select('*') — чтобы не упасть на отсутствующих колонках
   let emp=null;
   try{
-    const {data}=await sb.from("hr_employees").select("department,position,role,personal_email,email,work_email").limit(2000);
+    const {data,error}=await sb.from("hr_employees").select("*").limit(3000);
+    if(error){ console.log("hr lookup error:",error.message); return; }
     emp=(data||[]).find(e=>{
-      const cand=[e.personal_email,e.email,e.work_email].map(x=>(x||"").trim().toLowerCase());
+      // Сравниваем со всеми возможными email-полями
+      const cand=[e.personal_email,e.email,e.work_email,e.corp_email,e.login]
+        .map(x=>(x||"").toString().trim().toLowerCase());
       return cand.includes(email);
     });
   }catch(e){ console.log("hr lookup err:",e); return; }
-  if(!emp) return;
+  if(!emp){ console.log("HR: сотрудник с email",email,"не найден"); return; }
+  console.log("HR найден:",emp.last_name,emp.first_name,"| отдел:",emp.department,"| должность:",emp.position||emp.role);
+  // Заполняем поле «Должность» (read-only)
+  const posEl=document.getElementById("f-position");
+  const posVal=(emp.position||emp.role||"").toString().trim();
+  if(posEl) posEl.value = posVal || "—";
   // Галку «Направить в УКО» показываем ТОЛЬКО должности «Главный Консьерж» (ГК)
-  const pos=((emp.position||emp.role||"")+"").toLowerCase();
+  const pos=posVal.toLowerCase();
   const isGK = pos.includes("главный конс") || pos.includes("гк") || pos.replace(/\s/g,"")==="гк";
   const ukoBlock=document.getElementById("f-uko-block");
   if(ukoBlock) ukoBlock.style.display = isGK ? "flex" : "none";
-  if(!emp.department) return;
+  if(!emp.department){ console.log("HR: у сотрудника не указан отдел"); return; }
   const hrDept=emp.department.trim().toLowerCase();
   const sel=document.getElementById("f-dept");
   if(!sel) return;
