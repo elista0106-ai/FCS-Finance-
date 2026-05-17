@@ -480,7 +480,7 @@ tr:hover td{background:var(--bg2)}
             <tr>
               <th><input type="checkbox" id="cb-all" onchange="toggleAll(this)" style="cursor:pointer"></th>
               <th>№ заявки</th><th>Статус</th><th>Дата</th><th>Отдел</th>
-              <th>Назначение платежа</th><th class="col-finance">Сумма FCS</th><th>Тип оплаты</th>
+              <th>Назначение платежа</th><th class="col-finance">Приход FCS</th><th>Тип оплаты</th>
               <th>Расход</th><th class="col-finance">Комиссия</th><th>Метки</th><th>Клиент</th><th>Контрагент</th>
               <th style="color:#60A5FA">От кого</th><th></th>
             </tr>
@@ -1218,7 +1218,7 @@ tr:hover td{background:var(--bg2)}
     </div>
   </div>
   <div class="grid2">
-    <div class="field"><label>Сумма FCS (₽)</label><input type="number" id="m-amount" placeholder="0" oninput="calcModal();onAmountChangeAutoPay()"></div>
+    <div class="field"><label>Приход FCS (₽)</label><input type="number" id="m-amount" placeholder="0" oninput="calcModal();onAmountChangeAutoPay()"></div>
     <div class="field"><label>Тип оплаты FCS</label>
       <select id="m-pay" onchange="onPayChange();calcModal()">
         <option value="personal">Перевод на карту</option>
@@ -1613,7 +1613,7 @@ async function init(){
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = 'block';
 
-  // Скрываем финансовые поля (Сумма FCS, Комиссия) для не-финансистов
+  // Скрываем финансовые поля (Приход FCS, Комиссия) для не-финансистов
   if(typeof updateFinanceVisibility==='function') updateFinanceVisibility();
 
   // Открываем нужную вкладку по умолчанию для роли (все роли!)
@@ -1729,7 +1729,7 @@ function renderStats(){
     ${monthPickerCardHtml('stat')}
     <div class="stat"><div class="stat-label">Записей</div><div class="stat-value">${data.length}</div></div>
     <div class="stat"><div class="stat-label">Оплачено</div><div class="stat-value" style="color:#2ECC71">${paid}</div></div>
-    <div class="stat col-finance"><div class="stat-label">Сумма FCS</div><div class="stat-value" style="font-size:15px;color:#60A5FA">${fmt(total)} ₽</div></div>
+    <div class="stat col-finance"><div class="stat-label">Приход FCS</div><div class="stat-value" style="font-size:15px;color:#60A5FA">${fmt(total)} ₽</div></div>
     <div class="stat col-finance"><div class="stat-label">Комиссия</div><div class="stat-value" style="font-size:15px;color:#2ECC71">${fmt(comm)} ₽</div></div>
     ${losses?`<div class="stat"><div class="stat-label">Потери</div><div class="stat-value" style="color:#F87171">${losses}</div></div>`:''}
   `;
@@ -1878,7 +1878,7 @@ function renderDeptView(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div><div style="font-size:10px;color:var(--text3)">Заявок</div><div style="font-size:16px;font-weight:500">${deptData.length}</div></div>
         <div><div style="font-size:10px;color:var(--text3)">Оплачено</div><div style="font-size:16px;color:#2ECC71">${paid}</div></div>
-        <div><div style="font-size:10px;color:var(--text3)">Сумма FCS</div><div style="font-size:13px;font-weight:500;color:#60A5FA">${fmt(total)} ₽</div></div>
+        <div><div style="font-size:10px;color:var(--text3)">Приход FCS</div><div style="font-size:13px;font-weight:500;color:#60A5FA">${fmt(total)} ₽</div></div>
         <div><div style="font-size:10px;color:var(--text3)">Комиссия</div><div style="font-size:13px;font-weight:500;color:#2ECC71">${fmt(comm)} ₽</div></div>
       </div>
       ${losses?`<div style="margin-top:8px;font-size:11px;color:#F87171">⚠ ${losses} потер${losses===1?'я':'и'}</div>`:''}
@@ -1938,7 +1938,7 @@ function renderDays(){
               <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">№ заявки</th>
               <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Назначение платежа</th>
               <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Отдел</th>
-              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Сумма FCS</th>
+              <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Приход FCS</th>
               <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Тип оплаты</th>
               <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Расход</th>
               <th style="padding:7px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:500">Комиссия</th>
@@ -2365,7 +2365,7 @@ function renderTable(){
 // ===== ROLE VIEW SWITCHER (только для admin) =====
 let viewingAsRole = 'admin'; // текущая просматриваемая роль
 
-// Финансовые поля (Сумма FCS, Комиссия) видит только финансист и админ
+// Финансовые поля (Приход FCS, Комиссия) видит только финансист и админ
 function updateFinanceVisibility(){
   const role = (typeof viewingAsRole!=='undefined' && viewingAsRole!=='admin')
     ? viewingAsRole
@@ -2381,7 +2381,7 @@ window.switchViewRole = function(role){
   document.querySelectorAll('.rs-btn').forEach(b=>b.classList.remove('rs-active'));
   event?.target?.classList.add('rs-active');
 
-  // Скрываем «Сумма FCS» и «Комиссия» для всех ролей, кроме админа и финансиста
+  // Скрываем «Приход FCS» и «Комиссия» для всех ролей, кроме админа и финансиста
   updateFinanceVisibility();
 
   // Перестраиваем меню
@@ -3188,7 +3188,7 @@ function onPayChange(){
     // При депозитной оплате — клиент не переводит деньги
     amtField.value = '0';
     amtField.style.background = 'var(--bg4)';
-    amtField.title = 'При оплате из депозита сумма FCS = 0';
+    amtField.title = 'При оплате из депозита приход FCS = 0';
     // Подсказка
     showToast('💰 Расход контрагенту спишется с депозита клиента');
   } else {
@@ -3842,7 +3842,7 @@ function exportExcel(){
     'Дата': e.date,
     'Направление': DEPTS[e.dept]||e.dept,
     'Назначение платежа': e.service,
-    'Сумма FCS': e.amount,
+    'Приход FCS': e.amount,
     'Тип оплаты': PAYS[e.pay]||e.pay,
     'Расход': e.agent_amount,
     'Валюта расхода': e.agent_currency,
@@ -7709,7 +7709,7 @@ window.ukoOpenWorkModal = async function(entryId){
 
       <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-weight:600;color:var(--text2);font-size:11px">💰 Приход от клиента</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-top:6px">
-        <div><span style="color:var(--text3)">Сумма FCS: </span><b>${(+e.amount||0).toLocaleString('ru-RU')} ₽</b></div>
+        <div><span style="color:var(--text3)">Приход FCS: </span><b>${(+e.amount||0).toLocaleString('ru-RU')} ₽</b></div>
         <div><span style="color:var(--text3)">Тип оплаты FCS: </span>${(typeof PAYS!=='undefined'&&PAYS[e.pay])||e.pay||'—'}</div>
         <div><span style="color:var(--text3)">Комиссия FCS: </span><b style="color:var(--green)">${(+e.commission||0).toLocaleString('ru-RU')} ₽</b></div>
       </div>
@@ -9759,7 +9759,7 @@ window.textImportPreview = function(){
   if(parsed.service)        rows.push(['Назначение платежа', parsed.service]);
   if(parsed.dept)           rows.push(['Направление', parsed.dept]);
   if(parsed.date)           rows.push(['Дата FCS', parsed.date]);
-  if(parsed.amount)         rows.push(['Сумма FCS', parsed.amount.toLocaleString('ru-RU')+' ₽']);
+  if(parsed.amount)         rows.push(['Приход FCS', parsed.amount.toLocaleString('ru-RU')+' ₽']);
   if(parsed.pay)            rows.push(['Тип оплаты FCS', PAYS[parsed.pay]||parsed.pay]);
   if(parsed.agent_amount)   rows.push(['Расход контрагенту', parsed.agent_amount.toLocaleString('ru-RU')+' '+(parsed.currency||'RUB')]);
   if(parsed.currency)       rows.push(['Валюта', parsed.currency]);
@@ -10227,7 +10227,7 @@ function renderRoleJournal(containerId, payTypes){
     ${monthPickerCardHtml('hr-metric')}
     <div class="hr-metric"><div class="hr-metric-lbl">Записей</div><div class="hr-metric-val">${data.length}</div></div>
     <div class="hr-metric"><div class="hr-metric-lbl">Оплачено</div><div class="hr-metric-val" style="color:var(--green)">${paid}</div></div>
-    <div class="hr-metric"><div class="hr-metric-lbl">Сумма FCS</div><div class="hr-metric-val" style="font-size:16px;color:var(--accent)">${totalAmt.toLocaleString('ru-RU')} ₽</div></div>
+    <div class="hr-metric"><div class="hr-metric-lbl">Приход FCS</div><div class="hr-metric-val" style="font-size:16px;color:var(--accent)">${totalAmt.toLocaleString('ru-RU')} ₽</div></div>
     <div class="hr-metric"><div class="hr-metric-lbl">Комиссия</div><div class="hr-metric-val" style="font-size:16px;color:var(--green)">${totalComm.toLocaleString('ru-RU')} ₽</div></div>
   </div>
   ${roleCard(roleTbl(
