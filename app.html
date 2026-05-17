@@ -2910,11 +2910,18 @@ async function applyFcsPayByAmount(){
   const qrM   = methods.qr   || {};
   // База для сравнения — Сумма оплаты контрагенту (стабильна, не зависит от типа оплаты)
   const base = +(document.getElementById('m-agent-amount')?.value)||0;
-  // Лимит «По ссылке» (до какой суммы ссылка). Дефолт 50000 если не задан.
-  const limit = (linkM.limit_amount!=null && linkM.limit_amount!=='') ? +linkM.limit_amount : 50000;
+  // Проверка попадания суммы в диапазон [от; до] способа
+  const inRange = (mm)=>{
+    if(!mm || mm.active===false) return false;
+    const f = (mm.limit_from!=null && mm.limit_from!=='') ? +mm.limit_from : 0;
+    const t = (mm.limit_to!=null   && mm.limit_to!=='')   ? +mm.limit_to   : Infinity;
+    return base>=f && base<=t;
+  };
   let target;
-  if(base<=limit && linkM.active!==false) target='link';
-  else if(qrM.active!==false) target='qr';
+  if(inRange(linkM)) target='link';
+  else if(inRange(qrM)) target='qr';
+  else if(linkM.active!==false) target='link';   // запасной — ссылка
+  else if(qrM.active!==false)   target='qr';
   else target='link';
   fcsPay.value = target;
   if(typeof onPayChange==='function') onPayChange();
@@ -10843,11 +10850,15 @@ async function renderFinancierPayMethods(){
           <div class="field"><label>Получатель / держатель</label><input id="pm-${m.key}-holder" value="${(cur.holder||'').replace(/"/g,'&quot;')}" placeholder="ФИО / название"></div>
           <div class="field"><label>Банк</label><input id="pm-${m.key}-bank" value="${(cur.bank||'').replace(/"/g,'&quot;')}" placeholder="Банк"></div>
         </div>
-        <div class="field">
-          <label>Лимит — использовать до суммы (₽)</label>
-          <input type="number" id="pm-${m.key}-limit" value="${cur.limit_amount!=null?cur.limit_amount:''}" placeholder="напр. 30000 — выше уйдёт на QR">
-          <div style="font-size:10px;color:var(--text3);margin-top:3px">${m.key==='link'?'Если сумма ≤ лимита → ссылка, если выше → QR' : m.key==='qr'?'Используется когда сумма превысила лимит «По ссылке»' : 'Можно оставить пустым'}</div>
+        <div class="grid2">
+          <div class="field"><label>Лимит: сумма ОТ (₽)</label>
+            <input type="number" id="pm-${m.key}-limit-from" value="${cur.limit_from!=null?cur.limit_from:''}" placeholder="0">
+          </div>
+          <div class="field"><label>Лимит: сумма ДО (₽)</label>
+            <input type="number" id="pm-${m.key}-limit-to" value="${cur.limit_to!=null?cur.limit_to:''}" placeholder="напр. 30000">
+          </div>
         </div>
+        <div style="font-size:10px;color:var(--text3);margin:-6px 0 8px">Способ выбирается автоматически, если сумма попадает в диапазон от–до. Пусто = без ограничения с этой стороны.</div>
         <div class="field"><label>Комментарий</label><input id="pm-${m.key}-note" value="${(cur.note||'').replace(/"/g,'&quot;')}" placeholder="напр. до 50 000 ₽"></div>
         <button class="btn btn-primary btn-sm" onclick="savePayMethod('${m.key}')">💾 Сохранить</button>
         ${cur.updated_at?`<div style="font-size:10px;color:var(--text3);margin-top:6px">Обновлено: ${new Date(cur.updated_at).toLocaleString('ru-RU')}</div>`:''}
@@ -10868,7 +10879,8 @@ window.savePayMethod = async function(key){
     holder: g('holder').value.trim()||null,
     bank: g('bank').value.trim()||null,
     note: g('note').value.trim()||null,
-    limit_amount: g('limit') && g('limit').value!=='' ? (+g('limit').value||0) : null,
+    limit_from: g('limit-from') && g('limit-from').value!=='' ? (+g('limit-from').value||0) : null,
+    limit_to:   g('limit-to')   && g('limit-to').value!==''   ? (+g('limit-to').value||0)   : null,
     active: g('active').checked,
     updated_at: new Date().toISOString()
   };
