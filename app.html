@@ -1345,9 +1345,9 @@ tr:hover td{background:var(--bg2)}
       <input type="text" id="m-receipt" placeholder="Яндекс Диск...">
     </div>
   </div>
-  <!-- РЕКВИЗИТЫ ПОЛУЧАТЕЛЯ — куда платить (карта/телефон/ссылка) + PDF -->
+  <!-- РЕКВИЗИТЫ КОНТРАГЕНТА — куда платить (карта/телефон/ссылка) + PDF -->
   <div style="background:#F1EFE8;border:0.5px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px">
-    <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px">💳 РЕКВИЗИТЫ ПОЛУЧАТЕЛЯ <span id="m-requisites-req" style="color:var(--red);display:none">*</span></div>
+    <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px">💳 РЕКВИЗИТЫ КОНТРАГЕНТА <span id="m-requisites-req" style="color:var(--red);display:none">*</span></div>
     <input type="text" id="m-requisites-text" placeholder="Номер карты / телефон / ссылка на оплату / номер счёта…" style="width:100%;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);padding:7px 10px;font-size:13px;outline:none;margin-bottom:8px">
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <label class="btn btn-sm" style="cursor:pointer;margin:0">
@@ -2973,7 +2973,7 @@ function openAddEntry(){
   // Показ красной звёздочки у «Тип оплаты контрагенту» — только если это заявка от исполнителя
   const reqStar = document.getElementById('m-agent-pay-type-req');
   if(reqStar) reqStar.style.display = (activeTab === 'new-request') ? 'inline' : 'none';
-  // Реквизиты получателя — очищаем и тоже показываем звёздочку только из «Новая заявка»
+  // Реквизиты контрагента — очищаем и тоже показываем звёздочку только из «Новая заявка»
   const reqText = document.getElementById('m-requisites-text');
   const reqPdf  = document.getElementById('m-requisites-pdf');
   const reqStar2 = document.getElementById('m-requisites-req');
@@ -3569,7 +3569,7 @@ async function saveEntry(){
     payload.from_form = true;
     // Реквизиты обязательны при создании заявки исполнителем
     if(!payload.payment_details_text && !payload.payment_details_pdf){
-      showToast('⚠ Заполните реквизиты получателя (текст или PDF)');
+      showToast('⚠ Заполните реквизиты контрагента (текст или PDF)');
       document.getElementById('m-requisites-text')?.focus();
       return;
     }
@@ -7850,7 +7850,7 @@ window.ukoOpenWorkModal = async function(entryId){
         <div><span style="color:var(--text3)">Тип оплаты контрагенту: </span>${({card_rf:'💳 Карта РФ',foreign_card:'🌍 Иностр. карта',corp_card:'🏢 Корп карта',invoice:'📄 По счёту',partner_deposit:'🤝 Депозит партнёра'}[e.agent_pay_type])||e.agent_pay_type||'—'}</div>
       </div>
       ${(e.payment_details_text||e.payment_details_pdf||e.receipt_link)?`
-      <div style="margin-top:8px"><span style="color:var(--text3)">Реквизиты получателя: </span>
+      <div style="margin-top:8px"><span style="color:var(--text3)">Реквизиты контрагента: </span>
         <div style="line-height:1.4;margin-top:2px;word-break:break-word">${e.payment_details_text||'—'}</div>
         ${e.payment_details_pdf?`<a href="#" onclick="event.preventDefault();openRequisitesPdf('${e.payment_details_pdf}')" style="color:#60A5FA;font-size:11px">📎 Открыть PDF реквизитов</a>`:''}
         ${e.receipt_link?`<div style="margin-top:4px"><a href="${e.receipt_link}" target="_blank" rel="noopener" style="color:#60A5FA;font-size:11px">📎 Чек / ссылка на оплату</a></div>`:''}
