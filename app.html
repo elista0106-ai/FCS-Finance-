@@ -12412,7 +12412,9 @@ function cpRenderTable(list){
       <td style="font-size:11px"><div>${c.contact_name||'—'}</div><div style="color:var(--text3)">${c.contact_phone||''}</div></td>
       <td>${c.currency||'RUB'}</td>
       <td>${cpStatusBadge(c.status)}</td>
-      <td>${c.status==='active'
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" style="font-size:10px" onclick="cpOpenEdit('${c.id}')">✏️ Редактировать</button>
+        ${c.status==='active'
         ?`<button class="btn btn-sm" style="color:var(--red);font-size:10px" onclick="cpChangeStatus('${c.id}','blocked')">Блок</button>`
         :c.status==='blocked'
         ?`<button class="btn btn-sm" style="font-size:10px" onclick="cpChangeStatus('${c.id}','active')">Активировать</button>`
@@ -12431,6 +12433,124 @@ window.cpChangeStatus=async function(id,status){
     change_type:'status_change',old_value:old?.status,new_value:status
   });
   showToast('Статус обновлён');
+  renderCPList();
+};
+
+// ---- РЕДАКТИРОВАНИЕ КАРТОЧКИ КОНТРАГЕНТА ----
+window.cpOpenEdit=function(id){
+  const c=(window._cpAllList||[]).find(x=>x.id===id);
+  if(!c){ showToast('Контрагент не найден'); return; }
+  const ex=document.getElementById('cp-edit-modal'); if(ex) ex.remove();
+  const bg=document.createElement('div');
+  bg.id='cp-edit-modal'; bg.className='modal-bg'; bg.style.display='flex';
+  const v=(x)=>(x==null?'':String(x)).replace(/"/g,'&quot;');
+  const ptOpts=Object.entries(CP_PARTNER_TYPES).map(([k,l])=>`<option value="${k}" ${c.partner_type===k?'selected':''}>${l}</option>`).join('');
+  bg.innerHTML=`<div class="modal" style="max-width:680px;max-height:92vh;overflow-y:auto">
+    <h3>✏️ Редактирование: ${c.full_name||''}</h3>
+    <div class="grid2">
+      <div class="field"><label>Полное наименование *</label><input id="cpe-full-name" value="${v(c.full_name)}"></div>
+      <div class="field"><label>Краткое наименование</label><input id="cpe-short-name" value="${v(c.short_name)}"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>ИНН</label><input id="cpe-inn" value="${v(c.inn)}"></div>
+      <div class="field"><label>КПП</label><input id="cpe-kpp" value="${v(c.kpp)}"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>ОГРН</label><input id="cpe-ogrn" value="${v(c.ogrn)}"></div>
+      <div class="field"><label>Тип партнёра</label><select id="cpe-type">${ptOpts}</select></div>
+    </div>
+    <div class="field"><label>Юр. адрес</label><input id="cpe-legal-addr" value="${v(c.legal_address)}"></div>
+    <div class="field"><label>Факт. адрес</label><input id="cpe-fact-addr" value="${v(c.fact_address)}"></div>
+    <div class="grid2">
+      <div class="field"><label>Расчётный счёт</label><input id="cpe-bank-acc" value="${v(c.bank_account)}"></div>
+      <div class="field"><label>БИК</label><input id="cpe-bik" value="${v(c.bik)}"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Банк</label><input id="cpe-bank-name" value="${v(c.bank_name)}"></div>
+      <div class="field"><label>Корр. счёт</label><input id="cpe-corr-acc" value="${v(c.corr_account)}"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Контактное лицо</label><input id="cpe-contact-name" value="${v(c.contact_name)}"></div>
+      <div class="field"><label>Должность</label><input id="cpe-contact-pos" value="${v(c.contact_position)}"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Телефон</label><input id="cpe-contact-phone" value="${v(c.contact_phone)}"></div>
+      <div class="field"><label>Email</label><input id="cpe-contact-email" value="${v(c.contact_email)}"></div>
+    </div>
+    <div class="field"><label>Как работаем с партнёром</label>
+      <select id="cpe-work-type">
+        <option value="">— не указано —</option>
+        <option value="invoice" ${c.work_type==='invoice'?'selected':''}>По счёту</option>
+        <option value="transfer" ${c.work_type==='transfer'?'selected':''}>Переводом</option>
+      </select>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Ставка комиссии</label>
+        <div style="display:flex;gap:6px">
+          <input type="number" id="cpe-commission" value="${v(c.commission_rate||0)}" style="flex:1">
+          <select id="cpe-commission-type" style="width:90px">
+            <option value="percent" ${c.commission_type==='percent'?'selected':''}>%</option>
+            <option value="fixed" ${c.commission_type==='fixed'?'selected':''}>₽ фикс</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Валюта</label>
+        <select id="cpe-currency">${['RUB','USD','EUR','CNY'].map(x=>`<option ${c.currency===x?'selected':''}>${x}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="field"><label>Примечание</label><textarea id="cpe-note" rows="2">${v(c.note)}</textarea></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)">
+      <button class="btn" onclick="document.getElementById('cp-edit-modal').remove()">Отмена</button>
+      <button class="btn btn-primary" onclick="cpSaveEdit('${c.id}')">💾 Сохранить</button>
+    </div>
+  </div>`;
+  bg.addEventListener('click',e=>{ if(e.target===bg) bg.remove(); });
+  document.body.appendChild(bg);
+};
+
+window.cpSaveEdit=async function(id){
+  const g=(x)=>document.getElementById(x);
+  const data={
+    full_name:g('cpe-full-name').value.trim(),
+    short_name:g('cpe-short-name').value.trim()||null,
+    inn:g('cpe-inn').value.trim()||null,
+    kpp:g('cpe-kpp').value.trim()||null,
+    ogrn:g('cpe-ogrn').value.trim()||null,
+    partner_type:g('cpe-type').value,
+    legal_address:g('cpe-legal-addr').value.trim()||null,
+    fact_address:g('cpe-fact-addr').value.trim()||null,
+    bank_account:g('cpe-bank-acc').value.trim()||null,
+    bik:g('cpe-bik').value.trim()||null,
+    bank_name:g('cpe-bank-name').value.trim()||null,
+    corr_account:g('cpe-corr-acc').value.trim()||null,
+    contact_name:g('cpe-contact-name').value.trim()||null,
+    contact_position:g('cpe-contact-pos').value.trim()||null,
+    contact_phone:g('cpe-contact-phone').value.trim()||null,
+    contact_email:g('cpe-contact-email').value.trim()||null,
+    work_type:g('cpe-work-type').value||null,
+    commission_rate:parseFloat(g('cpe-commission').value)||0,
+    commission_type:g('cpe-commission-type').value,
+    currency:g('cpe-currency').value,
+    note:g('cpe-note').value.trim()||null,
+    updated_at:new Date().toISOString()
+  };
+  if(!data.full_name){ showToast('Укажите полное наименование'); return; }
+  const sbC=sb||window.sb;
+  const {data:upd,error}=await sbC.from('counterparties').update(data).eq('id',id).select();
+  if(error){
+    alert('❌ Не сохранено.\nКод: '+(error.code||'—')+'\nСообщение: '+(error.message||error)+'\nДетали: '+(error.details||'—'));
+    return;
+  }
+  if(!upd||!upd.length){ alert('Запись не обновилась (0 строк). Возможно RLS на UPDATE counterparties.'); return; }
+  try{
+    await sbC.from('counterparty_history').insert({
+      counterparty_id:id, changed_by:currentUser.id,
+      change_type:'edit', old_value:null, new_value:'Карточка отредактирована',
+      comment:'Изменение реквизитов/данных контрагента'
+    });
+  }catch(e){ console.log('[cpSaveEdit history]', e); }
+  showToast('✅ Карточка обновлена');
+  document.getElementById('cp-edit-modal')?.remove();
   renderCPList();
 };
 
