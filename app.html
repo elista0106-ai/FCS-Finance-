@@ -1248,6 +1248,29 @@ tr:hover td{background:var(--bg2)}
     <div id="m-total-breakdown" style="font-size:11px;color:var(--text3);margin-top:4px"></div>
   </div>
 
+  <!-- Выставить счёт клиенту -->
+  <div style="border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden">
+    <div onclick="toggleClientInvoice()" style="cursor:pointer;padding:12px 14px;background:var(--bg3);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between">
+      <span>📄 Выставить счёт клиенту</span>
+      <span id="m-ci-arrow" style="font-size:11px;color:var(--text3)">▾ раскрыть</span>
+    </div>
+    <div id="m-ci-body" style="display:none;padding:14px">
+      <div class="field">
+        <label>Куда клиент платит (ссылка / QR / № карты)</label>
+        <input type="text" id="m-client-pay-dest" placeholder="https://pay... / номер карты / ссылка на QR" oninput="buildClientInvoiceText()">
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">Реквизиты для оплаты клиентом. Автоподстановку из отдельной проводки подключим позже.</div>
+      </div>
+      <div class="field">
+        <label>Текст счёта для клиента <span id="m-ci-copied" style="font-size:10px;color:var(--green);display:none">· скопировано</span></label>
+        <textarea id="m-client-invoice-text" rows="7" style="font-size:12px;line-height:1.5" oninput="document.getElementById('m-ci-copied').style.display='none'"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn btn-sm" onclick="buildClientInvoiceText()">🔄 Сгенерировать заново</button>
+        <button type="button" class="btn btn-sm btn-primary" onclick="copyClientInvoiceText()">📋 Скопировать текст для клиента</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Поля конвертации — только для иностранной валюты -->
   <div id="currency-convert-block" style="display:none;background:#1A1A0A;border:0.5px solid #3A3010;border-radius:var(--radius);padding:12px;margin-bottom:12px">
     <div style="font-size:11px;font-weight:600;color:#FCD34D;margin-bottom:10px">💱 Конвертация валюты</div>
@@ -2926,6 +2949,10 @@ function openAddEntry(){
   document.getElementById('m-commission').value = '';
   const pctReset = document.getElementById('m-commission-pct'); if(pctReset) pctReset.value = '';
   const brReset = document.getElementById('m-total-breakdown'); if(brReset) brReset.innerHTML = '';
+  const cd=document.getElementById('m-client-pay-dest'); if(cd) cd.value='';
+  const cit=document.getElementById('m-client-invoice-text'); if(cit) cit.value='';
+  const cib=document.getElementById('m-ci-body'); if(cib) cib.style.display='none';
+  const cia=document.getElementById('m-ci-arrow'); if(cia) cia.textContent='▾ раскрыть';
   document.getElementById('m-status').value = 'pending';
   document.getElementById('m-link').value = '';
   document.getElementById('m-note').value = '';
@@ -3045,6 +3072,8 @@ function openEdit(id){
   document.getElementById('receipt-field').style.display = e.agent_pay_type==='corp_card'?'block':'none';
   document.getElementById('m-commission').value = e.commission||'';
   const pctEdit = document.getElementById('m-commission-pct'); if(pctEdit) pctEdit.value = e.commission_pct||'';
+  const cdEdit = document.getElementById('m-client-pay-dest'); if(cdEdit) cdEdit.value = e.client_pay_dest||'';
+  const citEdit = document.getElementById('m-client-invoice-text'); if(citEdit) citEdit.value = e.client_invoice_text||'';
   setTimeout(()=>{ if(typeof recalcClientTotal==='function') recalcClientTotal(); }, 50);
   document.getElementById('m-status').value = e.status||'pending';
   document.getElementById('m-link').value = e.link||'';
@@ -3240,6 +3269,52 @@ function resetCommManual(){
   calcModal();
 }
 
+// ===== Выставить счёт клиенту =====
+window.toggleClientInvoice = function(){
+  const body = document.getElementById('m-ci-body');
+  const arrow = document.getElementById('m-ci-arrow');
+  if(!body) return;
+  const open = body.style.display==='none';
+  body.style.display = open ? 'block' : 'none';
+  if(arrow) arrow.textContent = open ? '▴ свернуть' : '▾ раскрыть';
+  if(open) buildClientInvoiceText();
+};
+
+// Черновой шаблон текста счёта. Заменю на точный, когда пришлёшь образец.
+window.buildClientInvoiceText = function(){
+  const ta = document.getElementById('m-client-invoice-text');
+  if(!ta) return;
+  const service = (document.getElementById('m-service')?.value||'').trim() || '—';
+  const total   = +(document.getElementById('m-amount')?.value)||0;
+  const dest    = (document.getElementById('m-client-pay-dest')?.value||'').trim();
+  const sumStr  = total>0 ? total.toLocaleString('ru-RU')+' ₽' : '—';
+  const destBlock = dest ? dest : '[ссылка / QR / № карты — заполните поле выше]';
+  ta.value =
+`Здравствуйте!
+
+По вашей заявке: ${service}
+Сумма к оплате: ${sumStr}
+
+Реквизиты для оплаты:
+${destBlock}
+
+После оплаты, пожалуйста, пришлите подтверждение.
+Спасибо, что выбрали First Concierge Service!`;
+};
+
+window.copyClientInvoiceText = async function(){
+  const ta = document.getElementById('m-client-invoice-text');
+  if(!ta || !ta.value.trim()){ showToast('Текст пуст — сгенерируйте сначала'); return; }
+  try{
+    await navigator.clipboard.writeText(ta.value);
+    const c = document.getElementById('m-ci-copied'); if(c) c.style.display='inline';
+    showToast('📋 Текст счёта скопирован — отправьте клиенту');
+  }catch(e){
+    ta.select(); document.execCommand('copy');
+    showToast('📋 Скопировано');
+  }
+};
+
 // Новая логика: Приход FCS считается автоматически из суммы контрагенту + % комиссии + эквайринг
 function recalcClientTotal(){
   const baseEl = document.getElementById('m-agent-amount');
@@ -3276,6 +3351,9 @@ function recalcClientTotal(){
   }
   // Обновляем визуальный блок-расчёт (депозит/валюта/итоги) как раньше
   if(typeof calcModal==='function') calcModal();
+  // Если открыт блок счёта клиенту — пересобираем текст с новой суммой
+  const ciBody = document.getElementById('m-ci-body');
+  if(ciBody && ciBody.style.display!=='none' && typeof buildClientInvoiceText==='function') buildClientInvoiceText();
 }
 
 function calcModal(){
@@ -3446,6 +3524,8 @@ async function saveEntry(){
     commission: +document.getElementById('m-commission').value||0,
     commission_pct: +document.getElementById('m-commission-pct')?.value||0,
     client_total: +document.getElementById('m-amount').value||0,
+    client_pay_dest: document.getElementById('m-client-pay-dest')?.value.trim()||null,
+    client_invoice_text: document.getElementById('m-client-invoice-text')?.value.trim()||null,
     status: document.getElementById('m-status').value,
     link: normalizedLink,
     note: document.getElementById('m-note').value.trim(),
