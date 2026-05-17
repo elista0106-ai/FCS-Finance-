@@ -1141,6 +1141,7 @@ tr:hover td{background:var(--bg2)}
     <div id="view-financier-commission" style="display:none"><div class="content"><div id="fin-comm-content"></div></div></div>
     <div id="view-financier-cost" style="display:none"><div class="content"><div id="fin-cost-content"></div></div></div>
     <div id="view-financier-comp" style="display:none"><div class="content"><div id="fin-comp-content"></div></div></div>
+    <div id="view-financier-paymethods" style="display:none"><div class="content"><div id="fin-paymethods-content"></div></div></div>
     <div id="view-financier-analytics" style="display:none"><div class="content"><div id="fin-analytics-content"></div></div></div>
     <div id="view-financier-deposits" style="display:none"><div class="content"><div id="fin-dep-content"></div></div></div>
 
@@ -2517,6 +2518,7 @@ function buildRoleMenu(role){
       {id:'financier-commission',label:'💰 Комиссии по месяцам'},
       {id:'financier-cost',label:'📉 Себестоимость'},
       {id:'financier-comp',label:'🌙 Компенсация'},
+      {id:'financier-paymethods',label:'💳 Способы оплаты'},
       {id:'financier-analytics',label:'📈 Аналитика'},
       {id:'financier-deposits',label:'🏦 Депозиты клиентов'},
     ],
@@ -2644,7 +2646,7 @@ function switchTab(t){
     'kpi','hr','partners',
     'accounting-inbox','accounting-requests','accounting-corp','accounting-journal',
     'operations-inbox','operations-journal','new-request',
-    'financier-kpi','financier-commission','financier-cost','financier-comp','financier-analytics','financier-deposits',
+    'financier-kpi','financier-commission','financier-cost','financier-comp','financier-paymethods','financier-analytics','financier-deposits',
     'settings',
     'executor-journal','partner-operations','partner-deposits',
     'cp-new-request','cp-my-requests','cp-inbox','cp-list','cp-contracts','cp-history',
@@ -2809,6 +2811,7 @@ function switchTab(t){
   else if(t==='financier-commission') renderFinancierCommission();
   else if(t==='financier-cost') renderFinancierCost();
   else if(t==='financier-comp') renderFinancierComp();
+  else if(t==='financier-paymethods') renderFinancierPayMethods();
   else if(t==='financier-analytics') renderFinancierAnalytics();
   else if(t==='financier-deposits') renderFinancierDeposits();
   else if(t==='schedule') renderSchedule();
@@ -3281,6 +3284,40 @@ window.toggleClientInvoice = function(){
 };
 
 // Черновой шаблон текста счёта. Заменю на точный, когда пришлёшь образец.
+// Кэш способов оплаты FCS (настраиваются финансистом в «Способы оплаты»)
+window._fcsPayMethods = window._fcsPayMethods || null;
+window.loadFcsPayMethods = async function(){
+  if(window._fcsPayMethods) return window._fcsPayMethods;
+  try{
+    const {data} = await (sb||window.sb).from('fcs_payment_methods').select('*');
+    const map = {};
+    (data||[]).forEach(r=>{ map[r.method] = r; });
+    window._fcsPayMethods = map;
+  }catch(e){ window._fcsPayMethods = {}; }
+  return window._fcsPayMethods;
+};
+// Авто-подстановка «Куда клиент платит» по «Тип оплаты FCS» (если поле пустое)
+window.autofillClientPayDest = async function(){
+  const destEl = document.getElementById('m-client-pay-dest');
+  if(!destEl) return;
+  const pay = document.getElementById('m-pay')?.value || '';
+  // Маппинг типа оплаты FCS → способ из настроек
+  const mp = { qr:'qr', link:'link', personal:'card' };
+  const mk = mp[pay];
+  if(!mk) return;
+  const methods = await window.loadFcsPayMethods();
+  const m = methods[mk];
+  if(m && m.active!==false && m.value){
+    // Не перетираем если сотрудник уже вписал вручную
+    if(!destEl.value.trim() || destEl.dataset.autofilled==='1'){
+      const extra = [m.holder, m.bank].filter(Boolean).join(' · ');
+      destEl.value = m.value + (extra?` (${extra})`:'');
+      destEl.dataset.autofilled = '1';
+      if(typeof buildClientInvoiceText==='function') buildClientInvoiceText();
+    }
+  }
+};
+
 window.buildClientInvoiceText = function(){
   const ta = document.getElementById('m-client-invoice-text');
   if(!ta) return;
@@ -3351,6 +3388,8 @@ function recalcClientTotal(){
   }
   // Обновляем визуальный блок-расчёт (депозит/валюта/итоги) как раньше
   if(typeof calcModal==='function') calcModal();
+  // Авто-подстановка реквизитов клиенту по типу оплаты FCS (из настроек финансиста)
+  if(typeof autofillClientPayDest==='function') autofillClientPayDest();
   // Если открыт блок счёта клиенту — пересобираем текст с новой суммой
   const ciBody = document.getElementById('m-ci-body');
   if(ciBody && ciBody.style.display!=='none' && typeof buildClientInvoiceText==='function') buildClientInvoiceText();
@@ -10728,6 +10767,88 @@ window.finCompExportCSV = function(){
   a.download = `compensation_${cs.year}_${String(cs.month).padStart(2,'0')}.csv`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 1000);
+};
+
+// ============================================================
+// СПОСОБЫ ОПЛАТЫ FCS (финансист настраивает QR / ссылку / карту)
+// Отсюда форма заявки подтягивает «Куда клиент платит»
+// ============================================================
+const FCS_PAY_METHODS = [
+  {key:'qr',   icon:'📱', title:'По QR коду',  ph:'Ссылка на QR / номер для QR-оплаты'},
+  {key:'link', icon:'🔗', title:'По ссылке',   ph:'https://pay... — платёжная ссылка'},
+  {key:'card', icon:'💳', title:'По карте',    ph:'Номер карты получателя'},
+];
+
+async function renderFinancierPayMethods(){
+  const el = document.getElementById('fin-paymethods-content');
+  if(!el) return;
+  el.innerHTML = '<div class="empty">Загрузка…</div>';
+  let rows = [];
+  try{
+    const {data, error} = await (sb||window.sb).from('fcs_payment_methods').select('*');
+    if(error) throw error;
+    rows = data || [];
+  }catch(e){
+    el.innerHTML = `<div class="empty" style="color:var(--red)">Ошибка: ${e.message}<br><br>Создайте таблицу <code>fcs_payment_methods</code> по SQL из инструкции.</div>`;
+    return;
+  }
+  const byKey = {};
+  rows.forEach(r=>{ byKey[r.method] = r; });
+
+  el.innerHTML = `
+  <h2 style="margin:0 0 4px">💳 Способы оплаты FCS</h2>
+  <div style="color:var(--text2);font-size:13px;margin-bottom:18px">Реквизиты, по которым клиент оплачивает. Подтягиваются в форму заявки «Куда клиент платит» по выбранному «Тип оплаты FCS».</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">
+    ${FCS_PAY_METHODS.map(m=>{
+      const cur = byKey[m.key] || {};
+      const active = cur.active!==false;
+      return `<div class="kpi-card" style="padding:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:15px;font-weight:600">${m.icon} ${m.title}</div>
+          <label style="font-size:11px;display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="pm-${m.key}-active" ${active?'checked':''}> Активен
+          </label>
+        </div>
+        <div class="field">
+          <label>Реквизиты для оплаты</label>
+          <textarea id="pm-${m.key}-value" rows="2" placeholder="${m.ph}">${(cur.value||'').replace(/</g,'&lt;')}</textarea>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Получатель / держатель</label><input id="pm-${m.key}-holder" value="${(cur.holder||'').replace(/"/g,'&quot;')}" placeholder="ФИО / название"></div>
+          <div class="field"><label>Банк</label><input id="pm-${m.key}-bank" value="${(cur.bank||'').replace(/"/g,'&quot;')}" placeholder="Банк"></div>
+        </div>
+        <div class="field"><label>Комментарий</label><input id="pm-${m.key}-note" value="${(cur.note||'').replace(/"/g,'&quot;')}" placeholder="напр. до 50 000 ₽"></div>
+        <button class="btn btn-primary btn-sm" onclick="savePayMethod('${m.key}')">💾 Сохранить</button>
+        ${cur.updated_at?`<div style="font-size:10px;color:var(--text3);margin-top:6px">Обновлено: ${new Date(cur.updated_at).toLocaleString('ru-RU')}</div>`:''}
+      </div>`;
+    }).join('')}
+  </div>
+  <div style="margin-top:16px;padding:12px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--text2);line-height:1.6">
+    <b>Как используется:</b> в форме «Новая заявка» при выборе «Тип оплаты FCS» = По QR / По ссылке / Перевод на карту —
+    поле «Куда клиент платит» в блоке «Выставить счёт клиенту» автоматически заполнится этими реквизитами.
+  </div>`;
+}
+
+window.savePayMethod = async function(key){
+  const g=(s)=>document.getElementById('pm-'+key+'-'+s);
+  const payload = {
+    method: key,
+    value: g('value').value.trim()||null,
+    holder: g('holder').value.trim()||null,
+    bank: g('bank').value.trim()||null,
+    note: g('note').value.trim()||null,
+    active: g('active').checked,
+    updated_at: new Date().toISOString()
+  };
+  try{
+    const {error} = await (sb||window.sb).from('fcs_payment_methods')
+      .upsert(payload, {onConflict:'method'});
+    if(error) throw error;
+    showToast('✅ Способ оплаты сохранён');
+    renderFinancierPayMethods();
+  }catch(e){
+    alert('❌ Не сохранено.\nКод: '+(e.code||'—')+'\nСообщение: '+(e.message||e));
+  }
 };
 
 async function renderFinancierDeposits(){
