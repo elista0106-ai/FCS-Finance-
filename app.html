@@ -1218,9 +1218,20 @@ tr:hover td{background:var(--bg2)}
     </div>
   </div>
   <div class="grid2">
-    <div class="field"><label>Приход FCS (₽)</label><input type="number" id="m-amount" placeholder="0" oninput="calcModal();onAmountChangeAutoPay()"></div>
+    <div class="field"><label>Сумма оплаты контрагенту (₽) *</label><input type="number" id="m-agent-amount" placeholder="0" oninput="recalcClientTotal()"></div>
+    <div class="field"><label>Валюта расхода</label>
+      <select id="m-agent-currency" onchange="onCurrencyChange();recalcClientTotal()">
+        <option value="RUB">RUB ₽</option><option value="USD">USD $</option>
+        <option value="EUR">EUR €</option><option value="GBP">GBP £</option>
+        <option value="AED">AED</option><option value="TRY">TRY</option>
+        <option value="KZT">KZT</option><option value="JPY">JPY ¥</option>
+      </select>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="field"><label>% комиссии FCS</label><input type="number" id="m-commission-pct" placeholder="0" step="0.1" oninput="recalcClientTotal()"></div>
     <div class="field"><label>Тип оплаты FCS</label>
-      <select id="m-pay" onchange="onPayChange();calcModal()">
+      <select id="m-pay" onchange="onPayChange();recalcClientTotal()">
         <option value="personal">Перевод на карту</option>
         <option value="invoice">По счёту</option>
         <option value="qr">По QR (1%)</option>
@@ -1231,16 +1242,10 @@ tr:hover td{background:var(--bg2)}
       </select>
     </div>
   </div>
-  <div class="grid2">
-    <div class="field"><label>Расход контрагенту</label><input type="number" id="m-agent-amount" placeholder="0" oninput="calcModal()"></div>
-    <div class="field"><label>Валюта расхода</label>
-      <select id="m-agent-currency" onchange="onCurrencyChange()">
-        <option value="RUB">RUB ₽</option><option value="USD">USD $</option>
-        <option value="EUR">EUR €</option><option value="GBP">GBP £</option>
-        <option value="AED">AED</option><option value="TRY">TRY</option>
-        <option value="KZT">KZT</option><option value="JPY">JPY ¥</option>
-      </select>
-    </div>
+  <div class="field">
+    <label>Приход FCS (₽) <span style="font-size:10px;color:var(--text3)">· авто: контрагенту + % + эквайринг</span></label>
+    <input type="number" id="m-amount" placeholder="0" readonly style="background:var(--bg3);font-weight:700;font-size:16px;color:var(--accent);cursor:not-allowed">
+    <div id="m-total-breakdown" style="font-size:11px;color:var(--text3);margin-top:4px"></div>
   </div>
 
   <!-- Поля конвертации — только для иностранной валюты -->
@@ -2919,6 +2924,8 @@ function openAddEntry(){
   document.getElementById('m-receipt').value = '';
   document.getElementById('receipt-field').style.display = 'none';
   document.getElementById('m-commission').value = '';
+  const pctReset = document.getElementById('m-commission-pct'); if(pctReset) pctReset.value = '';
+  const brReset = document.getElementById('m-total-breakdown'); if(brReset) brReset.innerHTML = '';
   document.getElementById('m-status').value = 'pending';
   document.getElementById('m-link').value = '';
   document.getElementById('m-note').value = '';
@@ -3037,6 +3044,8 @@ function openEdit(id){
   document.getElementById('m-receipt').value = e.receipt_link||'';
   document.getElementById('receipt-field').style.display = e.agent_pay_type==='corp_card'?'block':'none';
   document.getElementById('m-commission').value = e.commission||'';
+  const pctEdit = document.getElementById('m-commission-pct'); if(pctEdit) pctEdit.value = e.commission_pct||'';
+  setTimeout(()=>{ if(typeof recalcClientTotal==='function') recalcClientTotal(); }, 50);
   document.getElementById('m-status').value = e.status||'pending';
   document.getElementById('m-link').value = e.link||'';
   document.getElementById('m-note').value = e.note||'';
@@ -3231,6 +3240,44 @@ function resetCommManual(){
   calcModal();
 }
 
+// Новая логика: Приход FCS считается автоматически из суммы контрагенту + % комиссии + эквайринг
+function recalcClientTotal(){
+  const baseEl = document.getElementById('m-agent-amount');
+  const pctEl  = document.getElementById('m-commission-pct');
+  const payEl  = document.getElementById('m-pay');
+  const amtEl  = document.getElementById('m-amount');
+  const commEl = document.getElementById('m-commission');
+  const brEl   = document.getElementById('m-total-breakdown');
+  if(!baseEl || !amtEl) return;
+  const base = +baseEl.value || 0;
+  const pct  = +(pctEl?.value) || 0;
+  const pay  = payEl ? payEl.value : '';
+  // Ставка эквайринга по типу оплаты FCS
+  let acqRate = 0;
+  if(pay==='link') acqRate = 0.03;
+  else if(pay==='qr') acqRate = 0.01;
+  // счёт / перевод на карту / корп / депозит — без эквайринга (0%)
+  const commission = Math.round(base * pct / 100);
+  const subtotal   = base + commission;
+  const total      = acqRate>0 ? Math.round(subtotal / (1 - acqRate)) : subtotal;
+  const acqAmount  = total - subtotal;
+  // Заполняем авто-поля
+  amtEl.value = total > 0 ? total : '';
+  if(commEl) commEl.value = commission || '';
+  // Разбивка под полем
+  if(brEl){
+    if(base>0){
+      brEl.innerHTML =
+        `Контрагенту: <b>${base.toLocaleString('ru-RU')} ₽</b>` +
+        ` &nbsp;+&nbsp; Комиссия ${pct}%: <b>${commission.toLocaleString('ru-RU')} ₽</b>` +
+        (acqRate>0 ? ` &nbsp;+&nbsp; Эквайринг ${(acqRate*100)}%: <b>${acqAmount.toLocaleString('ru-RU')} ₽</b>` : ` &nbsp;·&nbsp; без эквайринга`) +
+        ` &nbsp;=&nbsp; <b style="color:var(--accent)">${total.toLocaleString('ru-RU')} ₽</b>`;
+    } else brEl.innerHTML = '';
+  }
+  // Обновляем визуальный блок-расчёт (депозит/валюта/итоги) как раньше
+  if(typeof calcModal==='function') calcModal();
+}
+
 function calcModal(){
   const pay = document.getElementById('m-pay').value;
   const amount = +document.getElementById('m-amount').value||0;
@@ -3397,6 +3444,8 @@ async function saveEntry(){
     agent_pay_type: document.getElementById('m-agent-pay-type').value,
     receipt_link: document.getElementById('m-receipt').value.trim(),
     commission: +document.getElementById('m-commission').value||0,
+    commission_pct: +document.getElementById('m-commission-pct')?.value||0,
+    client_total: +document.getElementById('m-amount').value||0,
     status: document.getElementById('m-status').value,
     link: normalizedLink,
     note: document.getElementById('m-note').value.trim(),
