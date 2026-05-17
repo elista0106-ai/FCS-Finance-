@@ -2886,7 +2886,9 @@ window.onAgentSelect = function(){
     if(agentPay){ agentPay.value='card_rf'; if(typeof onAgentPayChange==='function') onAgentPayChange(); }
     if(fcsPay){ fcsPay.value='personal'; if(typeof onPayChange==='function') onPayChange(); }
   }
-  if(typeof calcModal==='function') calcModal();
+  // recalcClientTotal пересчитает приход И подтянет реквизиты клиенту из «Способы оплаты»
+  if(typeof recalcClientTotal==='function') recalcClientTotal();
+  else if(typeof calcModal==='function') calcModal();
 };
 
 // Для контрагента «По счёту»: ТИП ОПЛАТЫ FCS зависит от суммы
@@ -3280,7 +3282,11 @@ window.toggleClientInvoice = function(){
   const open = body.style.display==='none';
   body.style.display = open ? 'block' : 'none';
   if(arrow) arrow.textContent = open ? '▴ свернуть' : '▾ раскрыть';
-  if(open) buildClientInvoiceText();
+  if(open){
+    // Подтягиваем реквизиты из «Способы оплаты» по текущему типу оплаты FCS, потом текст
+    Promise.resolve(typeof autofillClientPayDest==='function' ? autofillClientPayDest() : null)
+      .finally(()=>{ if(typeof buildClientInvoiceText==='function') buildClientInvoiceText(); });
+  }
 };
 
 // Черновой шаблон текста счёта. Заменю на точный, когда пришлёшь образец.
