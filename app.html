@@ -399,7 +399,6 @@ tr:hover td{background:var(--bg2)}
     <button class="rs-btn" onclick="switchViewRole('operations')">⚙️ Операционист</button>
     <button class="rs-btn" onclick="switchViewRole('financier')">📊 Финансист</button>
     <button class="rs-btn" onclick="switchViewRole('hr')">👥 НР</button>
-    <button class="rs-btn" onclick="switchViewRole('partner_manager')">🤝 Партнёры</button>
     <button class="rs-btn" onclick="switchViewRole('account_manager')">💼 Аккаунт</button>
     <button class="rs-btn" onclick="switchViewRole('contract_manager')">📄 Договорной</button>
     <button class="rs-btn" onclick="switchViewRole('uko')">🛡 УКО</button>
@@ -1622,7 +1621,6 @@ async function init(){
     uko: 'uko-inbox',
     scheduler: 'schedule',
     executor: 'new-request',
-    partner_manager: 'partners',
     account_manager: 'cp-new-request',
     contract_manager: 'cp-inbox',
     manager: 'main',
@@ -2396,7 +2394,7 @@ window.switchViewRole = function(role){
   const roleNames = {
     executor:'👤 Исполнитель', accounting:'📒 Бухгалтерия',
     operations:'⚙️ Операционист', financier:'📊 Финансист',
-    hr:'👥 НР', partner_manager:'🤝 Партнёрский менеджер',
+    hr:'👥 НР',
     account_manager:'💼 Аккаунт-менеджер',
     contract_manager:'📄 Договорной отдел',
     uko:'🛡 УКО — Управление качеством',
@@ -2405,7 +2403,7 @@ window.switchViewRole = function(role){
   const defaultTabs = {
     executor:'new-request', accounting:'accounting-inbox',
     operations:'operations-inbox', financier:'main',
-    hr:'hr', partner_manager:'partners',
+    hr:'hr',
     account_manager:'cp-new-request',
     contract_manager:'cp-inbox',
     uko:'uko-inbox',
@@ -2443,7 +2441,7 @@ function buildRoleMenu(role){
       {id:'accounting-inbox',label:'📥 Входящие (бухгалтерия)'},
       {id:'operations-inbox',label:'📥 Входящие (операционист)'},
       {group:'Управление'},
-      {id:'kpi',label:'🏆 KPI'},{id:'hr',label:'👥 НР — Сотрудники'},{id:'schedule',label:'📅 График'},{id:'partners',label:'🤝 Партнёры'},
+      {id:'kpi',label:'🏆 KPI'},{id:'hr',label:'👥 НР — Сотрудники'},{id:'schedule',label:'📅 График'},
       {group:'Настройки'},
       {id:'settings',label:'⚙️ Настройки'},
     ],
@@ -2455,7 +2453,7 @@ function buildRoleMenu(role){
       {group:'Аналитика'},
       {id:'dept',label:'📊 По отделам'},{id:'days',label:'📅 По дням'},{id:'clients',label:'👤 Клиенты'},
       {group:'Управление'},
-      {id:'kpi',label:'🏆 KPI'},{id:'schedule',label:'📅 График'},{id:'partners',label:'🤝 Партнёры'},
+      {id:'kpi',label:'🏆 KPI'},{id:'schedule',label:'📅 График'},
     ],
     executor: [
       {group:'Мои действия'},
@@ -2488,7 +2486,6 @@ function buildRoleMenu(role){
       {id:'financier-cost',label:'📉 Себестоимость'},
       {id:'financier-comp',label:'🌙 Компенсация'},
       {id:'financier-analytics',label:'📈 Аналитика'},
-      {id:'partners',label:'🤝 Партнёры'},
       {id:'financier-deposits',label:'🏦 Депозиты клиентов'},
     ],
     hr: [
@@ -2509,12 +2506,6 @@ function buildRoleMenu(role){
       {id:'uko-inwork',label:'🛠 Заявки в работе'},
       {id:'uko-approval',label:'👁 На согласовании'},
       {id:'uko-losses-journal',label:'📋 Журнал обработанных потерь'},
-    ],
-    partner_manager: [
-      {group:'Партнёры'},
-      {id:'partners',label:'🤝 База партнёров'},
-      {id:'partner-operations',label:'📋 Операции по партнёрам'},
-      {id:'partner-deposits',label:'💰 Депозиты'},
     ],
     account_manager: [
       {group:'Контрагенты'},
@@ -3471,9 +3462,9 @@ async function renderSettings(){
   const roleClass = {admin:'role-admin',manager:'role-manager',viewer:'role-viewer',executor:'role-executor'};
   const roleLabel = {admin:'👑 Админ',manager:'✏️ Менеджер',viewer:'👁 Просмотр',executor:'👤 Исполнитель',
     scheduler:'📅 Планировщик',uko:'🛡 УКО',hr:'👥 НР',financier:'📊 Финансист',
-    accounting:'📒 Бухгалтерия',operations:'⚙️ Операционист',partner_manager:'🤝 Партнёры',
+    accounting:'📒 Бухгалтерия',operations:'⚙️ Операционист',
     account_manager:'💼 Аккаунт',contract_manager:'📄 Договорной'};
-  const allRoles = ['executor','viewer','manager','scheduler','uko','hr','financier','accounting','operations','partner_manager','account_manager','contract_manager','admin'];
+  const allRoles = ['executor','viewer','manager','scheduler','uko','hr','financier','accounting','operations','account_manager','contract_manager','admin'];
 
   const userCards = (users||[]).map(u=>{
     const restricted = Array.isArray(u.allowed_tabs) && u.allowed_tabs.length;
@@ -7687,6 +7678,15 @@ window.ukoOpenWorkModal = async function(entryId){
       </div>
     </div>
     <div class="field" style="margin-bottom:10px">
+      <label>Статья</label>
+      <select id="uko-w-article">
+        <option value="">— выберите статью —</option>
+        <option value="compensation" ${e.uko_article==='compensation'?'selected':''}>Компенсация</option>
+        <option value="compliment" ${e.uko_article==='compliment'?'selected':''}>Комплимент</option>
+        <option value="refund_not_loss" ${e.uko_article==='refund_not_loss'?'selected':''}>Возврат (не потеря)</option>
+      </select>
+    </div>
+    <div class="field" style="margin-bottom:10px">
       <label>Комментарий УКО</label>
       <textarea id="uko-w-comment" rows="3" placeholder="Что выяснили, причины, меры...">${e.uko_employee_comment||''}</textarea>
     </div>
@@ -7730,6 +7730,7 @@ window.ukoUpdateWorkEmpList = function(){
 window.ukoSaveWork = async function(entryId, sendForApproval){
   const update = {
     loss_responsible_id: document.getElementById('uko-w-emp').value || null,
+    uko_article: document.getElementById('uko-w-article')?.value || null,
     uko_employee_comment: document.getElementById('uko-w-comment').value.trim() || null,
     loss_amount: +document.getElementById('uko-w-loss-amount').value || 0,
   };
@@ -7840,6 +7841,9 @@ window.ukoOpenApprovalModal = function(entryId){
       </div>
       ${e.loss_note?`<div style="margin-top:6px"><span style="color:var(--text3)">Причина (от заявителя): </span><div style="line-height:1.4;margin-top:2px">${e.loss_note}</div></div>`:''}
       <div style="margin-top:8px;padding-top:8px;border-top:0.5px solid var(--border)">
+        <span style="color:var(--text3)">Статья: </span><b>${({compensation:'Компенсация',compliment:'Комплимент',refund_not_loss:'Возврат (не потеря)'}[e.uko_article])||'— не указана —'}</b>
+      </div>
+      <div style="margin-top:8px">
         <span style="color:var(--text3)">Подготовил УКО (${ukoUserDisplayName(e.uko_taken_by)}): </span>
         <div style="line-height:1.4;margin-top:2px">${e.uko_employee_comment||'—'}</div>
       </div>
@@ -12070,7 +12074,7 @@ const _cpRoleMap = {
   admin:'👑 Админ', manager:'✏️ Менеджер', viewer:'👁 Просмотр',
   executor:'👤 Исполнитель', accounting:'📒 Бухгалтерия',
   operations:'⚙️ Операционист', financier:'📊 Финансист',
-  hr:'👥 НР', partner_manager:'🤝 Партнёрский менеджер',
+  hr:'👥 НР',
   account_manager:'💼 Аккаунт-менеджер',
   contract_manager:'📄 Договорной отдел'
 };
@@ -12153,6 +12157,13 @@ function renderCPNewRequest(){
     </div>
     <div class="kpi-card" style="padding:16px;margin-bottom:12px">
       <div class="kpi-sec" style="margin-top:0">Договорная информация</div>
+      <div class="field"><label>Как работаем с партнёром *</label>
+        <select id="cp-work-type">
+          <option value="">— выберите —</option>
+          <option value="invoice">По счёту</option>
+          <option value="transfer">Переводом</option>
+        </select>
+      </div>
       <div class="grid2">
         <div class="field"><label>Ставка комиссии</label>
           <div style="display:flex;gap:6px">
@@ -12184,6 +12195,7 @@ function resetCPForm(){
   ].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const t=document.getElementById('cp-type'); if(t) t.value='';
   const c=document.getElementById('cp-currency'); if(c) c.value='RUB';
+  const wt=document.getElementById('cp-work-type'); if(wt) wt.value='';
 }
 
 async function submitCPRequest(){
@@ -12216,6 +12228,7 @@ async function submitCPRequest(){
     partner_type:document.getElementById('cp-type').value,
     commission_rate:parseFloat(document.getElementById('cp-commission').value)||0,
     commission_type:document.getElementById('cp-commission-type').value,
+    work_type:document.getElementById('cp-work-type')?.value||null,
     currency:document.getElementById('cp-currency').value,
     cooperation_start:document.getElementById('cp-coop-start').value||null,
     cooperation_end:document.getElementById('cp-coop-end').value||null,
@@ -12298,6 +12311,7 @@ window.cpOpenReview=async function(id){
       <div><span style="color:var(--text3)">Email: </span>${r.contact_email||'—'}</div>
       <div><span style="color:var(--text3)">Комиссия: </span>${r.commission_rate||0}${r.commission_type==='percent'?'%':' ₽'}</div>
       <div><span style="color:var(--text3)">Валюта: </span>${r.currency||'RUB'}</div>
+      <div><span style="color:var(--text3)">Работаем: </span><b>${({invoice:'По счёту',transfer:'Переводом'}[r.work_type])||'— не указано —'}</b></div>
     </div>
     ${r.note?`<div style="font-size:12px;padding:8px;background:var(--bg3);border-radius:6px;margin-bottom:12px">${r.note}</div>`:''}
     <div class="field" style="margin-bottom:12px">
@@ -12337,6 +12351,7 @@ window.cpDecideRequest=async function(id,decision){
         contact_phone:req.contact_phone,contact_email:req.contact_email,
         partner_type:req.partner_type,commission_rate:req.commission_rate,
         commission_type:req.commission_type,currency:req.currency,
+        work_type:req.work_type,
         cooperation_start:req.cooperation_start,cooperation_end:req.cooperation_end,
         note:req.note,status:'active',created_by:req.created_by,
         activated_by:currentUser.id,activated_at:new Date().toISOString()
