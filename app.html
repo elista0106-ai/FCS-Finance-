@@ -1211,10 +1211,14 @@ tr:hover td{background:var(--bg2)}
   <div class="field"><label>Назначение платежа *</label><input type="text" id="m-service" placeholder="Что оформляем..."></div>
   <div class="grid2">
     <div class="field"><label>ID клиента</label><input type="text" id="m-client-name" placeholder="ID клиента из AmoCRM" list="client-names-list"><datalist id="client-names-list"></datalist></div>
-    <div class="field"><label>Контрагент</label><input type="text" id="m-agent" placeholder="Кому платим"></div>
+    <div class="field"><label>Контрагент</label>
+      <select id="m-agent" onchange="onAgentSelect()">
+        <option value="">— выберите контрагента —</option>
+      </select>
+    </div>
   </div>
   <div class="grid2">
-    <div class="field"><label>Сумма FCS (₽)</label><input type="number" id="m-amount" placeholder="0" oninput="calcModal()"></div>
+    <div class="field"><label>Сумма FCS (₽)</label><input type="number" id="m-amount" placeholder="0" oninput="calcModal();onAmountChangeAutoPay()"></div>
     <div class="field"><label>Тип оплаты FCS</label>
       <select id="m-pay" onchange="onPayChange();calcModal()">
         <option value="personal">Перевод на карту</option>
@@ -2801,6 +2805,75 @@ function addMonth(){
   if(m && /^\d{4}-\d{2}$/.test(m)){ activeMonth=m; renderAll(); }
 }
 
+// ===== Контрагенты в форме заявки: выпадающий список + авто-тип оплаты =====
+window._cpAgentsCache = window._cpAgentsCache || [];
+
+window.cpPopulateAgentSelect = async function(selectedName){
+  const sel = document.getElementById('m-agent');
+  if(!sel || sel.tagName!=='SELECT') return;
+  // Грузим активных контрагентов (кэшируем)
+  if(!window._cpAgentsCache.length){
+    try{
+      const {data} = await (sb||window.sb).from('counterparties')
+        .select('id,full_name,short_name,work_type,status')
+        .eq('status','active').order('full_name');
+      window._cpAgentsCache = data||[];
+    }catch(e){ console.log('[cpAgents] load err:', e); }
+  }
+  const list = window._cpAgentsCache;
+  let opts = '<option value="">— выберите контрагента —</option>';
+  let found = false;
+  list.forEach(c=>{
+    const nm = c.full_name || c.short_name || '';
+    if(!nm) return;
+    const isSel = (nm===selectedName);
+    if(isSel) found = true;
+    opts += `<option value="${nm.replace(/"/g,'&quot;')}" data-work-type="${c.work_type||''}" ${isSel?'selected':''}>${nm}${c.work_type?(' · '+(c.work_type==='invoice'?'по счёту':'переводом')):''}</option>`;
+  });
+  // Старые заявки с произвольным контрагентом — добавим как отдельную опцию
+  if(selectedName && !found){
+    opts += `<option value="${selectedName.replace(/"/g,'&quot;')}" selected>${selectedName} (вне базы)</option>`;
+  }
+  sel.innerHTML = opts;
+};
+
+// Авто-проставление типов оплаты по «Как работаем с партнёром»
+window.onAgentSelect = function(){
+  const sel = document.getElementById('m-agent');
+  if(!sel) return;
+  const opt = sel.options[sel.selectedIndex];
+  const workType = opt ? (opt.getAttribute('data-work-type')||'') : '';
+  if(!workType) return;
+  const agentPay = document.getElementById('m-agent-pay-type');
+  const fcsPay   = document.getElementById('m-pay');
+  if(workType==='invoice'){
+    // Тип оплаты контрагенту → Счёт
+    if(agentPay){ agentPay.value='invoice'; if(typeof onAgentPayChange==='function') onAgentPayChange(); }
+    // Тип оплаты FCS → по сумме: ≤50000 ссылка, >50000 QR
+    applyFcsPayByAmount();
+  } else if(workType==='transfer'){
+    if(agentPay){ agentPay.value='card_rf'; if(typeof onAgentPayChange==='function') onAgentPayChange(); }
+    if(fcsPay){ fcsPay.value='personal'; if(typeof onPayChange==='function') onPayChange(); }
+  }
+  if(typeof calcModal==='function') calcModal();
+};
+
+// Для контрагента «По счёту»: ТИП ОПЛАТЫ FCS зависит от суммы
+function applyFcsPayByAmount(){
+  const sel = document.getElementById('m-agent');
+  const opt = sel? sel.options[sel.selectedIndex] : null;
+  const workType = opt ? (opt.getAttribute('data-work-type')||'') : '';
+  if(workType!=='invoice') return; // правило только для «По счёту»
+  const amount = +(document.getElementById('m-amount')?.value)||0;
+  const fcsPay = document.getElementById('m-pay');
+  if(!fcsPay) return;
+  fcsPay.value = (amount>50000) ? 'qr' : 'link';
+  if(typeof onPayChange==='function') onPayChange();
+}
+
+// Вызывается при изменении Суммы FCS — пересчитываем тип оплаты FCS для «По счёту»
+window.onAmountChangeAutoPay = function(){ applyFcsPayByAmount(); };
+
 // ===== ENTRY CRUD =====
 function openAddEntry(){
   editId = null;
@@ -2834,8 +2907,7 @@ function openAddEntry(){
   })();
   document.getElementById('m-service').value = '';
   document.getElementById('m-client-name').value = '';
-  document.getElementById('m-client-name').value = '';
-  document.getElementById('m-agent').value = '';
+  cpPopulateAgentSelect('');
   document.getElementById('m-amount').value = '';
   document.getElementById('m-pay').value = 'personal';
   document.getElementById('m-agent-amount').value = '';
@@ -2951,7 +3023,7 @@ function openEdit(id){
   document.getElementById('m-service').value = e.service||'';
   document.getElementById('m-client-name').value = e.client_name||'';
   document.getElementById('m-client-name').value = e.client_name||'';
-  document.getElementById('m-agent').value = e.agent||'';
+  cpPopulateAgentSelect(e.agent||'');
   document.getElementById('m-amount').value = e.amount||'';
   document.getElementById('m-pay').value = e.pay||'personal';
   document.getElementById('m-agent-amount').value = e.agent_amount||'';
@@ -9716,7 +9788,7 @@ window.parseAndOpenEntry = function(){
     if(parsed.service) document.getElementById('m-service').value = parsed.service;
     // Клиент и контрагент — НЕ заполняем (по правилу), но если когда-нибудь будут — оставлю заглушки
     if(parsed.client_name) document.getElementById('m-client-name').value = parsed.client_name;
-    if(parsed.agent)       document.getElementById('m-agent').value = parsed.agent;
+    if(parsed.agent)       cpPopulateAgentSelect(parsed.agent);
     // Приход от клиента
     if(parsed.amount) document.getElementById('m-amount').value = parsed.amount;
     if(parsed.pay)    document.getElementById('m-pay').value = parsed.pay;
