@@ -7632,16 +7632,43 @@ window.ukoOpenWorkModal = async function(entryId){
   bg.id = 'uko-work-modal'; bg.className = 'modal-bg'; bg.style.display='flex';
   bg.innerHTML = `<div class="modal" style="max-width:640px;max-height:92vh;overflow-y:auto">
     <h3>🛠 Разбор потери (УКО — сотрудник)</h3>
-    <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:12px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+    <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px;font-size:12px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text2);margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:6px">📋 Полная заявка</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px">
         <div><span style="color:var(--text3)">Дата: </span><b>${e.date||'—'}</b></div>
-        <div><span style="color:var(--text3)">№ заявки: </span>${lead?`<a href="${e.link}" target="_blank" rel="noopener" style="color:#60A5FA">#${lead}</a>`:'—'}</div>
-        <div><span style="color:var(--text3)">Исполнитель: </span>${ukoEmployeeName(e)}</div>
-        <div><span style="color:var(--text3)">Отдел: </span>${e.dept||'—'}</div>
+        <div><span style="color:var(--text3)">№ заявки: </span>${lead?`<a href="${e.link}" target="_blank" rel="noopener" style="color:#60A5FA">#${lead}</a>`:(e.link?`<a href="${e.link}" target="_blank" rel="noopener" style="color:#60A5FA">ссылка</a>`:'—')}</div>
+        <div><span style="color:var(--text3)">Исполнитель: </span><b>${ukoEmployeeName(e)}</b></div>
+        <div><span style="color:var(--text3)">Отдел: </span>${(typeof DEPTS!=='undefined'&&DEPTS[e.dept])||e.dept||'—'}</div>
+        <div><span style="color:var(--text3)">Статус заявки: </span>${e.status||'—'}</div>
+        <div><span style="color:var(--text3)">ID клиента: </span>${e.client_name||'—'}</div>
       </div>
-      <div><span style="color:var(--text3)">Назначение: </span><div style="line-height:1.4;margin-top:2px">${e.service||'—'}</div></div>
-      <div style="margin-top:8px"><span style="color:var(--text3)">Сумма потери: </span><b style="color:var(--red)">${(+e.loss_amount||0).toLocaleString('ru-RU')} ₽</b></div>
-      ${e.loss_note?`<div style="margin-top:6px"><span style="color:var(--text3)">Причина: </span><div style="line-height:1.4;margin-top:2px">${e.loss_note}</div></div>`:''}
+      <div style="margin-top:8px"><span style="color:var(--text3)">Назначение платежа: </span><div style="line-height:1.4;margin-top:2px;font-weight:500">${e.service||'—'}</div></div>
+
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-weight:600;color:var(--text2);font-size:11px">💰 Приход от клиента</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-top:6px">
+        <div><span style="color:var(--text3)">Сумма FCS: </span><b>${(+e.amount||0).toLocaleString('ru-RU')} ₽</b></div>
+        <div><span style="color:var(--text3)">Тип оплаты FCS: </span>${(typeof PAYS!=='undefined'&&PAYS[e.pay])||e.pay||'—'}</div>
+        <div><span style="color:var(--text3)">Комиссия FCS: </span><b style="color:var(--green)">${(+e.commission||0).toLocaleString('ru-RU')} ₽</b></div>
+      </div>
+
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-weight:600;color:var(--text2);font-size:11px">📤 Кому платим</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-top:6px">
+        <div><span style="color:var(--text3)">Контрагент: </span>${e.agent||'—'}</div>
+        <div><span style="color:var(--text3)">Расход контрагенту: </span><b>${(+e.agent_amount||0).toLocaleString('ru-RU')} ${e.agent_currency||'RUB'}</b></div>
+        <div><span style="color:var(--text3)">Тип оплаты контрагенту: </span>${({card_rf:'💳 Карта РФ',foreign_card:'🌍 Иностр. карта',corp_card:'🏢 Корп карта',invoice:'📄 По счёту',partner_deposit:'🤝 Депозит партнёра'}[e.agent_pay_type])||e.agent_pay_type||'—'}</div>
+      </div>
+      ${(e.payment_details_text||e.payment_details_pdf||e.receipt_link)?`
+      <div style="margin-top:8px"><span style="color:var(--text3)">Реквизиты получателя: </span>
+        <div style="line-height:1.4;margin-top:2px;word-break:break-word">${e.payment_details_text||'—'}</div>
+        ${e.payment_details_pdf?`<a href="#" onclick="event.preventDefault();openRequisitesPdf('${e.payment_details_pdf}')" style="color:#60A5FA;font-size:11px">📎 Открыть PDF реквизитов</a>`:''}
+        ${e.receipt_link?`<div style="margin-top:4px"><a href="${e.receipt_link}" target="_blank" rel="noopener" style="color:#60A5FA;font-size:11px">📎 Чек / ссылка на оплату</a></div>`:''}
+      </div>`:''}
+      ${e.note?`<div style="margin-top:8px"><span style="color:var(--text3)">Комментарий исполнителя: </span><div style="line-height:1.4;margin-top:2px;font-style:italic">${e.note}</div></div>`:''}
+
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+        <span style="color:var(--text3)">Сумма потери: </span><b style="color:var(--red);font-size:14px">${(+e.loss_amount||0).toLocaleString('ru-RU')} ₽</b>
+        ${e.loss_note?`<div style="margin-top:4px"><span style="color:var(--text3)">Причина потери: </span><div style="line-height:1.4;margin-top:2px">${e.loss_note}</div></div>`:''}
+      </div>
     </div>
 
     <div class="grid2" style="margin-bottom:10px">
