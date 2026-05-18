@@ -1680,16 +1680,24 @@ async function loadEntries(){
     const {data:profs} = await sb.from('profiles').select('id, full_name, email');
     window.allProfiles = profs || [];
   }
-  const {data, error} = await sb
+  // Сначала пробуем со встроенным профилем. Если RLS на profiles ломает запрос —
+  // повторяем БЕЗ join (имя отправителя возьмём из window.allProfiles).
+  let data, error;
+  ({data, error} = await sb
     .from('entries')
     .select('*, profiles!entries_submitted_by_fkey(full_name, email)')
-    .order('date', {ascending:false});
+    .order('date', {ascending:false}));
+  if(error){
+    console.warn('[loadEntries] join с profiles упал, грузим без него:', error.message);
+    ({data, error} = await sb.from('entries').select('*').order('date', {ascending:false}));
+  }
+  if(error){ console.error('[loadEntries] критическая ошибка:', error); setSyncStatus('error'); showToast('Ошибка загрузки заявок: '+(error.message||error)); return; }
 
-  if(error){ console.error(error); setSyncStatus('error'); return; }
-
+  const profMap = {};
+  (window.allProfiles||[]).forEach(p=>{ profMap[p.id] = p.full_name || p.email; });
   entries = (data||[]).map(e=>({
     ...e,
-    _submitter_name: e.profiles?.full_name || e.profiles?.email || null
+    _submitter_name: (e.profiles?.full_name || e.profiles?.email) || profMap[e.submitted_by] || null
   }));
 
   const months = [...new Set(entries.map(e=>getMonth(e.date)).filter(Boolean))].sort().reverse();
